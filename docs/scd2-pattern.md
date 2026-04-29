@@ -143,7 +143,68 @@ intra-jour = écrasement de la version du jour).
 | `ecrasement_intra_jour` | Champ SCD2-tracé modifié sur version créée aujourd'hui | UPDATE en place de la ligne du jour |
 | `in_place_est_actif` | Seul `estActif` modifié | UPDATE en place du flag (jamais de nouvelle version) |
 
-**Scope actuel** : implémenté dans `StructureService.update()`. À
-généraliser dans `Scd2Service` au moment où une 2ᵉ dimension SCD2
-hiérarchique aura le même besoin (probablement `dim_centre_responsabilite`
-au Lot 2.3B ou `dim_compte` au Lot 2.3C).
+**Scope actuel** : implémenté dans `StructureService.update()` et
+**dupliqué** dans `CentreResponsabiliteService.update()` (Lot 2.3B).
+Règle « factoriser à 3 cas concrets » → extraire dans
+`Scd2HierarchicalService` quand `dim_compte` aura aussi ce besoin.
+
+## 8. FK entre dimensions SCD2 — stratégie A (lien vivant)
+
+Quand une dimension SCD2 (ex. `dim_centre_responsabilite`) pointe
+via FK vers une autre dimension SCD2 (ex. `dim_structure`), MIZNAS
+applique la **stratégie A** :
+
+> Le lien est **vivant**. La FK pointe toujours vers la version
+> courante de la dimension cible. Quand la dimension cible reçoit
+> une nouvelle version SCD2, **toutes les lignes** (toutes versions
+> SCD2 du dépendant, courantes ou non) qui pointaient vers
+> l'ancien `id` sont automatiquement mises à jour pour pointer vers
+> le nouvel `id`. Le dépendant ne crée **PAS** de nouvelle version
+> SCD2 lors d'un relink — il n'a pas d'historique de rattachement
+> propre.
+
+**Justification** : un rattachement n'a pas d'historique propre
+dans MIZNAS. Un CR appartient à sa structure **actuelle**.
+L'historique des libellés / parents / type de la structure est
+dans `dim_structure` ; le CR n'a pas à dupliquer ce signal. La
+stratégie A préserve la lisibilité de l'historique CR (1 ligne =
+1 vraie évolution business du CR, pas un effet de bord d'une
+modif structure).
+
+**Implémentation** :
+- Hook applicatif dans `StructureService.update()` (cas 4 — nouvelle
+  version) qui appelle
+  `CentreResponsabiliteService.relinkAfterStructureRevision`. Pas
+  de trigger Postgres (magie cachée évitée).
+- `forwardRef` NestJS pour casser la dépendance circulaire
+  StructureModule ↔ CentreResponsabiliteModule, **dans les 2
+  modules ET dans les 2 constructeurs de service** (sinon
+  l'injection est silencieusement résolue à `undefined`).
+- L'appel est protégé par `if (this.crService)` : si le hook n'est
+  pas câblé (tests unitaires isolés de StructureService), le PATCH
+  structure réussit sans relink.
+- `crsRelinked` (nombre de lignes mises à jour) est exposé dans la
+  réponse du PATCH structure et capté par l'AuditInterceptor dans
+  `audit_log.payload_apres.response.crsRelinked`.
+
+**Réponse PATCH structure** quand un relink a eu lieu :
+```json
+{ ..., "modeMaj": "nouvelle_version", "crsRelinked": 1 }
+```
+
+**Vérification SQL après PATCH** :
+```sql
+SELECT cr.code_cr, cr.fk_structure,
+       s.code_structure, s.libelle, s.version_courante
+FROM dim_centre_responsabilite cr
+JOIN dim_structure s ON s.id = cr.fk_structure
+WHERE cr.version_courante = true
+ORDER BY cr.code_cr;
+```
+Tous les CR doivent pointer vers des lignes structure
+`version_courante = true`.
+
+**Stratégie B (alternative)** : figer la FK à la
+`dateDebutValidite` de la version créatrice du dépendant — donne
+un historique de rattachement propre au dépendant. Pas d'usage
+actuel ; à reconsidérer si une dimension métier l'exige.
