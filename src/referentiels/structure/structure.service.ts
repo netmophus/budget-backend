@@ -22,14 +22,18 @@
  */
 import {
   ConflictException,
+  forwardRef,
+  Inject,
   Injectable,
   NotFoundException,
+  Optional,
   UnprocessableEntityException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, ILike, Repository } from 'typeorm';
 
 import { Scd2Service } from '../../common/services/scd2.service';
+import { CentreResponsabiliteService } from '../centre-responsabilite/centre-responsabilite.service';
 import { CreateStructureDto } from './dto/create-structure.dto';
 import { ListStructuresQueryDto } from './dto/list-structures-query.dto';
 import { PaginatedStructuresDto } from './dto/paginated-structures.dto';
@@ -74,6 +78,17 @@ export class StructureService extends Scd2Service<DimStructure> {
     @InjectRepository(DimStructure)
     repo: Repository<DimStructure>,
     dataSource: DataSource,
+    /**
+     * Injection optionnelle pour gérer 2 cas :
+     *  - Tests unitaires isolés (StructureService construit hors Nest) :
+     *    `crService` est `undefined` → le hook de relink est sauté.
+     *  - Cycle ESM : `forwardRef` casse la dépendance circulaire
+     *    StructureModule ↔ CentreResponsabiliteModule
+     *    (cf. `scd2-pattern.md` §8 stratégie A).
+     */
+    @Optional()
+    @Inject(forwardRef(() => CentreResponsabiliteService))
+    private readonly crService?: CentreResponsabiliteService,
   ) {
     super(repo, 'codeStructure', dataSource);
   }
@@ -451,12 +466,31 @@ export class StructureService extends Scd2Service<DimStructure> {
     if (wantsEstActifChange) {
       attrsForNewVersion.estActif = dto.estActif;
     }
+    const ancienId = current.id;
     const created = await this.createNewVersionStructure(
       codeStructure,
       attrsForNewVersion,
       utilisateur,
     );
-    return { ...toResponse(created), modeMaj: 'nouvelle_version' };
+
+    // Stratégie A (cf. scd2-pattern.md §8) : repointer les CR qui
+    // référençaient l'ancienne version vers le nouvel id de structure.
+    // Skipped si CrService non injecté (tests unitaires isolés).
+    let crsRelinked = 0;
+    if (this.crService && ancienId !== created.id) {
+      const result = await this.crService.relinkAfterStructureRevision(
+        ancienId,
+        created.id,
+        utilisateur,
+      );
+      crsRelinked = result.count;
+    }
+
+    return {
+      ...toResponse(created),
+      modeMaj: 'nouvelle_version',
+      crsRelinked,
+    };
   }
 
   async desactiver(codeStructure: string, utilisateur: string): Promise<void> {
