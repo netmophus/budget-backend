@@ -1,6 +1,6 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Between, Repository } from 'typeorm';
+import { Repository } from 'typeorm';
 
 import { ListTempsQueryDto } from './dto/list-temps-query.dto';
 import { PaginatedTempsDto } from './dto/paginated-temps.dto';
@@ -35,26 +35,28 @@ export class TempsService {
   ) {}
 
   async findAll(query: ListTempsQueryDto): Promise<PaginatedTempsDto> {
-    const where: Record<string, unknown> = {};
-    if (query.annee !== undefined) where.annee = query.annee;
-    if (query.mois !== undefined) where.mois = query.mois;
-    if (query.exerciceFiscal !== undefined) {
-      where.exerciceFiscal = query.exerciceFiscal;
+    const qb = this.repo.createQueryBuilder('t');
+    if (query.annee !== undefined) {
+      qb.andWhere('t.annee = :annee', { annee: query.annee });
     }
-    if (query.dateDebut && query.dateFin) {
-      where.date = Between(query.dateDebut, query.dateFin);
-    } else if (query.dateDebut) {
-      where.date = Between(query.dateDebut, '9999-12-31');
-    } else if (query.dateFin) {
-      where.date = Between('0001-01-01', query.dateFin);
+    if (query.mois !== undefined) {
+      qb.andWhere('t.mois = :mois', { mois: query.mois });
+    }
+    if (query.exerciceFiscal !== undefined) {
+      qb.andWhere('t.exerciceFiscal = :exo', { exo: query.exerciceFiscal });
+    }
+    if (query.dateDebut) {
+      qb.andWhere('t.date >= :debut', { debut: query.dateDebut });
+    }
+    if (query.dateFin) {
+      qb.andWhere('t.date <= :fin', { fin: query.dateFin });
     }
 
-    const [items, total] = await this.repo.findAndCount({
-      where,
-      order: { date: 'ASC' },
-      skip: (query.page - 1) * query.limit,
-      take: query.limit,
-    });
+    qb.orderBy('t.date', 'ASC')
+      .skip((query.page - 1) * query.limit)
+      .take(query.limit);
+
+    const [items, total] = await qb.getManyAndCount();
 
     return {
       items: items.map(toResponse),
@@ -91,10 +93,12 @@ export class TempsService {
     dateDebut: string,
     dateFin: string,
   ): Promise<TempsResponseDto[]> {
-    const items = await this.repo.find({
-      where: { date: Between(dateDebut, dateFin) },
-      order: { date: 'ASC' },
-    });
+    const items = await this.repo
+      .createQueryBuilder('t')
+      .where('t.date >= :debut', { debut: dateDebut })
+      .andWhere('t.date <= :fin', { fin: dateFin })
+      .orderBy('t.date', 'ASC')
+      .getMany();
     return items.map(toResponse);
   }
 
