@@ -20,6 +20,7 @@ import { ProduitModule } from './referentiels/produit/produit.module';
 import { SegmentModule } from './referentiels/segment/segment.module';
 import { StructureModule } from './referentiels/structure/structure.module';
 import { TempsModule } from './referentiels/temps/temps.module';
+import { VersionModule } from './referentiels/version/version.module';
 import { RolesModule } from './roles/roles.module';
 import { UsersModule } from './users/users.module';
 
@@ -84,6 +85,7 @@ import { UsersModule } from './users/users.module';
     LigneMetierModule,
     ProduitModule,
     SegmentModule,
+    VersionModule,
   ],
   controllers: [AppController],
   providers: [
