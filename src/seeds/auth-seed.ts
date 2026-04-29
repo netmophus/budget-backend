@@ -134,6 +134,24 @@ export const PERMISSIONS: PermissionSeed[] = [
     module: 'REFERENTIEL',
     description: 'Créer, modifier, désactiver les éléments des référentiels (devises, calendrier, etc.).',
   },
+  {
+    code: 'BUDGET.LIRE',
+    libelle: 'Lire les faits budget',
+    module: 'BUDGET',
+    description: 'Consulter les lignes de fait_budget (toutes versions et scénarios).',
+  },
+  {
+    code: 'BUDGET.SAISIR',
+    libelle: 'Saisir / modifier les faits budget',
+    module: 'BUDGET',
+    description: "Créer et modifier les mesures d'un fait_budget tant que la version est ouverte.",
+  },
+  {
+    code: 'BUDGET.SUPPRIMER',
+    libelle: 'Supprimer les faits budget',
+    module: 'BUDGET',
+    description: 'Supprimer une ligne de fait_budget (autorisé uniquement si la version est ouverte).',
+  },
 ];
 
 interface RoleSeed {
