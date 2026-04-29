@@ -135,13 +135,19 @@ Calendrier complet, granularité jour. Pré-rempli sur 10 ans glissants.
 | jour                   | int       | NOT NULL, CHECK 1–31     | Jour du mois                                     |
 | semaine_iso            | int       | NULL                     | N° de semaine ISO 8601                           |
 | jour_ouvre             | boolean   | NOT NULL                 | Jour ouvré bancaire selon le calendrier BCEAO (régional UEMOA). Pour les fériés nationaux spécifiques à un pays, utiliser un calendrier dérivé via `ref_calendrier_pays` (V2). |
-| est_fin_de_mois        | boolean   | NOT NULL                 | Dernier jour ouvré du mois                       |
-| est_fin_de_trimestre   | boolean   | NOT NULL                 | Dernier jour ouvré du trimestre                  |
-| est_fin_d_annee        | boolean   | NOT NULL                 | Dernier jour ouvré de l'année                    |
+| est_fin_de_mois        | boolean   | NOT NULL                 | Dernier jour calendaire du mois (pour alignement avec les arrêtés comptables BCEAO) |
+| est_fin_de_trimestre   | boolean   | NOT NULL                 | Dernier jour calendaire du trimestre             |
+| est_fin_d_annee        | boolean   | NOT NULL                 | Dernier jour calendaire de l'année               |
 | exercice_fiscal        | int       | NOT NULL                 | Exercice fiscal de rattachement                  |
 | libelle_mois           | varchar   | NOT NULL                 | Libellé court du mois (ex. « Janv. 2026 »)       |
 
 > Pas de SCD2 : le calendrier est figé une fois généré.
+
+> Le besoin du dernier jour ouvré du mois (utile pour l'horodatage des
+> opérations effectives) reste accessible en requête :
+> `SELECT MAX(date) FROM dim_temps WHERE jour_ouvre = true GROUP BY annee, mois`.
+> Si ce besoin se matérialise au Lot 5 ou plus tard, ajouter une colonne
+> `est_dernier_ouvre_mois` sera une extension non-cassante.
 
 ---
 

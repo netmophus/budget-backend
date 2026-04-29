@@ -137,17 +137,19 @@ export function generateTempsRows(
     });
   }
 
-  // Marquage des fins de période : on parcourt depuis la fin et on
-  // marque la première occurrence `jourOuvre=true` rencontrée par
-  // mois / trimestre / année — c'est par construction le dernier jour
-  // ouvré de la période.
+  // Marquage des fins de période — sémantique « dernier jour calendaire »
+  // (cf. modele-donnees.md §3.1 : alignement sur les arrêtés comptables
+  // BCEAO mensuels). On parcourt depuis la fin : la première occurrence
+  // rencontrée par (annee, mois) / (annee, trimestre) / annee est par
+  // construction le dernier jour calendaire de la période, indépendamment
+  // de `jourOuvre`. Le besoin « dernier jour ouvré » reste accessible
+  // en SQL : SELECT MAX(date) WHERE jour_ouvre=true GROUP BY annee, mois.
   let lastMonthKey = -1;
   let lastTrimKey = -1;
   let lastYearKey = -1;
 
   for (let i = rows.length - 1; i >= 0; i--) {
     const r = rows[i]!;
-    if (!r.jourOuvre) continue;
 
     const monthKey = r.annee * 100 + r.mois;
     const trimKey = r.annee * 10 + r.trimestre;
@@ -181,6 +183,16 @@ async function seedTemps(): Promise<void> {
   await AppDataSource.initialize();
 
   try {
+    // Mode `--force` : purge avant régénération. Utile quand la
+    // sémantique des flags change (cf. refacto 2.2A.bis sur
+    // est_fin_de_*) car `ON CONFLICT (date) DO NOTHING` ne met pas
+    // à jour les lignes déjà présentes. Mode par défaut idempotent.
+    const force = process.argv.slice(2).includes('--force');
+    if (force) {
+      console.log('[seed:temps] --force : purge de dim_temps avant régénération');
+      await AppDataSource.query(`DELETE FROM dim_temps`);
+    }
+
     const { startYear, endYear } = defaultRange();
     const rows = generateTempsRows(startYear, endYear);
 

@@ -83,31 +83,57 @@ describe('temps-seed (pure functions)', () => {
       expect(day!.jourOuvre).toBe(true);
     });
 
-    it('flags est_fin_de_mois on the last working day of January 2026 (Fri 30/01, since Sat 31/01 is weekend)', () => {
-      // Note : 31/01/2026 est un samedi → pas jour_ouvre. Per spec
-      // §3.1 "Dernier jour ouvré du mois", est_fin_de_mois tombe sur
-      // le dernier jour ouvré, soit le vendredi 30/01.
+    it('flags est_fin_de_mois on the last calendar day of January 2026 (Sat 31/01) — semantic "last calendar day", not "last working day"', () => {
+      // Sémantique alignée sur les arrêtés comptables BCEAO :
+      // est_fin_de_mois = dernier jour calendaire du mois,
+      // indépendamment de jour_ouvre. 31/01/2026 est un samedi
+      // (jour_ouvre=false) mais reste est_fin_de_mois=true.
+      // 30/01/2026 (vendredi, jour_ouvre=true) n'est PAS fin de mois.
       const rows = generateTempsRows(2026, 2026);
       const fri30 = rows.find((r) => r.date === '2026-01-30');
       const sat31 = rows.find((r) => r.date === '2026-01-31');
       expect(fri30!.jourOuvre).toBe(true);
-      expect(fri30!.estFinDeMois).toBe(true);
+      expect(fri30!.estFinDeMois).toBe(false);
       expect(sat31!.jourOuvre).toBe(false);
-      expect(sat31!.estFinDeMois).toBe(false);
+      expect(sat31!.estFinDeMois).toBe(true);
     });
 
-    it('flags est_fin_de_trimestre on Tuesday 31/03/2026', () => {
+    it('flags est_fin_de_mois on 29/02/2024 (leap year), confirming the calendar-day semantic', () => {
+      const rows = generateTempsRows(2024, 2024);
+      const feb29 = rows.find((r) => r.date === '2024-02-29');
+      const feb28 = rows.find((r) => r.date === '2024-02-28');
+      expect(feb29).toBeDefined();
+      expect(feb29!.estFinDeMois).toBe(true);
+      expect(feb28!.estFinDeMois).toBe(false);
+    });
+
+    it('flags est_fin_de_mois on 28/02/2026 (non-leap year)', () => {
+      const rows = generateTempsRows(2026, 2026);
+      const feb28 = rows.find((r) => r.date === '2026-02-28');
+      const feb27 = rows.find((r) => r.date === '2026-02-27');
+      expect(feb28!.estFinDeMois).toBe(true);
+      expect(feb27!.estFinDeMois).toBe(false);
+    });
+
+    it('flags est_fin_de_trimestre on 31/03/2026', () => {
       const rows = generateTempsRows(2026, 2026);
       const day = rows.find((r) => r.date === '2026-03-31');
-      expect(day!.jourOuvre).toBe(true);
       expect(day!.estFinDeTrimestre).toBe(true);
     });
 
-    it('flags est_fin_d_annee on Thursday 31/12/2026', () => {
+    it('flags est_fin_d_annee on 31/12/2026', () => {
       const rows = generateTempsRows(2026, 2026);
       const day = rows.find((r) => r.date === '2026-12-31');
-      expect(day!.jourOuvre).toBe(true);
       expect(day!.estFinDAnnee).toBe(true);
+    });
+
+    it('marks no other date in January 2026 as est_fin_de_mois', () => {
+      const rows = generateTempsRows(2026, 2026);
+      const finsJanvier = rows.filter(
+        (r) => r.annee === 2026 && r.mois === 1 && r.estFinDeMois,
+      );
+      expect(finsJanvier).toHaveLength(1);
+      expect(finsJanvier[0]!.date).toBe('2026-01-31');
     });
 
     it('marks all weekends as non-working days across a sample year', () => {
