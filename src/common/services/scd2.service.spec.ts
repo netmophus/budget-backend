@@ -266,6 +266,53 @@ describe('Scd2Service', () => {
       expect(old.utilisateurModification).toBe('tester');
     });
 
+    it('respects the default estActif=true when attrs.estActif is not provided', async () => {
+      const created = await service.createNewVersion(
+        'A',
+        { libelle: 'libellé' } as Partial<DimTest>,
+        'tester',
+      );
+      expect(created.estActif).toBe(true);
+    });
+
+    /**
+     * Test de non-régression du contrat « défauts override-ables »
+     * (cf. refactor 2.3A.0 du socle : `estActif` placé AVANT le spread
+     * `attrs` permet à l'appelant d'override le défaut). Cas d'usage :
+     * PATCH SCD2 + désactivation atomique sur dim_structure (Lot 2.3A).
+     */
+    it('lets attrs.estActif=false override the application default', async () => {
+      const created = await service.createNewVersion(
+        'A',
+        { libelle: 'libellé', estActif: false } as Partial<DimTest>,
+        'tester',
+      );
+      expect(created.estActif).toBe(false);
+    });
+
+    /**
+     * Verrou des invariants SCD2 : `versionCourante`, `dateDebutValidite`,
+     * `dateFinValidite`, et la business key sont posés APRÈS le spread
+     * de `attrs`. L'appelant ne peut donc pas les corrompre, même
+     * accidentellement.
+     */
+    it('locks SCD2 invariants — attrs cannot override versionCourante / dateFinValidite', async () => {
+      const today = new Date().toISOString().slice(0, 10);
+      const created = await service.createNewVersion(
+        'A',
+        {
+          libelle: 'tentative',
+          versionCourante: false,
+          dateFinValidite: '2020-01-01',
+          dateDebutValidite: '1999-01-01',
+        } as Partial<DimTest>,
+        'tester',
+      );
+      expect(created.versionCourante).toBe(true);
+      expect(created.dateFinValidite).toBeNull();
+      expect(created.dateDebutValidite).toBe(today);
+    });
+
     /**
      * Limitation pg-mem 3.x : l'adapter TypeORM ne propage pas
      * correctement le `ROLLBACK` quand le callback de

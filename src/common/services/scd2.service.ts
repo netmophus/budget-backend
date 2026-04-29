@@ -105,13 +105,27 @@ export class Scd2Service<T extends Scd2Entity> {
         .execute();
 
       // 2. Insérer la nouvelle.
+      //    Construction en 3 sections, ordre du spread important :
+      //    a. Défauts applicatifs : override-ables par l'appelant via
+      //       `attrs`. Permet par exemple PATCH SCD2 + désactivation
+      //       atomique (`attrs.estActif = false`).
+      //    b. Spread des attrs fournis par l'appelant.
+      //    c. Invariants SCD2 verrouillés : non override-ables, pour
+      //       préserver la sémantique de la dimension (au plus 1 ligne
+      //       courante par business key, intervalles `[debut, fin)`
+      //       disjoints, etc.).
       const row = manager.create(target, {
+        // (a) Défauts applicatifs override-ables
+        estActif: true,
+
+        // (b) Spread des attrs fournis par l'appelant
         ...(attrs as object),
+
+        // (c) Invariants SCD2 verrouillés (non override-ables)
         [this.businessKeyProp]: businessKey,
         dateDebutValidite: today,
         dateFinValidite: null,
         versionCourante: true,
-        estActif: true,
         utilisateurCreation: utilisateur,
       } as never);
       const saved = await manager.save(row);
