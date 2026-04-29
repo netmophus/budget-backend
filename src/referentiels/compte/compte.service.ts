@@ -21,7 +21,7 @@ import {
   UnprocessableEntityException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, ILike, Repository } from 'typeorm';
+import { DataSource, ILike, IsNull, Repository } from 'typeorm';
 
 import { Scd2Service } from '../../common/services/scd2.service';
 import { CreateCompteDto } from './dto/create-compte.dto';
@@ -211,7 +211,7 @@ export class CompteService extends Scd2Service<DimCompte> {
 
   async findRoots(): Promise<DimCompte[]> {
     return this.repo.find({
-      where: { fkCompteParent: null as never, versionCourante: true },
+      where: { fkCompteParent: IsNull(), versionCourante: true },
       order: { codeCompte: 'ASC' },
     });
   }
