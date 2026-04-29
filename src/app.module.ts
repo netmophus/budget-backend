@@ -20,6 +20,7 @@ import { ProduitModule } from './referentiels/produit/produit.module';
 import { ScenarioModule } from './referentiels/scenario/scenario.module';
 import { SegmentModule } from './referentiels/segment/segment.module';
 import { StructureModule } from './referentiels/structure/structure.module';
+import { TauxChangeModule } from './referentiels/taux-change/taux-change.module';
 import { TempsModule } from './referentiels/temps/temps.module';
 import { VersionModule } from './referentiels/version/version.module';
 import { RolesModule } from './roles/roles.module';
@@ -87,6 +88,7 @@ import { UsersModule } from './users/users.module';
     ProduitModule,
     ScenarioModule,
     SegmentModule,
+    TauxChangeModule,
     VersionModule,
   ],
   controllers: [AppController],
