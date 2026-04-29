@@ -13,6 +13,7 @@ import { PermissionsGuard } from './auth/guards/permissions.guard';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 import { HealthModule } from './health/health.module';
 import { DeviseModule } from './referentiels/devise/devise.module';
+import { StructureModule } from './referentiels/structure/structure.module';
 import { TempsModule } from './referentiels/temps/temps.module';
 import { RolesModule } from './roles/roles.module';
 import { UsersModule } from './users/users.module';
@@ -72,6 +73,7 @@ import { UsersModule } from './users/users.module';
     AuthModule,
     TempsModule,
     DeviseModule,
+    StructureModule,
   ],
   controllers: [AppController],
   providers: [
