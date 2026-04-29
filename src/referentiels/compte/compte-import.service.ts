@@ -40,6 +40,32 @@ import {
 } from './dto/import-rapport.dto';
 import { ImportMode } from './dto/import-request.dto';
 
+/**
+ * `csv-parse` retourne `''` pour une cellule vide. Pour qu'une
+ * cellule vide soit traitée comme « absent » (et non comme une
+ * chaîne vide qui passerait Zod, polluerait le diff SCD2 upsert,
+ * ou serait insérée telle quelle), on prétraite `'' → undefined`
+ * sur tous les champs optionnels.
+ */
+const emptyToUndefined = (v: unknown) => (v === '' ? undefined : v);
+
+/**
+ * `z.coerce.boolean()` utilise `Boolean(v)` JS qui considère TOUTE
+ * chaîne non vide comme `true` (`Boolean('false') === true`). Inutilisable
+ * pour un CSV où l'utilisateur écrit explicitement `true` / `false`.
+ * On parse les valeurs textuelles courantes — vide → false (défaut).
+ */
+const csvBoolean = z.preprocess((v) => {
+  if (typeof v === 'boolean') return v;
+  if (v == null || v === '') return false;
+  if (typeof v === 'string') {
+    const s = v.trim().toLowerCase();
+    if (['true', '1', 'yes', 'oui', 'vrai'].includes(s)) return true;
+    if (['false', '0', 'no', 'non', 'faux'].includes(s)) return false;
+  }
+  return v;
+}, z.boolean());
+
 const ligneCompteSchema = z.object({
   code_compte: z
     .string()
@@ -48,13 +74,19 @@ const ligneCompteSchema = z.object({
     .regex(/^[0-9]+$/, 'code_compte doit être numérique'),
   libelle: z.string().min(1).max(200),
   classe: z.coerce.number().int().min(1).max(9),
-  sous_classe: z.string().max(20).nullish(),
-  code_compte_parent: z.string().max(20).nullish(),
+  sous_classe: z.preprocess(emptyToUndefined, z.string().max(20).optional()),
+  code_compte_parent: z.preprocess(
+    emptyToUndefined,
+    z.string().max(20).optional(),
+  ),
   niveau: z.coerce.number().int().min(1).max(4),
-  sens: z.enum(['D', 'C', 'M']).nullish(),
-  code_poste_budgetaire: z.string().max(50).nullish(),
-  est_compte_collectif: z.coerce.boolean().default(false),
-  est_porteur_interets: z.coerce.boolean().default(false),
+  sens: z.preprocess(emptyToUndefined, z.enum(['D', 'C', 'M']).optional()),
+  code_poste_budgetaire: z.preprocess(
+    emptyToUndefined,
+    z.string().max(50).optional(),
+  ),
+  est_compte_collectif: csvBoolean.default(false),
+  est_porteur_interets: csvBoolean.default(false),
 });
 
 type LigneCompte = z.infer<typeof ligneCompteSchema>;

@@ -150,6 +150,7 @@ export class CompteController {
   // ─── Mutation
 
   @Post('import')
+  @HttpCode(HttpStatus.OK)
   @RequirePermissions('REFERENTIEL.GERER')
   @UseInterceptors(FileInterceptor('file'))
   @Auditable({ typeAction: 'IMPORT', entiteCible: 'dim_compte' })
