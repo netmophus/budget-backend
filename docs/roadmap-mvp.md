@@ -6,10 +6,11 @@
 > d'achèvement (DoD) et ses dépendances.
 
 État actuel : **Lot 2 en cours**. Sous-étapes 2.1 (socle SCD2 +
-import CSV) et 2.2 (`dim_temps` + `dim_devise` + frontend
-consultation) livrées sur `main`. Prochaine étape : **2.3** —
-premières dimensions SCD2 réelles (`dim_structure`,
-`dim_centre_responsabilite`).
+import CSV), 2.2 (`dim_temps` + `dim_devise` + frontend consultation)
+et 2.3 (`dim_structure` + `dim_centre_responsabilite` SCD2 hiérarchique
+avec relink stratégie A + frontend consultation) livrées sur `main`.
+Prochaine étape : **2.4** — autres dimensions SCD2 (`dim_compte`
+PCB UMOA, `dim_ligne_metier`, `dim_produit`, `dim_segment`).
 
 ---
 
@@ -33,7 +34,7 @@ premières dimensions SCD2 réelles (`dim_structure`,
 |-------|---------------|-----------------------------------------------------------|-----------------|
 | Lot 0 | 1 semaine     | Initialisation projet, choix techniques, cadrage          | Terminé         |
 | Lot 1 | 3 semaines    | Socle transverse (auth, RBAC, audit, Swagger, CORS)       | Terminé         |
-| Lot 2 | 4 semaines    | Module A — Référentiels (PCB UMOA, structure, axes)       | En cours (2.2 livré : socle SCD2, dim_temps, dim_devise + frontend lecture) |
+| Lot 2 | 4 semaines    | Module A — Référentiels (PCB UMOA, structure, axes)       | En cours (2.1, 2.2, 2.3 livrés ; 2.4 axes restants à venir) |
 | Lot 3 | 5 semaines    | Module B — Élaboration budgétaire (cycle, versions, WF)   | En attente      |
 | Lot 4 | 4 semaines    | Modules C (PNB) et D (Charges)                            | En attente      |
 | Lot 5 | 6 semaines    | Modules E (CAPEX), F (Bilan/ALM), H (Exécution), I (Reforecast), L (Reporting) | En attente      |

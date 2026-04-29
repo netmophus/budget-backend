@@ -179,6 +179,32 @@ de mauvais découpage. **D'abord** essayer de remonter la responsabilité
 commune dans un troisième module ou dans `common/`. Le `forwardRef` est
 un dernier recours, à documenter en commentaire dans le code.
 
+### 2.7 Dépendances circulaires entre modules (forwardRef en pratique)
+
+Quand deux modules NestJS s'importent mutuellement (ex.
+`StructureModule` ↔ `CentreResponsabiliteModule` pour le relink
+stratégie A — cf. `scd2-pattern.md` §8), TypeScript et Nest signalent
+généralement le cycle au boot. Pour le casser proprement :
+
+1. Utiliser `forwardRef` **symétriquement** dans les 2 modules :
+   - `imports`: `forwardRef(() => OtherModule)`
+   - injection : `@Inject(forwardRef(() => OtherService))`
+2. Si l'injection est optionnelle (le hook peut ne pas être appelé en
+   isolation, ex. tests unitaires qui construisent le service à la
+   main), ajouter `@Optional()` ET **ajouter un test e2e** qui vérifie
+   que le hook s'exécute bien (par ex. `expect(crsRelinked).toBe(1)`).
+   **Sans cette assertion**, une mauvaise configuration `forwardRef`
+   se traduit en injection silencieuse à `undefined` : le hook ne
+   s'exécute pas, aucune erreur, aucun warning. Bug masqué.
+3. Documenter en commentaire dans le service consommateur pourquoi
+   `@Optional()` est utilisé (par ex. « tests unitaires isolés »).
+
+Validé en condition réelle au Lot 2.3B : le forwardRef asymétrique
+côté `CentreResponsabiliteService.constructor` (oubli) avait laissé
+`crService` à `undefined` dans `StructureService`, ce qui faisait
+remonter `crsRelinked=0` au e2e — c'est ce test qui a permis
+d'identifier le bug.
+
 ---
 
 ## 3. DTO et validation

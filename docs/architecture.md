@@ -284,9 +284,11 @@ règles applicatives, transactions. Elle ne connaît ni HTTP ni Express
 
 | Module | Lot | Périmètre fonctionnel |
 |---|---|---|
-| `referentiels/temps` | 2 (livré 2.2A) | `dim_temps` : calendrier régional UEMOA |
-| `referentiels/devise` | 2 (livré 2.2B) | `dim_devise` : référentiel BCEAO + pivot XOF |
-| `referentiels/*` (autres axes) | 2 (à venir) | `dim_structure`, `dim_compte`, `dim_centre_responsabilite`, `dim_ligne_metier`, `dim_produit`, `dim_segment` (SCD2) |
+| `referentiels/temps` | 2.2A livré | `dim_temps` : calendrier régional UEMOA |
+| `referentiels/devise` | 2.2B livré | `dim_devise` : référentiel BCEAO + pivot XOF |
+| `referentiels/structure` | 2.3A livré | `dim_structure` (SCD2 hiérarchique) |
+| `referentiels/centre-responsabilite` | 2.3B livré | `dim_centre_responsabilite` (SCD2 + FK SCD2 stratégie A) |
+| `referentiels/*` (autres axes) | 2.4 à venir | `dim_compte`, `dim_ligne_metier`, `dim_produit`, `dim_segment` (tous SCD2) |
 | `budget-campaigns`, `budget-entries`, `budget-workflow`, `budget-versions` | 3 | Cycle d'élaboration budgétaire |
 | `pnb`, `expenses` | 4 | PNB et charges |
 | `capex`, `alm`, `actuals`, `variances`, `reforecast`, `reporting` | 5 | CAPEX, bilan/ALM, exécution, reforecast, restitution |

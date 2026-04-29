@@ -267,22 +267,28 @@ Toute évolution fonctionnelle doit être tracée par rapport à ces référenti
 
 ## 9. Statut du projet
 
-**Lot 2 en cours** — Sous-étapes 2.1 (socle SCD2) et 2.2
-(`dim_temps`, `dim_devise`, frontend lecture) livrées. Prochaine
-étape : 2.3 — premières dimensions SCD2 réelles (structure, CR).
+**Lot 2 en cours** — 2.1 (socle SCD2), 2.2 (`dim_temps`,
+`dim_devise`), 2.3 (`dim_structure`, `dim_centre_responsabilite`)
+livrés. Prochaine étape : 2.4 — autres dimensions SCD2.
 
-| Élément                                 | Statut |
-| --------------------------------------- | ------ |
-| Backend NestJS sur :3001                | ✅      |
-| Frontend React/Vite sur :5173           | ✅      |
-| Base PostgreSQL `budget_db` connectée   | ✅      |
-| Authentification JWT + refresh          | ✅      |
-| Autorisation RBAC                       | ✅      |
-| Audit applicatif réglementaire          | ✅      |
-| Documentation de cadrage (Lot 0)        | ✅      |
-| Lot 1 — Socle transverse                | ✅      |
-| Lot 2 — Référentiels                    | 🟡 en cours (2.1 + 2.2 livrés) |
-| Lot 3 — Élaboration budgétaire          | ⏳      |
+| Élément                                         | Statut |
+| ----------------------------------------------- | ------ |
+| Backend NestJS sur :3001                        | ✅      |
+| Frontend React/Vite sur :5173                   | ✅      |
+| Base PostgreSQL `budget_db` connectée           | ✅      |
+| Authentification JWT + refresh                  | ✅      |
+| Autorisation RBAC                               | ✅      |
+| Audit applicatif réglementaire                  | ✅      |
+| Documentation de cadrage (Lot 0)                | ✅      |
+| Lot 1 — Socle transverse                        | ✅      |
+| Lot 2 — Référentiels (4/10 dimensions livrées)  | 🟡 en cours (2.1+2.2+2.3 livrés) |
+| Lot 3 — Élaboration budgétaire                  | ⏳      |
+
+> 4 dimensions livrées au Lot 2.3 : `dim_temps`, `dim_devise`,
+> `dim_structure` (SCD2), `dim_centre_responsabilite` (SCD2). Reste
+> 4 dimensions à livrer au Lot 2.4 : `dim_compte`, `dim_ligne_metier`,
+> `dim_produit`, `dim_segment` (toutes SCD2). `dim_pays` et
+> `dim_canal_distribution` resteront éventuellement pour V2.
 
 Détail des étapes : voir `docs/roadmap-mvp.md`.
 
