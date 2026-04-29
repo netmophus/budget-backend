@@ -5,11 +5,11 @@
 > projet. Chaque lot précise son périmètre, ses livrables, ses critères
 > d'achèvement (DoD) et ses dépendances.
 
-État actuel : **Lot 1 terminé**. Backend (auth + RBAC + audit)
-opérationnel sur :3001, frontend (login + dashboard + users +
-audit-logs) sur :5173. Documentation de cadrage complète (README,
-architecture, modele-donnees, conventions, audit). **Lot 2
-(Référentiels) en démarrage**.
+État actuel : **Lot 2 en cours**. Sous-étapes 2.1 (socle SCD2 +
+import CSV) et 2.2 (`dim_temps` + `dim_devise` + frontend
+consultation) livrées sur `main`. Prochaine étape : **2.3** —
+premières dimensions SCD2 réelles (`dim_structure`,
+`dim_centre_responsabilite`).
 
 ---
 
@@ -33,7 +33,7 @@ architecture, modele-donnees, conventions, audit). **Lot 2
 |-------|---------------|-----------------------------------------------------------|-----------------|
 | Lot 0 | 1 semaine     | Initialisation projet, choix techniques, cadrage          | Terminé         |
 | Lot 1 | 3 semaines    | Socle transverse (auth, RBAC, audit, Swagger, CORS)       | Terminé         |
-| Lot 2 | 4 semaines    | Module A — Référentiels (PCB UMOA, structure, axes)       | En cours        |
+| Lot 2 | 4 semaines    | Module A — Référentiels (PCB UMOA, structure, axes)       | En cours (2.2 livré : socle SCD2, dim_temps, dim_devise + frontend lecture) |
 | Lot 3 | 5 semaines    | Module B — Élaboration budgétaire (cycle, versions, WF)   | En attente      |
 | Lot 4 | 4 semaines    | Modules C (PNB) et D (Charges)                            | En attente      |
 | Lot 5 | 6 semaines    | Modules E (CAPEX), F (Bilan/ALM), H (Exécution), I (Reforecast), L (Reporting) | En attente      |

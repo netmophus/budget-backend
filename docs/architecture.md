@@ -284,7 +284,9 @@ règles applicatives, transactions. Elle ne connaît ni HTTP ni Express
 
 | Module | Lot | Périmètre fonctionnel |
 |---|---|---|
-| `referentiels` (multi-axes) | 2 | Tous les `dim_*` du modèle dimensionnel |
+| `referentiels/temps` | 2 (livré 2.2A) | `dim_temps` : calendrier régional UEMOA |
+| `referentiels/devise` | 2 (livré 2.2B) | `dim_devise` : référentiel BCEAO + pivot XOF |
+| `referentiels/*` (autres axes) | 2 (à venir) | `dim_structure`, `dim_compte`, `dim_centre_responsabilite`, `dim_ligne_metier`, `dim_produit`, `dim_segment` (SCD2) |
 | `budget-campaigns`, `budget-entries`, `budget-workflow`, `budget-versions` | 3 | Cycle d'élaboration budgétaire |
 | `pnb`, `expenses` | 4 | PNB et charges |
 | `capex`, `alm`, `actuals`, `variances`, `reforecast`, `reporting` | 5 | CAPEX, bilan/ALM, exécution, reforecast, restitution |

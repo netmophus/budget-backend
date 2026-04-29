@@ -345,6 +345,32 @@ chronologiques (`audit_log`), forcer le `DESC` :
 await queryRunner.query(`CREATE INDEX "ix_audit_log_date_action" ON "audit_log" ("date_action" DESC)`);
 ```
 
+#### 5.2.4 Index unique partiel sur valeur boolean spécifique
+
+Pour matérialiser un invariant métier du type « exactement une
+ligne avec un flag à `true` » (cf. `dim_devise.est_devise_pivot`),
+TypeORM ne sait pas générer la clause `WHERE`. À ajouter
+manuellement dans le `up()` :
+
+```typescript
+await queryRunner.query(
+  `CREATE UNIQUE INDEX "uq_dim_devise_pivot"
+   ON "dim_devise" ("est_devise_pivot")
+   WHERE "est_devise_pivot" = true`,
+);
+```
+
+Cet invariant doit **aussi** être vérifié côté service
+(`ConflictException` claire) avant l'`INSERT`, pour ne pas exposer
+une erreur Postgres `23505` brute. L'index reste comme **2ᵉ ligne
+de défense** contre les race conditions. Validé en condition réelle
+au Lot 2.2B.
+
+**Limitation pg-mem 3.x** : les index partiels sur boolean ne sont
+pas créés par `synchronize:true`. Tests d'unicité côté service
+uniquement, validation de l'index en intégration Postgres réelle
+(Lot 6).
+
 ### 5.3 Réversibilité
 
 Le `down()` doit être **complet** et **testé** :
