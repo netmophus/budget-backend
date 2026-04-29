@@ -135,7 +135,13 @@ async function seedAccessControlAndStructures(ds: DataSource): Promise<SeedIds> 
   }
 
   // 6. Hiérarchie 9 structures (parents avant enfants)
-  const today = new Date().toISOString().slice(0, 10);
+  //    Date passée volontairement (30 jours en arrière) pour que les
+  //    PATCHes d'aujourd'hui créent bien une NOUVELLE version SCD2.
+  //    Les tests intra-jour qui exigent une version créée aujourd'hui
+  //    insèrent leur propre fixture localement.
+  const today = new Date(Date.now() - 30 * 86_400_000)
+    .toISOString()
+    .slice(0, 10);
   const structureIds = new Map<string, string>();
 
   async function insertStructure(
@@ -313,12 +319,21 @@ describe('Structure (e2e) — première dimension SCD2 réelle', () => {
       ],
     );
     // Ramener les 9 structures seedées à un état propre : 1 ligne par
-    // code, version_courante=true, est_actif=true.
+    // code, version_courante=true, est_actif=true. Ramener aussi
+    // `date_debut_validite` au passé pour que les PATCHes du test
+    // suivant créent par défaut une nouvelle version (cas 4) — sinon
+    // un PATCH dans un test précédent peut avoir poussé la date à
+    // today, faisant basculer le suivant en mode intra-jour à son insu.
     await dataSource.query(
       `DELETE FROM dim_structure WHERE version_courante = false`,
     );
+    const pastDate = new Date(Date.now() - 30 * 86_400_000)
+      .toISOString()
+      .slice(0, 10);
     await dataSource.query(
-      `UPDATE dim_structure SET est_actif = true, version_courante = true, date_fin_validite = NULL WHERE 1=1`,
+      `UPDATE dim_structure SET est_actif = true, version_courante = true,
+              date_fin_validite = NULL, date_debut_validite = $1 WHERE 1=1`,
+      [pastDate],
     );
 
     // Rafraîchir le cache d'IDs : un PATCH dans un test précédent a pu
@@ -558,6 +573,61 @@ describe('Structure (e2e) — première dimension SCD2 réelle', () => {
 
     const audits = await fetchAuditStructure();
     expect(audits.some((a) => a.type_action === 'DELETE' && a.statut === 'success')).toBe(true);
+  });
+
+  // ─── Intra-jour (fix 2.3A.1) ─────────────────────────────────────
+
+  it('PATCH puis re-PATCH même jour → 1 ligne courante, pas de ligne fantôme 0-day', async () => {
+    // 1er PATCH : version seedée 30j en arrière → nouvelle version (today)
+    const r1 = await request(app.getHttpServer())
+      .patch('/api/v1/referentiels/structures/par-code/AG_ABJ_PLATEAU')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ libelle: 'Plateau V2' })
+      .expect(200);
+    expect(r1.body.modeMaj).toBe('nouvelle_version');
+
+    // 2ᵉ PATCH même jour : version courante créée à today → écrasement
+    const r2 = await request(app.getHttpServer())
+      .patch('/api/v1/referentiels/structures/par-code/AG_ABJ_PLATEAU')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ libelle: 'Plateau V3' })
+      .expect(200);
+    expect(r2.body.modeMaj).toBe('ecrasement_intra_jour');
+    expect(r2.body.libelle).toBe('Plateau V3');
+
+    // État DB : 2 lignes au total (V1 fermée 30j en arrière, V2 courante
+    // mise à jour en place — pas de ligne fantôme avec intervalle 0-day).
+    const all = (await dataSource.query(
+      `SELECT libelle, version_courante, date_debut_validite, date_fin_validite
+       FROM dim_structure WHERE code_structure = 'AG_ABJ_PLATEAU'
+       ORDER BY date_debut_validite ASC`,
+    )) as Array<{
+      libelle: string;
+      version_courante: boolean;
+      date_debut_validite: string;
+      date_fin_validite: string | null;
+    }>;
+    expect(all).toHaveLength(2);
+    const courante = all.find((r) => r.version_courante);
+    const fermee = all.find((r) => !r.version_courante);
+    expect(courante!.libelle).toBe('Plateau V3');
+    expect(fermee).toBeDefined();
+    // (Le libellé de la version fermée peut varier selon les PATCHes
+    // dans les tests précédents — le beforeEach reset les métadonnées
+    // SCD2 mais pas les champs métier. Ce qui compte : 1 fermée + 1
+    // courante avec dates disjointes.)
+    // Aucune ligne avec date_debut === date_fin (intervalle 0-day).
+    for (const row of all) {
+      if (row.date_fin_validite !== null) {
+        expect(row.date_fin_validite).not.toBe(row.date_debut_validite);
+      }
+    }
+
+    // audit_log contient bien 2 entrées UPDATE distinctes.
+    const audits = await fetchAuditStructure();
+    const updates = audits.filter((a) => a.type_action === 'UPDATE');
+    expect(updates).toHaveLength(2);
+    expect(updates.every((u) => u.statut === 'success')).toBe(true);
   });
 
   it('DELETE /par-code/BR_CIV (has children) → 409 + audit DELETE failure', async () => {

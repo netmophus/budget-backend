@@ -109,3 +109,41 @@ Tous les comportements du pattern (transactionnalité de
 `softClose` avec `est_actif=false`) sont couverts par
 `src/common/services/scd2.service.spec.ts` — c'est la
 spécification exécutable du pattern, à consulter en cas de doute.
+
+## 7. Modification intra-jour
+
+Quand un `PATCH` modifie un champ SCD2-tracé sur une version
+**créée le jour même**, créer une nouvelle ligne SCD2 produirait
+deux problèmes :
+
+1. **Violation d'unicité** sur l'index
+   `(code_<entité>, date_debut_validite)` (cf. ADR pattern SCD2).
+2. **Intervalle 0-day** dans l'historique (`[today, today)` vide),
+   qui pollue les requêtes temporelles.
+
+**Comportement appliqué sur `dim_structure`** (cf.
+`structure.service.ts` `update()` cas 3) : si
+`current.dateDebutValidite === today`, l'UPDATE se fait **en place**
+sur la ligne existante au lieu de créer une nouvelle version. La
+réponse expose `modeMaj: 'ecrasement_intra_jour'` et une ligne
+`audit_log` UPDATE est tracée normalement par `@Auditable`.
+
+**Justification métier** : pendant la phase d'onboarding d'une
+banque cliente (ou de saisie en rafale par un admin), des
+micro-corrections intra-jour sont normales — l'historique préserve
+ainsi « 1 ligne = 1 période de validité réelle » sans ligne fantôme.
+Cohérent avec la pratique data warehouse (Kimball : corrections
+intra-jour = écrasement de la version du jour).
+
+**Modes possibles d'un PATCH** (champ `modeMaj` de la réponse) :
+
+| Mode | Déclencheur | Effet |
+|---|---|---|
+| `nouvelle_version` | Champ SCD2-tracé modifié sur version d'hier ou avant | Nouvelle ligne SCD2, ancienne fermée |
+| `ecrasement_intra_jour` | Champ SCD2-tracé modifié sur version créée aujourd'hui | UPDATE en place de la ligne du jour |
+| `in_place_est_actif` | Seul `estActif` modifié | UPDATE en place du flag (jamais de nouvelle version) |
+
+**Scope actuel** : implémenté dans `StructureService.update()`. À
+généraliser dans `Scd2Service` au moment où une 2ᵉ dimension SCD2
+hiérarchique aura le même besoin (probablement `dim_centre_responsabilite`
+au Lot 2.3B ou `dim_compte` au Lot 2.3C).

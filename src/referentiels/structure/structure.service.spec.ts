@@ -160,13 +160,15 @@ describe('StructureService', () => {
 
     it('createNewVersionStructure closes the old version and opens a new one', async () => {
       // Type entite_juridique : aucune contrainte de parent (cf. assertion
-      // métier du service). Évite de coupler ce test SCD2 à la cohérence
-      // type/niveau testée séparément plus bas.
+      // métier du service). Date passée pour que la nouvelle version
+      // (today) ne collisionne pas avec V1 sur l'index unique
+      // (codeStructure, dateDebutValidite). Cf. fix 2.3A.1.
       await rawInsert(dataSource, {
         codeStructure: 'A',
         libelle: 'Old',
         typeStructure: 'entite_juridique',
         niveauHierarchique: 1,
+        dateDebutValidite: '2024-01-01',
       });
 
       const today = new Date().toISOString().slice(0, 10);
@@ -433,17 +435,23 @@ describe('StructureService', () => {
 
   describe('Smart update (SCD2 vs in-place)', () => {
     beforeEach(async () => {
+      // Date passée pour que les PATCH d'aujourd'hui créent bien une
+      // NOUVELLE version SCD2 (cas 4) au lieu de l'écrasement intra-jour
+      // (cas 3 — testé séparément plus bas avec une version créée today).
+      const parentId = await rawInsert(dataSource, {
+        codeStructure: 'P',
+        libelle: 'P',
+        typeStructure: 'entite_juridique',
+        niveauHierarchique: 1,
+        dateDebutValidite: '2024-01-01',
+      });
       await rawInsert(dataSource, {
         codeStructure: 'AG',
         libelle: 'Original',
         typeStructure: 'agence',
         niveauHierarchique: 5,
-        parentId: await rawInsert(dataSource, {
-          codeStructure: 'P',
-          libelle: 'P',
-          typeStructure: 'entite_juridique',
-          niveauHierarchique: 1,
-        }),
+        parentId,
+        dateDebutValidite: '2024-01-01',
       });
     });
 
@@ -496,6 +504,58 @@ describe('StructureService', () => {
       await expect(
         service.update('UNKNOWN', { libelle: 'X' }, 'tester'),
       ).rejects.toThrow(NotFoundException);
+    });
+
+    /**
+     * Tests dédiés au fix 2.3A.1 — comportement intra-jour.
+     */
+    it('PATCH on a version created TODAY → in-place overwrite (still 1 row, modeMaj=ecrasement_intra_jour)', async () => {
+      // Remplacer AG par une version créée aujourd'hui.
+      await dataSource.query("DELETE FROM dim_structure WHERE code_structure = 'AG'");
+      const parents = (await dataSource.query(
+        `SELECT id FROM dim_structure WHERE code_structure = 'P'`,
+      )) as Array<{ id: string }>;
+      await rawInsert(dataSource, {
+        codeStructure: 'AG',
+        libelle: 'Du jour',
+        typeStructure: 'agence',
+        niveauHierarchique: 5,
+        parentId: parents[0]!.id,
+        // dateDebutValidite défaut = today
+      });
+
+      const updated = await service.update(
+        'AG',
+        { libelle: 'Renommée intra-jour' },
+        'admin@miznas.local',
+      );
+      expect(updated.libelle).toBe('Renommée intra-jour');
+      expect(updated.versionCourante).toBe(true);
+      expect(updated.modeMaj).toBe('ecrasement_intra_jour');
+
+      const history = await service.findHistory('AG');
+      // Toujours 1 ligne — pas de nouvelle version, pas d'intervalle 0-day.
+      expect(history).toHaveLength(1);
+      expect(history[0]!.libelle).toBe('Renommée intra-jour');
+      expect(history[0]!.utilisateurModification).toBe('admin@miznas.local');
+    });
+
+    it('PATCH on a past version returns modeMaj=nouvelle_version', async () => {
+      const updated = await service.update(
+        'AG',
+        { libelle: 'Renommée' },
+        'admin@miznas.local',
+      );
+      expect(updated.modeMaj).toBe('nouvelle_version');
+    });
+
+    it('PATCH estActif only returns modeMaj=in_place_est_actif', async () => {
+      const updated = await service.update(
+        'AG',
+        { estActif: false },
+        'admin@miznas.local',
+      );
+      expect(updated.modeMaj).toBe('in_place_est_actif');
     });
   });
 

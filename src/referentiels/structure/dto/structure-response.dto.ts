@@ -9,6 +9,24 @@ import type {
   TypeStructure,
 } from '../entities/dim-structure.entity';
 
+/**
+ * Mode d'application d'un PATCH sur une dimension SCD2 (cf. fix 2.3A.1) :
+ *  - `nouvelle_version`        : création d'une nouvelle ligne SCD2
+ *    (PATCH sur version d'hier ou avant, champ SCD2-tracé modifié)
+ *  - `ecrasement_intra_jour`   : mise à jour en place de la version du
+ *    jour (PATCH sur version créée aujourd'hui, champ SCD2-tracé modifié)
+ *  - `in_place_est_actif`      : mise à jour en place du flag estActif
+ *    seul (jamais de nouvelle version, pas de bruit dans l'historique)
+ *
+ * Champ uniquement renseigné dans les réponses de PATCH ; absent des
+ * réponses GET. Tracé dans `audit_log.payload_apres.response.modeMaj`
+ * pour audit fin du mode d'application.
+ */
+export type ModeMajStructure =
+  | 'nouvelle_version'
+  | 'ecrasement_intra_jour'
+  | 'in_place_est_actif';
+
 export class StructureResponseDto {
   @ApiProperty({ example: '12' })
   id!: string;
@@ -57,4 +75,11 @@ export class StructureResponseDto {
 
   @ApiPropertyOptional({ example: 'admin@miznas.local', nullable: true })
   utilisateurModification!: string | null;
+
+  @ApiPropertyOptional({
+    enum: ['nouvelle_version', 'ecrasement_intra_jour', 'in_place_est_actif'],
+    description:
+      "Présent uniquement dans les réponses de PATCH — indique comment la modification a été appliquée (cf. ModeMajStructure).",
+  })
+  modeMaj?: ModeMajStructure;
 }

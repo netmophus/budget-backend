@@ -64,6 +64,20 @@ export const CODES_PAYS_UEMOA: readonly CodePaysUemoa[] = [
 @Entity({ name: 'dim_structure' })
 @Index('ix_dim_structure_parent', ['fkStructureParent'])
 @Index('ix_dim_structure_code_pays', ['codePays'])
+// Index unique métier (codeStructure, dateDebutValidite) — en métadata
+// d'entité pour que `synchronize:true` (tests pg-mem) le crée aussi,
+// pas seulement la migration. Cf. fix 2.3A.1.
+@Index('uq_dim_structure_business_date', ['codeStructure', 'dateDebutValidite'], { unique: true })
+// Index unique partiel `uq_dim_structure_courante (codeStructure)
+// WHERE version_courante = true` : créé par la migration
+// `CreateDimStructure1777800000000` mais PAS déclaré ici comme @Index
+// avec `where:` car pg-mem 3.x interprète mal la clause (crée un
+// unique full sur codeStructure, ce qui interdit l'historique SCD2 et
+// fait planter le 2ᵉ rawInsert d'un même code). En Postgres réel
+// l'index partiel est en place via la migration. L'invariant
+// « 1 seule version courante par BK » est porté en runtime par
+// `Scd2Service.createNewVersion` (ferme l'ancienne avant d'insérer la
+// nouvelle, transactionnellement).
 export class DimStructure extends Scd2Entity {
   @PrimaryGeneratedColumn('identity', { type: 'bigint' })
   id!: string;

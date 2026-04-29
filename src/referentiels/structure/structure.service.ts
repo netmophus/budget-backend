@@ -330,6 +330,30 @@ export class StructureService extends Scd2Service<DimStructure> {
     return super.createNewVersion(codeStructure, attrs, utilisateur);
   }
 
+  /**
+   * PATCH sur une dimension SCD2 — distingue 4 cas (cf. fix 2.3A.1) :
+   *
+   *  1. **No-op** : aucun champ ne change effectivement.
+   *
+   *  2. **`in_place_est_actif`** : seul `estActif` change. Mise à jour
+   *     en place — pas de nouvelle version, pas de bruit historique.
+   *
+   *  3. **`ecrasement_intra_jour`** : champ SCD2-tracé change ET la
+   *     version courante a été créée aujourd'hui. Mise à jour en
+   *     place — évite de violer `uq_dim_structure_business_date`
+   *     (code, date_debut_validite) et de polluer l'historique avec
+   *     un intervalle 0-day. Cohérent avec la pratique Kimball :
+   *     corrections intra-jour = écrasement de la version du jour.
+   *
+   *  4. **`nouvelle_version`** : champ SCD2-tracé change sur version
+   *     d'hier ou avant → création d'une nouvelle ligne SCD2 via
+   *     `createNewVersionStructure` (validations parent / cycle /
+   *     cohérence type-niveau) et fermeture de l'ancienne.
+   *
+   * Le mode d'application est tracé dans la réponse via `modeMaj` et
+   * remonte dans `audit_log.payload_apres.response.modeMaj` via
+   * l'AuditInterceptor.
+   */
   async update(
     codeStructure: string,
     dto: UpdateStructureDto,
@@ -356,13 +380,12 @@ export class StructureService extends Scd2Service<DimStructure> {
     const wantsEstActifChange =
       dto.estActif !== undefined && dto.estActif !== current.estActif;
 
-    // Cas 1 : aucun changement effectif → no-op.
+    // Cas 1 : no-op.
     if (!hasScd2Change && !wantsEstActifChange) {
       return toResponse(current);
     }
 
-    // Cas 2 : seul `estActif` change → mise à jour en place (pas de
-    // nouvelle version SCD2, pas de bruit dans l'historique).
+    // Cas 2 : seul `estActif` change → in-place.
     if (!hasScd2Change && wantsEstActifChange) {
       await this.repo.update(
         { id: current.id },
@@ -373,13 +396,49 @@ export class StructureService extends Scd2Service<DimStructure> {
         },
       );
       const refreshed = await this.findCurrent(codeStructure);
-      return toResponse(refreshed!);
+      return { ...toResponse(refreshed!), modeMaj: 'in_place_est_actif' };
     }
 
-    // Cas 3 : au moins un champ SCD2-tracé change → nouvelle version.
-    //         Construire les attrs en partant du courant + diff dto +
-    //         estActif si demandé. Le socle 2.1 (refacto 2.3A.0) accepte
-    //         maintenant override de estActif via attrs.
+    // Cas 3 : changement SCD2-tracé sur la version du jour →
+    // écrasement intra-jour. Validations parent / cycle / type-niveau
+    // appliquées avant l'UPDATE pour rester cohérent avec le cas 4.
+    const today = new Date().toISOString().slice(0, 10);
+    if (current.dateDebutValidite === today) {
+      const futureFkParent =
+        scd2Diff.fkStructureParent !== undefined
+          ? scd2Diff.fkStructureParent
+          : current.fkStructureParent;
+
+      if (
+        scd2Diff.fkStructureParent !== undefined &&
+        scd2Diff.fkStructureParent !== null &&
+        scd2Diff.fkStructureParent !== current.fkStructureParent
+      ) {
+        await this.assertParentExistsAndCurrent(scd2Diff.fkStructureParent);
+        await this.validateNoCycle(current.id, scd2Diff.fkStructureParent);
+      }
+
+      this.assertTypeNiveauCoherence(
+        scd2Diff.typeStructure ?? current.typeStructure,
+        scd2Diff.niveauHierarchique ?? current.niveauHierarchique,
+        futureFkParent,
+      );
+
+      const updates: Record<string, unknown> = {
+        ...scd2Diff,
+        utilisateurModification: utilisateur,
+        dateModification: () => 'CURRENT_TIMESTAMP',
+      };
+      if (wantsEstActifChange) {
+        updates.estActif = dto.estActif;
+      }
+      await this.repo.update({ id: current.id }, updates as never);
+      const refreshed = await this.findCurrent(codeStructure);
+      return { ...toResponse(refreshed!), modeMaj: 'ecrasement_intra_jour' };
+    }
+
+    // Cas 4 : changement SCD2-tracé sur version d'hier ou avant →
+    // nouvelle version SCD2.
     const attrsForNewVersion: Partial<DimStructure> = {
       libelle: current.libelle,
       libelleCourt: current.libelleCourt,
@@ -397,7 +456,7 @@ export class StructureService extends Scd2Service<DimStructure> {
       attrsForNewVersion,
       utilisateur,
     );
-    return toResponse(created);
+    return { ...toResponse(created), modeMaj: 'nouvelle_version' };
   }
 
   async desactiver(codeStructure: string, utilisateur: string): Promise<void> {
