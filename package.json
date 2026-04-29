@@ -34,7 +34,8 @@
     "seed:produits": "ts-node src/seeds/produit-seed.ts",
     "seed:segments": "ts-node src/seeds/segment-seed.ts",
     "seed:versions": "ts-node src/seeds/version-seed.ts",
-    "seed:scenarios": "ts-node src/seeds/scenario-seed.ts"
+    "seed:scenarios": "ts-node src/seeds/scenario-seed.ts",
+    "seed:taux-change": "ts-node src/seeds/taux-change-seed.ts"
   },
   "dependencies": {
     "@nestjs/common": "^11.0.1",
