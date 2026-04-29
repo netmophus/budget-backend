@@ -1,0 +1,353 @@
+/**
+ * Tests e2e /api/v1/referentiels/versions.
+ *
+ * Couvre :
+ *  - Permissions LECTEUR / ADMIN
+ *  - CRUD avec @Auditable
+ *  - Refus PATCH / DELETE quand statut != 'ouvert' (forcer le statut
+ *    en SQL puis tenter PATCH/DELETE → 409 Conflict)
+ */
+import { INestApplication, ValidationPipe } from '@nestjs/common';
+import { ConfigModule } from '@nestjs/config';
+import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
+import { JwtService } from '@nestjs/jwt';
+import { Test } from '@nestjs/testing';
+import { TypeOrmModule } from '@nestjs/typeorm';
+import { LoggerModule } from 'nestjs-pino';
+import { DataType, newDb } from 'pg-mem';
+import request from 'supertest';
+import { DataSource, DataSourceOptions } from 'typeorm';
+
+import { AuditModule } from '../../audit/audit.module';
+import { AuditInterceptor } from '../../audit/interceptors/audit.interceptor';
+import { AuthModule } from '../../auth/auth.module';
+import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
+import { PermissionsGuard } from '../../auth/guards/permissions.guard';
+import { AllExceptionsFilter } from '../../common/filters/all-exceptions.filter';
+import { RolesModule } from '../../roles/roles.module';
+import { UsersModule } from '../../users/users.module';
+import { VersionModule } from './version.module';
+
+interface SeedIds {
+  adminId: string;
+  lecteurId: string;
+}
+
+async function seedRolesUsers(ds: DataSource): Promise<SeedIds> {
+  for (const [code, libelle] of [
+    ['REFERENTIEL.LIRE', 'Lire'],
+    ['REFERENTIEL.GERER', 'Gérer'],
+  ]) {
+    await ds.query(
+      `INSERT INTO ref_permission (code_permission, libelle, module, utilisateur_creation)
+       VALUES ($1, $2, 'REFERENTIEL', 'system')`,
+      [code, libelle],
+    );
+  }
+  for (const [code, libelle] of [
+    ['ADMIN', 'Admin'],
+    ['LECTEUR', 'Lecteur'],
+  ]) {
+    await ds.query(
+      `INSERT INTO ref_role (code_role, libelle, est_actif, utilisateur_creation)
+       VALUES ($1, $2, true, 'system')`,
+      [code, libelle],
+    );
+  }
+  for (const [r, p] of [
+    ['ADMIN', 'REFERENTIEL.LIRE'],
+    ['ADMIN', 'REFERENTIEL.GERER'],
+    ['LECTEUR', 'REFERENTIEL.LIRE'],
+  ]) {
+    await ds.query(
+      `INSERT INTO bridge_role_permission (fk_role, fk_permission)
+       VALUES (
+         (SELECT id FROM ref_role WHERE code_role = $1),
+         (SELECT id FROM ref_permission WHERE code_permission = $2)
+       )`,
+      [r, p],
+    );
+  }
+  await ds.query(
+    `INSERT INTO "user" (email, mot_de_passe_hash, nom, prenom, est_actif, utilisateur_creation)
+     VALUES
+       ('admin@miznas.local',  'placeholder', 'Admin',  'X', true, 'system'),
+       ('lecteur@miznas.local','placeholder', 'Lecteur','X', true, 'system')`,
+  );
+  const users = (await ds.query(
+    `SELECT email, id FROM "user" WHERE email IN ($1, $2)`,
+    ['admin@miznas.local', 'lecteur@miznas.local'],
+  )) as Array<{ email: string; id: string | number }>;
+  const userIdByEmail = new Map(users.map((u) => [u.email, String(u.id)]));
+  for (const [email, role] of [
+    ['admin@miznas.local', 'ADMIN'],
+    ['lecteur@miznas.local', 'LECTEUR'],
+  ]) {
+    const roleRows = (await ds.query(
+      `SELECT id FROM ref_role WHERE code_role = $1`,
+      [role],
+    )) as Array<{ id: string | number }>;
+    await ds.query(
+      `INSERT INTO bridge_user_role (fk_user, fk_role, perimetre_type, perimetre_id, est_actif, utilisateur_creation)
+       VALUES ($1, $2, 'global', NULL, true, 'system')`,
+      [userIdByEmail.get(email), String(roleRows[0]!.id)],
+    );
+  }
+  return {
+    adminId: userIdByEmail.get('admin@miznas.local')!,
+    lecteurId: userIdByEmail.get('lecteur@miznas.local')!,
+  };
+}
+
+describe('Version (e2e)', () => {
+  let app: INestApplication;
+  let dataSource: DataSource;
+  let ids: SeedIds;
+  let adminToken: string;
+  let lecteurToken: string;
+
+  beforeAll(async () => {
+    process.env.NODE_ENV = 'test';
+    process.env.JWT_SECRET = 'test-secret-version-e2e-min-32-chars-vvvvvvvvvv';
+    process.env.JWT_ACCESS_EXPIRES_IN = '15m';
+    process.env.JWT_REFRESH_EXPIRES_IN = '7d';
+    process.env.BCRYPT_ROUNDS = '4';
+    process.env.DB_HOST = 'localhost';
+    process.env.DB_PORT = '5432';
+    process.env.DB_USER = 'postgres';
+    process.env.DB_PASSWORD = 'unused';
+    process.env.DB_NAME = 'unused';
+
+    const memDb = newDb({ autoCreateForeignKeyIndices: true });
+    memDb.public.registerFunction({
+      name: 'current_database',
+      args: [],
+      returns: DataType.text,
+      implementation: () => 'test',
+    });
+    memDb.public.registerFunction({
+      name: 'version',
+      args: [],
+      returns: DataType.text,
+      implementation: () => 'PostgreSQL 15 (pg-mem)',
+    });
+
+    const moduleRef = await Test.createTestingModule({
+      imports: [
+        ConfigModule.forRoot({ isGlobal: true, ignoreEnvFile: true }),
+        LoggerModule.forRoot({ pinoHttp: { level: 'silent' } }),
+        TypeOrmModule.forRootAsync({
+          useFactory: () => ({
+            type: 'postgres' as const,
+            database: 'test',
+            synchronize: true,
+            autoLoadEntities: true,
+          }),
+          dataSourceFactory: async (options?: DataSourceOptions) => {
+            if (!options) throw new Error('TypeOrm options required');
+            const ds = memDb.adapters.createTypeormDataSource(
+              options,
+            ) as DataSource;
+            await ds.initialize();
+            return ds;
+          },
+        }),
+        UsersModule,
+        RolesModule,
+        AuditModule,
+        AuthModule,
+        VersionModule,
+      ],
+      providers: [
+        { provide: APP_GUARD, useClass: JwtAuthGuard },
+        { provide: APP_GUARD, useClass: PermissionsGuard },
+        { provide: APP_INTERCEPTOR, useClass: AuditInterceptor },
+        { provide: APP_FILTER, useClass: AllExceptionsFilter },
+      ],
+    }).compile();
+
+    app = moduleRef.createNestApplication();
+    app.setGlobalPrefix('api/v1');
+    app.useGlobalPipes(
+      new ValidationPipe({
+        whitelist: true,
+        forbidNonWhitelisted: true,
+        transform: true,
+        transformOptions: { enableImplicitConversion: true },
+      }),
+    );
+    await app.init();
+
+    dataSource = app.get(DataSource);
+    const jwtService = app.get(JwtService);
+
+    ids = await seedRolesUsers(dataSource);
+
+    adminToken = await jwtService.signAsync({
+      sub: ids.adminId,
+      email: 'admin@miznas.local',
+      jti: 'jti-admin-vr',
+    });
+    lecteurToken = await jwtService.signAsync({
+      sub: ids.lecteurId,
+      email: 'lecteur@miznas.local',
+      jti: 'jti-lecteur-vr',
+    });
+  });
+
+  afterAll(async () => {
+    if (app) await app.close();
+  });
+
+  beforeEach(async () => {
+    await dataSource.query('DELETE FROM audit_log');
+    await dataSource.query('DELETE FROM dim_version');
+  });
+
+  it('GET /versions sans token → 401', async () => {
+    await request(app.getHttpServer())
+      .get('/api/v1/referentiels/versions')
+      .expect(401);
+  });
+
+  it('POST /versions avec LECTEUR → 403', async () => {
+    await request(app.getHttpServer())
+      .post('/api/v1/referentiels/versions')
+      .set('Authorization', `Bearer ${lecteurToken}`)
+      .send({
+        codeVersion: 'X',
+        libelle: 'X',
+        typeVersion: 'budget_initial',
+        exerciceFiscal: 2026,
+      })
+      .expect(403);
+  });
+
+  it('POST valide → 201 + audit CREATE success + statut=ouvert', async () => {
+    const res = await request(app.getHttpServer())
+      .post('/api/v1/referentiels/versions')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({
+        codeVersion: 'BUDGET_INITIAL_2027',
+        libelle: 'Budget initial 2027',
+        typeVersion: 'budget_initial',
+        exerciceFiscal: 2027,
+      })
+      .expect(201);
+    expect(res.body.codeVersion).toBe('BUDGET_INITIAL_2027');
+    expect(res.body.statut).toBe('ouvert');
+
+    const audits = (await dataSource.query(
+      `SELECT type_action, statut FROM audit_log WHERE entite_cible = 'dim_version'`,
+    )) as Array<{ type_action: string; statut: string }>;
+    expect(
+      audits.find(
+        (a) => a.type_action === 'CREATE' && a.statut === 'success',
+      ),
+    ).toBeDefined();
+  });
+
+  it('POST avec doublon → 409', async () => {
+    await dataSource.query(
+      `INSERT INTO dim_version
+        ("code_version","libelle","type_version","exercice_fiscal","statut","utilisateur_creation")
+       VALUES ('BUDGET_INITIAL_2026','Budget','budget_initial',2026,'ouvert','system')`,
+    );
+    await request(app.getHttpServer())
+      .post('/api/v1/referentiels/versions')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({
+        codeVersion: 'BUDGET_INITIAL_2026',
+        libelle: 'Dup',
+        typeVersion: 'budget_initial',
+        exerciceFiscal: 2026,
+      })
+      .expect(409);
+  });
+
+  it('GET / + filtre exerciceFiscal=2026 → 1 résultat', async () => {
+    await dataSource.query(
+      `INSERT INTO dim_version
+        ("code_version","libelle","type_version","exercice_fiscal","statut","utilisateur_creation")
+       VALUES
+         ('BUDGET_INITIAL_2026','Budget 2026','budget_initial',2026,'ouvert','system'),
+         ('BUDGET_INITIAL_2025','Budget 2025','budget_initial',2025,'gele','system')`,
+    );
+    const res = await request(app.getHttpServer())
+      .get('/api/v1/referentiels/versions')
+      .query({ exerciceFiscal: 2026 })
+      .set('Authorization', `Bearer ${lecteurToken}`)
+      .expect(200);
+    expect(res.body.total).toBe(1);
+    expect(res.body.items[0].codeVersion).toBe('BUDGET_INITIAL_2026');
+  });
+
+  it('GET /par-code/:codeVersion → 200', async () => {
+    await dataSource.query(
+      `INSERT INTO dim_version
+        ("code_version","libelle","type_version","exercice_fiscal","statut","utilisateur_creation")
+       VALUES ('BUDGET_INITIAL_2026','Budget','budget_initial',2026,'ouvert','system')`,
+    );
+    const res = await request(app.getHttpServer())
+      .get('/api/v1/referentiels/versions/par-code/BUDGET_INITIAL_2026')
+      .set('Authorization', `Bearer ${lecteurToken}`)
+      .expect(200);
+    expect(res.body.codeVersion).toBe('BUDGET_INITIAL_2026');
+  });
+
+  // ─── SCÉNARIO CRITIQUE — refus modif statut != ouvert
+
+  it('PATCH refusé (409) si statut=soumis (forçage SQL)', async () => {
+    const res = await request(app.getHttpServer())
+      .post('/api/v1/referentiels/versions')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({
+        codeVersion: 'BUDGET_INITIAL_2027',
+        libelle: 'Budget 2027',
+        typeVersion: 'budget_initial',
+        exerciceFiscal: 2027,
+      })
+      .expect(201);
+    const id: string = res.body.id;
+
+    // Forcer le statut à 'soumis' en bypassant le service.
+    await dataSource.query(
+      `UPDATE dim_version SET statut='soumis' WHERE code_version='BUDGET_INITIAL_2027'`,
+    );
+
+    const patchRes = await request(app.getHttpServer())
+      .patch(`/api/v1/referentiels/versions/${id}`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ libelle: 'Test refus' })
+      .expect(409);
+    expect(patchRes.body.message).toMatch(/'soumis'/);
+  });
+
+  it('DELETE refusé (409) si statut=valide', async () => {
+    const ins = await dataSource.query(
+      `INSERT INTO dim_version
+        ("code_version","libelle","type_version","exercice_fiscal","statut","utilisateur_creation")
+       VALUES ('BUDGET_INITIAL_2026','B','budget_initial',2026,'valide','system')
+       RETURNING id`,
+    );
+    const id = String((ins as Array<{ id: string | number }>)[0]!.id);
+    await request(app.getHttpServer())
+      .delete(`/api/v1/referentiels/versions/${id}`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .expect(409);
+  });
+
+  it('DELETE OK quand statut=ouvert → 204', async () => {
+    const ins = await dataSource.query(
+      `INSERT INTO dim_version
+        ("code_version","libelle","type_version","exercice_fiscal","statut","utilisateur_creation")
+       VALUES ('BUDGET_INITIAL_2026','B','budget_initial',2026,'ouvert','system')
+       RETURNING id`,
+    );
+    const id = String((ins as Array<{ id: string | number }>)[0]!.id);
+    await request(app.getHttpServer())
+      .delete(`/api/v1/referentiels/versions/${id}`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .expect(204);
+  });
+});
