@@ -11,6 +11,7 @@ import { AuthModule } from './auth/auth.module';
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
 import { PermissionsGuard } from './auth/guards/permissions.guard';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
+import { FaitBudgetModule } from './faits/budget/fait-budget.module';
 import { HealthModule } from './health/health.module';
 import { CentreResponsabiliteModule } from './referentiels/centre-responsabilite/centre-responsabilite.module';
 import { CompteModule } from './referentiels/compte/compte.module';
@@ -90,6 +91,7 @@ import { UsersModule } from './users/users.module';
     SegmentModule,
     TauxChangeModule,
     VersionModule,
+    FaitBudgetModule,
   ],
   controllers: [AppController],
   providers: [
