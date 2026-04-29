@@ -5,12 +5,23 @@
 > projet. Chaque lot précise son périmètre, ses livrables, ses critères
 > d'achèvement (DoD) et ses dépendances.
 
-État actuel : **Lot 2 en cours**. Sous-étapes 2.1 (socle SCD2 +
-import CSV), 2.2 (`dim_temps` + `dim_devise` + frontend consultation)
-et 2.3 (`dim_structure` + `dim_centre_responsabilite` SCD2 hiérarchique
-avec relink stratégie A + frontend consultation) livrées sur `main`.
-Prochaine étape : **2.4** — autres dimensions SCD2 (`dim_compte`
-PCB UMOA, `dim_ligne_metier`, `dim_produit`, `dim_segment`).
+État actuel : **Lot 2 LIVRÉ — 29/04/2026**. Les 4 sous-étapes sont
+sur `main` : 2.1 (socle SCD2 + `CsvImportService`), 2.2 (`dim_temps`
++ `dim_devise` + frontend), 2.3 (`dim_structure` +
+`dim_centre_responsabilite` SCD2 hiérarchique avec relink stratégie A
++ frontend), 2.4 (`dim_compte` PCB UMOA Révisé avec import CSV
+opérationnel, `dim_ligne_metier`, `dim_produit`, `dim_segment` plat,
++ frontend des 4 nouvelles pages).
+
+**Chiffres clés Lot 2** : 11 migrations en base (3 Lot 1 + 8
+dimensions Lot 2), 449 tests backend verts, 49 tests frontend verts,
+~50 commits sur `main` (répartis sur les dépôts `budget-backend`
+porteur de `docs/` et `budget-frontend`). Premier vrai usage de
+`CsvImportService` validé en condition réelle Postgres au Lot 2.4A.2
+(import du PCB UMOA Révisé via `POST /referentiels/comptes/import`).
+
+Prochaine étape : **Lot 3** — Module B Élaboration budgétaire
+(campagnes, saisie, workflow, versions, scénarios).
 
 ---
 
@@ -34,7 +45,7 @@ PCB UMOA, `dim_ligne_metier`, `dim_produit`, `dim_segment`).
 |-------|---------------|-----------------------------------------------------------|-----------------|
 | Lot 0 | 1 semaine     | Initialisation projet, choix techniques, cadrage          | Terminé         |
 | Lot 1 | 3 semaines    | Socle transverse (auth, RBAC, audit, Swagger, CORS)       | Terminé         |
-| Lot 2 | 4 semaines    | Module A — Référentiels (PCB UMOA, structure, axes)       | En cours (2.1, 2.2, 2.3 livrés ; 2.4 axes restants à venir) |
+| Lot 2 | 4 semaines    | Module A — Référentiels (PCB UMOA, structure, axes)       | **Livré — 29/04/2026** |
 | Lot 3 | 5 semaines    | Module B — Élaboration budgétaire (cycle, versions, WF)   | En attente      |
 | Lot 4 | 4 semaines    | Modules C (PNB) et D (Charges)                            | En attente      |
 | Lot 5 | 6 semaines    | Modules E (CAPEX), F (Bilan/ALM), H (Exécution), I (Reforecast), L (Reporting) | En attente      |
@@ -196,6 +207,39 @@ faits budgétaires et comptables seront indexés.
 - **SCD2 vs SCD1** : tous les axes ne nécessitent pas une
   historisation type 2 ; trancher attribut par attribut pour ne
   pas surdimensionner.
+
+### Livraison effective — 29/04/2026 [LIVRÉ]
+
+**8 dimensions sur les 10 du modèle dimensionnel** sont livrées en
+base, seedées et exposées via API + frontend lecture seule. Les 2
+dernières (`dim_version` et `dim_scenario`) relèvent du Lot 3 (cycle
+budgétaire) — pas du Lot 2.
+
+| Dimension | Volumétrie seed | Pattern |
+|---|---|---|
+| `dim_temps` | ~3 653 lignes (10 ans glissants, fériés UEMOA) | Pas SCD2 |
+| `dim_devise` | 7 devises (XOF pivot + 6 convertibles) | Pas SCD2 |
+| `dim_structure` | 9 structures multi-pays UEMOA | SCD2 hiérarchique |
+| `dim_centre_responsabilite` | 6 CR | SCD2 + FK SCD2 stratégie A |
+| `dim_compte` | 104 comptes PCB Révisé pédagogique + **import CSV opérationnel** | SCD2 hiérarchique auto-référencée |
+| `dim_ligne_metier` | 12 lignes (retail / corporate / treasury / support) | SCD2 hiérarchique auto-référencée |
+| `dim_produit` | 26 produits (crédits / dépôts / services / marchés) | SCD2 hiérarchique auto-référencée |
+| `dim_segment` | 6 segments (catégories UEMOA) | **SCD2 plat** (cf. `modele-donnees.md` §3.7) |
+
+**Faits notables** :
+- Premier vrai usage du socle `CsvImportService` (Lot 2.1) validé en
+  condition réelle Postgres au Lot 2.4A.2 — endpoint
+  `POST /api/v1/referentiels/comptes/import` opérationnel avec mode
+  `insert-only` ou `upsert` (génère une nouvelle version SCD2 si un
+  champ tracé diffère). Audit `IMPORT` capté dans `audit_log`.
+- Stratégie A appliquée 4 fois : 1 fois inter-modules (CR ↔ structure)
+  + 3 fois en auto-référence (compte, ligne-métier, produit). Bilan
+  consolidé en `scd2-pattern.md` §8.4.
+
+**DoD officiellement atteinte** : tous les critères de la section
+[Definition of Done](#definition-of-done-dod) du Lot 2 sont validés
+sur `main` (449 tests backend + 49 tests frontend verts). Aucun reste
+à charge en backlog post-Lot-2.
 
 ---
 
