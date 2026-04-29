@@ -23,16 +23,22 @@
 | Terme | Définition | Référence |
 |---|---|---|
 | Business key | Code stable inter-versions d'une dimension (ex. `code_compte`, `code_structure`). Sert de jointure logique. | `modele-donnees.md` §6.4 |
+| Écrasement intra-jour | Modification SCD2 d'une dimension dans la même journée que la version courante actuelle ; le service met à jour la ligne du jour en place plutôt que de créer une nouvelle version (évite l'intervalle 0-day). `audit_log` capte `modeMaj='ecrasement_intra_jour'`. | `scd2-pattern.md` §7 |
 | Index partiel | Index PostgreSQL avec clause `WHERE` (ex. `uq_dim_devise_pivot WHERE est_devise_pivot = true`). Non inférable par TypeORM, à ajouter manuellement. | `conventions.md` §5.2.2 |
 | Ligne sentinelle "NA" | Ligne fixe `id=0` ou `id=-1` insérée dans une dimension pour gérer les FK obligatoires côté `fait_*` quand l'attribut n'est pas renseigné. | `architecture.md` §12 ADR |
 | SCD2 | Slowly Changing Dimension type 2 — historisation des attributs structurants : nouvelle ligne pour chaque changement, intervalles `[date_debut, date_fin)` disjoints et contigus. | `modele-donnees.md` §6, `scd2-pattern.md` |
+| SCD2 hiérarchique auto-référencée | Dimension SCD2 dont une colonne FK pointe vers la même table (ex. `fk_structure_parent` dans `dim_structure`). Validation applicative anti-cycle requise (cf. `validateNoCycle`). | `modele-donnees.md` §3.2, `scd2-pattern.md` |
 | Star schema | Modèle dimensionnel en étoile : faits centraux entourés de dimensions reliées par FK. | `modele-donnees.md` §1 |
+| Stratégie A pour FK SCD2-vers-SCD2 | La FK pointe vers la version courante de la dimension cible et est mise à jour automatiquement quand la dimension cible reçoit une nouvelle version SCD2 — lien « vivant ». Implémentée via hook applicatif (cf. `relinkAfterStructureRevision`), pas via trigger. | `scd2-pattern.md` §8 |
 | Surrogate key | Identifiant technique (`id bigint generated always`). Change à chaque nouvelle version SCD2 ; à ne pas utiliser comme jointure logique. | `modele-donnees.md` §6.4 |
 
 ## Comptable et budgétaire
 
 | Terme | Définition | Référence |
 |---|---|---|
+| CDC | Centre de coût. Type de CR pour les fonctions support sans génération de chiffre d'affaires (ex. Fonctions Branche). | `modele-donnees.md` §3.3 |
+| CDP | Centre de profit. Type de CR pour les unités opérationnelles produisant du chiffre d'affaires (ex. agences, directions retail/corporate). | `modele-donnees.md` §3.3 |
+| CDR | Centre de revenu. Type de CR pour les unités génératrices de revenu sans charges substantielles. Distinction CDC/CDP/CDR à formaliser au Lot 4 avec le contrôle de gestion. | `modele-donnees.md` §3.3 |
 | Centre de responsabilité (CR) | Maille de saisie budgétaire principale rattachée à la structure organisationnelle. | `modele-donnees.md` §3.3 |
 | Devise pivot | Devise de consolidation du module. XOF par convention régionale. Exactement une ligne pivot dans `dim_devise`. | `modele-donnees.md` §3.8 |
 | Exercice fiscal | Année comptable de rattachement. UEMOA = exercice civil (1er janvier — 31 décembre). | `modele-donnees.md` §3.1 |
