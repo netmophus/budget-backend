@@ -27,7 +27,8 @@
     "seed:auth": "ts-node src/seeds/auth-seed.ts",
     "seed:temps": "ts-node src/seeds/temps-seed.ts",
     "seed:devises": "ts-node src/seeds/devise-seed.ts",
-    "seed:structures": "ts-node src/seeds/structure-seed.ts"
+    "seed:structures": "ts-node src/seeds/structure-seed.ts",
+    "seed:cr": "ts-node src/seeds/cr-seed.ts"
   },
   "dependencies": {
     "@nestjs/common": "^11.0.1",
