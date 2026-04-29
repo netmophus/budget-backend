@@ -17,6 +17,7 @@ import { CompteModule } from './referentiels/compte/compte.module';
 import { DeviseModule } from './referentiels/devise/devise.module';
 import { LigneMetierModule } from './referentiels/ligne-metier/ligne-metier.module';
 import { ProduitModule } from './referentiels/produit/produit.module';
+import { SegmentModule } from './referentiels/segment/segment.module';
 import { StructureModule } from './referentiels/structure/structure.module';
 import { TempsModule } from './referentiels/temps/temps.module';
 import { RolesModule } from './roles/roles.module';
@@ -82,6 +83,7 @@ import { UsersModule } from './users/users.module';
     CompteModule,
     LigneMetierModule,
     ProduitModule,
+    SegmentModule,
   ],
   controllers: [AppController],
   providers: [
