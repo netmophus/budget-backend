@@ -1,0 +1,140 @@
+import { DataSource, FindOptionsWhere, Repository } from 'typeorm';
+import { Scd2Entity } from '../entities/scd2.entity';
+
+/**
+ * Service générique SCD2.
+ *
+ * Paramétré par l'entité concrète et le **nom de propriété TS** de la
+ * business key (ex. `'codeCompte'`, `'codeStructure'`). Toutes les
+ * opérations multi-table passent par une transaction unique pour
+ * préserver les invariants §6.2 du modèle de données.
+ *
+ * Usage type :
+ * ```typescript
+ * @Injectable()
+ * export class StructuresService extends Scd2Service<DimStructure> {
+ *   constructor(
+ *     @InjectRepository(DimStructure) repo: Repository<DimStructure>,
+ *     dataSource: DataSource,
+ *   ) {
+ *     super(repo, 'codeStructure', dataSource);
+ *   }
+ * }
+ * ```
+ */
+export class Scd2Service<T extends Scd2Entity> {
+  constructor(
+    protected readonly repo: Repository<T>,
+    /** Nom de la **propriété TS** servant de business key (camelCase). */
+    protected readonly businessKeyProp: keyof T & string,
+    protected readonly dataSource: DataSource,
+  ) {}
+
+  /** Version courante (active) à date pour une business key. */
+  async findCurrent(businessKey: string): Promise<T | null> {
+    const where = {
+      [this.businessKeyProp]: businessKey,
+      versionCourante: true,
+    } as unknown as FindOptionsWhere<T>;
+    return this.repo.findOne({ where });
+  }
+
+  /** Toutes les versions courantes (filtrées éventuellement). */
+  async findAllCurrent(extra?: FindOptionsWhere<T>): Promise<T[]> {
+    const base = { versionCourante: true } as unknown as FindOptionsWhere<T>;
+    return this.repo.find({ where: { ...base, ...(extra ?? {}) } });
+  }
+
+  /** Version valide à une date donnée (selon `[debut, fin)`). */
+  async findValidAt(businessKey: string, date: Date): Promise<T | null> {
+    const dateStr = date.toISOString().slice(0, 10);
+    const alias = 'e';
+    return this.repo
+      .createQueryBuilder(alias)
+      .where(`${alias}.${this.businessKeyProp} = :businessKey`, { businessKey })
+      .andWhere(`${alias}.dateDebutValidite <= :date`, { date: dateStr })
+      .andWhere(
+        `(${alias}.dateFinValidite IS NULL OR ${alias}.dateFinValidite > :date)`,
+        { date: dateStr },
+      )
+      .getOne();
+  }
+
+  /** Historique chronologique d'une business key. */
+  async findHistory(businessKey: string): Promise<T[]> {
+    const where = {
+      [this.businessKeyProp]: businessKey,
+    } as unknown as FindOptionsWhere<T>;
+    return this.repo.find({
+      where,
+      order: { dateDebutValidite: 'ASC' } as never,
+    });
+  }
+
+  /**
+   * Crée une nouvelle version SCD2 :
+   *  - en transaction unique
+   *  - ferme la version courante (`date_fin_validite = today`,
+   *    `version_courante = false`)
+   *  - insère la nouvelle (`date_debut_validite = today`,
+   *    `version_courante = true`)
+   *
+   * Si aucune version courante n'existe, insère simplement la première.
+   */
+  async createNewVersion(
+    businessKey: string,
+    attrs: Partial<T>,
+    utilisateur: string,
+  ): Promise<T> {
+    return this.dataSource.transaction(async (manager) => {
+      const today = new Date().toISOString().slice(0, 10);
+      const target = this.repo.target;
+
+      // 1. Fermer l'ancienne version courante si présente.
+      await manager
+        .createQueryBuilder()
+        .update(target)
+        .set({
+          dateFinValidite: today,
+          versionCourante: false,
+          dateModification: () => 'CURRENT_TIMESTAMP',
+          utilisateurModification: utilisateur,
+        } as never)
+        .where(`${this.businessKeyProp} = :businessKey`, { businessKey })
+        .andWhere('versionCourante = :true', { true: true })
+        .execute();
+
+      // 2. Insérer la nouvelle.
+      const row = manager.create(target, {
+        ...(attrs as object),
+        [this.businessKeyProp]: businessKey,
+        dateDebutValidite: today,
+        dateFinValidite: null,
+        versionCourante: true,
+        estActif: true,
+        utilisateurCreation: utilisateur,
+      } as never);
+      const saved = await manager.save(row);
+      // save() retourne T | T[] selon l'overload — ici on insère un seul.
+      return Array.isArray(saved) ? saved[0]! : saved;
+    });
+  }
+
+  /** Ferme la version courante sans en créer de nouvelle (clôture). */
+  async softClose(businessKey: string, utilisateur: string): Promise<void> {
+    const today = new Date().toISOString().slice(0, 10);
+    await this.repo
+      .createQueryBuilder()
+      .update()
+      .set({
+        dateFinValidite: today,
+        versionCourante: false,
+        estActif: false,
+        dateModification: () => 'CURRENT_TIMESTAMP',
+        utilisateurModification: utilisateur,
+      } as never)
+      .where(`${this.businessKeyProp} = :businessKey`, { businessKey })
+      .andWhere('versionCourante = :true', { true: true })
+      .execute();
+  }
+}

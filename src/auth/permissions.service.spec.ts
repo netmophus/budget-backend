@@ -1,0 +1,168 @@
+import { Test, TestingModule } from '@nestjs/testing';
+import { getRepositoryToken } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { User } from '../users/entities/user.entity';
+import { UserRole } from '../users/entities/user-role.entity';
+import { PermissionsService } from './permissions.service';
+
+interface QbStub {
+  innerJoinAndSelect: jest.Mock;
+  leftJoinAndSelect: jest.Mock;
+  where: jest.Mock;
+  andWhere: jest.Mock;
+  getMany: jest.Mock;
+}
+
+function makeQb(rows: Partial<UserRole>[]): QbStub {
+  const qb: QbStub = {
+    innerJoinAndSelect: jest.fn().mockReturnThis(),
+    leftJoinAndSelect: jest.fn().mockReturnThis(),
+    where: jest.fn().mockReturnThis(),
+    andWhere: jest.fn().mockReturnThis(),
+    getMany: jest.fn().mockResolvedValue(rows),
+  };
+  return qb;
+}
+
+function urRow(opts: {
+  perimetreType?: string | null;
+  perimetreId?: string | null;
+  permissions: Array<{ code: string; module: string }>;
+}): Partial<UserRole> {
+  return {
+    perimetreType: opts.perimetreType ?? null,
+    perimetreId: opts.perimetreId ?? null,
+    role: {
+      rolePermissions: opts.permissions.map((p) => ({
+        permission: { codePermission: p.code, module: p.module },
+      })),
+    },
+  } as unknown as UserRole;
+}
+
+describe('PermissionsService', () => {
+  let service: PermissionsService;
+  let userRepo: jest.Mocked<Pick<Repository<User>, 'findOne'>>;
+  let userRoleRepo: { createQueryBuilder: jest.Mock };
+
+  beforeEach(async () => {
+    userRepo = { findOne: jest.fn() };
+    userRoleRepo = { createQueryBuilder: jest.fn() };
+
+    const moduleRef: TestingModule = await Test.createTestingModule({
+      providers: [
+        PermissionsService,
+        { provide: getRepositoryToken(User), useValue: userRepo },
+        { provide: getRepositoryToken(UserRole), useValue: userRoleRepo },
+      ],
+    }).compile();
+
+    service = moduleRef.get(PermissionsService);
+  });
+
+  it('returns [] for an inactive user', async () => {
+    userRepo.findOne.mockResolvedValue({ id: '1', estActif: false } as User);
+    expect(await service.getEffectivePermissions('1')).toEqual([]);
+    expect(userRoleRepo.createQueryBuilder).not.toHaveBeenCalled();
+  });
+
+  it('returns [] for an unknown user', async () => {
+    userRepo.findOne.mockResolvedValue(null);
+    expect(await service.getEffectivePermissions('999')).toEqual([]);
+  });
+
+  it('flattens permissions from a single global role (perimetre_type null → global)', async () => {
+    userRepo.findOne.mockResolvedValue({ id: '1', estActif: true } as User);
+    userRoleRepo.createQueryBuilder.mockReturnValue(
+      makeQb([
+        urRow({
+          perimetreType: 'global',
+          permissions: [
+            { code: 'USER.LIRE', module: 'USER' },
+            { code: 'ROLE.LIRE', module: 'ROLE' },
+          ],
+        }),
+      ]),
+    );
+
+    const result = await service.getEffectivePermissions('1');
+    expect(result).toEqual([
+      {
+        code_permission: 'USER.LIRE',
+        module: 'USER',
+        perimetre_type: 'global',
+        perimetre_id: null,
+      },
+      {
+        code_permission: 'ROLE.LIRE',
+        module: 'ROLE',
+        perimetre_type: 'global',
+        perimetre_id: null,
+      },
+    ]);
+  });
+
+  it('multiplies permissions across roles on different periphery scopes', async () => {
+    userRepo.findOne.mockResolvedValue({ id: '1', estActif: true } as User);
+    userRoleRepo.createQueryBuilder.mockReturnValue(
+      makeQb([
+        urRow({
+          perimetreType: 'structure',
+          perimetreId: '10',
+          permissions: [{ code: 'BUDGET.SAISIR', module: 'BUDGET' }],
+        }),
+        urRow({
+          perimetreType: 'centre_responsabilite',
+          perimetreId: '42',
+          permissions: [{ code: 'BUDGET.SAISIR', module: 'BUDGET' }],
+        }),
+      ]),
+    );
+
+    const result = await service.getEffectivePermissions('1');
+    expect(result).toHaveLength(2);
+    expect(result[0]).toMatchObject({
+      perimetre_type: 'structure',
+      perimetre_id: '10',
+    });
+    expect(result[1]).toMatchObject({
+      perimetre_type: 'centre_responsabilite',
+      perimetre_id: '42',
+    });
+  });
+
+  describe('hasPermission', () => {
+    beforeEach(() => {
+      userRepo.findOne.mockResolvedValue({ id: '1', estActif: true } as User);
+      userRoleRepo.createQueryBuilder.mockReturnValue(
+        makeQb([
+          urRow({
+            permissions: [
+              { code: 'USER.LIRE', module: 'USER' },
+              { code: 'ROLE.LIRE', module: 'ROLE' },
+            ],
+          }),
+        ]),
+      );
+    });
+
+    it("mode 'any': returns true if at least one matches", async () => {
+      expect(
+        await service.hasPermission('1', ['USER.LIRE', 'USER.GERER'], 'any'),
+      ).toBe(true);
+    });
+
+    it("mode 'any': returns false if none match", async () => {
+      expect(await service.hasPermission('1', ['USER.GERER'], 'any')).toBe(false);
+    });
+
+    it("mode 'all': returns true only if every code is possessed", async () => {
+      expect(
+        await service.hasPermission('1', ['USER.LIRE', 'ROLE.LIRE'], 'all'),
+      ).toBe(true);
+      expect(
+        await service.hasPermission('1', ['USER.LIRE', 'USER.GERER'], 'all'),
+      ).toBe(false);
+    });
+  });
+});
