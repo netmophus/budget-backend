@@ -267,9 +267,42 @@ Toute évolution fonctionnelle doit être tracée par rapport à ces référenti
 
 ## 9. Statut du projet
 
-**Lot 2 en cours** — 2.1 (socle SCD2), 2.2 (`dim_temps`,
-`dim_devise`), 2.3 (`dim_structure`, `dim_centre_responsabilite`)
-livrés. Prochaine étape : 2.4 — autres dimensions SCD2.
+**Lot 2 LIVRÉ — 29/04/2026**. 8 dimensions du modèle dimensionnel
+sont livrées en base, seedées et exposées via API + frontend lecture
+seule. Prochaine étape : Lot 3 (Élaboration budgétaire).
+
+| Lot                                 | Statut |
+| ----------------------------------- | ------ |
+| Lot 0 — Documentation               | ✅ Livré |
+| Lot 1 — Socle transverse            | ✅ Livré |
+| Lot 2 — Référentiels SCD2           | ✅ **Livré — 29/04/2026** |
+| Lot 3 — Élaboration budgétaire      | ⏳ À venir |
+| Lot 4 — PNB / Charges               | ⏳ À venir |
+| Lot 5 — Reporting / ALM             | ⏳ À venir |
+| Lot 6 — Stabilisation               | ⏳ À venir |
+
+**Chiffres clés actuels** :
+
+- 11 migrations en base (3 Lot 1 + 8 dimensions Lot 2)
+- **8 dimensions livrées sur 10** du modèle dimensionnel (les 2
+  restantes — `dim_version` et `dim_scenario` — relèvent du Lot 3)
+- **449 tests backend verts** (jest + pg-mem)
+- **49 tests frontend verts** (vitest + testing-library)
+- **2 dépôts GitHub** : `budget-backend` (porte également `docs/`) +
+  `budget-frontend`
+
+**Dimensions livrées au Lot 2** :
+
+| Dimension | Volumétrie seed | Pattern |
+|---|---|---|
+| `dim_temps` | ~3 653 lignes (10 ans, fériés UEMOA) | Pas SCD2 |
+| `dim_devise` | 7 devises (XOF pivot) | Pas SCD2 |
+| `dim_structure` | 9 structures multi-pays UEMOA | SCD2 hiérarchique |
+| `dim_centre_responsabilite` | 6 CR | SCD2 + FK SCD2 stratégie A |
+| `dim_compte` | 104 comptes PCB Révisé + import CSV | SCD2 hiérarchique auto-référencée |
+| `dim_ligne_metier` | 12 lignes | SCD2 hiérarchique auto-référencée |
+| `dim_produit` | 26 produits | SCD2 hiérarchique auto-référencée |
+| `dim_segment` | 6 segments | SCD2 plat |
 
 | Élément                                         | Statut |
 | ----------------------------------------------- | ------ |
@@ -279,16 +312,7 @@ livrés. Prochaine étape : 2.4 — autres dimensions SCD2.
 | Authentification JWT + refresh                  | ✅      |
 | Autorisation RBAC                               | ✅      |
 | Audit applicatif réglementaire                  | ✅      |
-| Documentation de cadrage (Lot 0)                | ✅      |
-| Lot 1 — Socle transverse                        | ✅      |
-| Lot 2 — Référentiels (4/10 dimensions livrées)  | 🟡 en cours (2.1+2.2+2.3 livrés) |
-| Lot 3 — Élaboration budgétaire                  | ⏳      |
-
-> 4 dimensions livrées au Lot 2.3 : `dim_temps`, `dim_devise`,
-> `dim_structure` (SCD2), `dim_centre_responsabilite` (SCD2). Reste
-> 4 dimensions à livrer au Lot 2.4 : `dim_compte`, `dim_ligne_metier`,
-> `dim_produit`, `dim_segment` (toutes SCD2). `dim_pays` et
-> `dim_canal_distribution` resteront éventuellement pour V2.
+| Import CSV PCB UMOA Révisé (Lot 2.4A.2)         | ✅      |
 
 Détail des étapes : voir `docs/roadmap-mvp.md`.
 

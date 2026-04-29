@@ -288,7 +288,10 @@ règles applicatives, transactions. Elle ne connaît ni HTTP ni Express
 | `referentiels/devise` | 2.2B livré | `dim_devise` : référentiel BCEAO + pivot XOF |
 | `referentiels/structure` | 2.3A livré | `dim_structure` (SCD2 hiérarchique) |
 | `referentiels/centre-responsabilite` | 2.3B livré | `dim_centre_responsabilite` (SCD2 + FK SCD2 stratégie A) |
-| `referentiels/*` (autres axes) | 2.4 à venir | `dim_compte`, `dim_ligne_metier`, `dim_produit`, `dim_segment` (tous SCD2) |
+| `referentiels/compte` | 2.4A livré | `dim_compte` (SCD2 hiérarchique + import CSV) |
+| `referentiels/ligne-metier` | 2.4B livré | `dim_ligne_metier` (SCD2 hiérarchique) |
+| `referentiels/produit` | 2.4B livré | `dim_produit` (SCD2 hiérarchique + porteur intérêts) |
+| `referentiels/segment` | 2.4B livré | `dim_segment` (SCD2 plat) |
 | `budget-campaigns`, `budget-entries`, `budget-workflow`, `budget-versions` | 3 | Cycle d'élaboration budgétaire |
 | `pnb`, `expenses` | 4 | PNB et charges |
 | `capex`, `alm`, `actuals`, `variances`, `reforecast`, `reporting` | 5 | CAPEX, bilan/ALM, exécution, reforecast, restitution |

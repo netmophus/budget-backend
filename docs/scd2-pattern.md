@@ -208,3 +208,38 @@ Tous les CR doivent pointer vers des lignes structure
 `dateDebutValidite` de la version créatrice du dépendant — donne
 un historique de rattachement propre au dépendant. Pas d'usage
 actuel ; à reconsidérer si une dimension métier l'exige.
+
+## 8.4 Bilan de l'implémentation au Lot 2
+
+La stratégie A a été appliquée 4 fois au Lot 2, dans 2 configurations
+distinctes :
+
+- **Inter-modules SCD2** (1 fois) :
+  `CrService.relinkAfterStructureRevision` après une nouvelle version
+  SCD2 de `dim_structure` (Lot 2.3B). Implémentation requiert
+  `forwardRef` NestJS symétrique (cf. `conventions.md` §2.7 pour le
+  piège d'asymétrie observé en pratique : `forwardRef` doit être
+  posé dans **les 2 modules ET dans les 2 constructeurs de service**,
+  sinon l'injection est silencieusement résolue à `undefined`).
+
+- **Auto-référence** (3 fois) :
+  - `CompteService.createNewVersionCompte` (Lot 2.4A.1) →
+    `relinkAfterCompteRevision`.
+  - `LigneMetierService.createNewVersionLigneMetier` (Lot 2.4B) →
+    `relinkAfterLigneMetierRevision`.
+  - `ProduitService.createNewVersionProduit` (Lot 2.4B) →
+    `relinkAfterProduitRevision`.
+
+  Le hook self-relink est interne au service de la dimension (la FK
+  `fk_*_parent` pointe vers la même table), sans `forwardRef`
+  nécessaire. Plus simple que l'inter-modules et plus rapide à coder.
+
+Pattern validé sur ~50 cas de tests automatisés (unitaires + e2e)
++ 1 scénario réel par dimension (PATCH parent → 2-3 enfants
+relinkés vers le nouvel `id`, audit `audit_log.payload_apres.response`
+contient `crsRelinked` / `comptesEnfantsRelinked` /
+`lignesMetierEnfantsRelinked` / `produitsEnfantsRelinked`).
+
+`dim_segment` est volontairement plat au MVP (cf. `modele-donnees.md`
+§3.7) : pas d'auto-référence, pas de relink. Si une hiérarchie y
+devient nécessaire en V2, le pattern est éprouvé et reproductible.
