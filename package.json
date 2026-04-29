@@ -32,7 +32,8 @@
     "seed:comptes": "ts-node src/seeds/compte-seed.ts",
     "seed:lignes-metier": "ts-node src/seeds/ligne-metier-seed.ts",
     "seed:produits": "ts-node src/seeds/produit-seed.ts",
-    "seed:segments": "ts-node src/seeds/segment-seed.ts"
+    "seed:segments": "ts-node src/seeds/segment-seed.ts",
+    "seed:versions": "ts-node src/seeds/version-seed.ts"
   },
   "dependencies": {
     "@nestjs/common": "^11.0.1",
