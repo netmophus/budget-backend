@@ -210,13 +210,18 @@ export class StructureService extends Scd2Service<DimStructure> {
     idStructure: string,
     nouveauParentId: string,
   ): Promise<void> {
-    if (nouveauParentId === idStructure) {
+    // String() défensif des deux côtés : Postgres retourne `bigint` en
+    // string (par convention TypeORM), pg-mem en number — on normalise
+    // pour rendre la comparaison portable.
+    const target = String(nouveauParentId);
+    const self = String(idStructure);
+    if (target === self) {
       throw new UnprocessableEntityException(
         'Une structure ne peut pas être son propre parent.',
       );
     }
     const descendants = await this.findDescendants(idStructure);
-    if (descendants.some((d) => d.id === nouveauParentId)) {
+    if (descendants.some((d) => String(d.id) === target)) {
       throw new UnprocessableEntityException(
         `Cycle hiérarchique détecté : la structure cible ${nouveauParentId} est descendante de ${idStructure}.`,
       );
