@@ -187,7 +187,7 @@ saisie budgétaire principale.
 | code_cr                | varchar   | NOT NULL                 | Business key                                     |
 | libelle                | varchar   | NOT NULL                 |                                                  |
 | fk_structure           | bigint    | NOT NULL, FK dim_structure | Structure de rattachement (version courante)   |
-| type_cr                | varchar   | NOT NULL                 | Enum : centre_de_cout / centre_de_profit / centre_mixte |
+| type_cr                | varchar   | NOT NULL                 | Enum : `cdc` / `cdp` / `cdr` / `autre`. `cdc` = centre de coût (fonctions support sans CA, ex. fonctions branche). `cdp` = centre de profit (unités opérationnelles avec CA). `cdr` = centre de revenu (sans charges substantielles). `autre` = sentinelle pour cas non-typés. |
 | nom_responsable        | varchar   | NULL                     | Nom du responsable budgétaire                    |
 | date_debut_validite    | date      | NOT NULL                 | SCD2                                             |
 | date_fin_validite      | date      | NULL                     | SCD2                                             |
@@ -198,8 +198,18 @@ saisie budgétaire principale.
 
 ### 3.4 dim_compte (SCD2)
 
-Plan Comptable Bancaire UMOA — classes 1 à 9, hiérarchique. Sert
-d'axe d'agrégation comptable et de pivot vers le poste budgétaire.
+Plan Comptable Bancaire **Révisé** de l'UMOA (PCB révisé, en
+application progressive depuis 2018 — BCEAO, transposition régionale
+des principes IFRS). Classes 1 à 9, hiérarchique. Sert d'axe
+d'agrégation comptable et de pivot vers le poste budgétaire.
+
+> Le seed initial du Lot 2.4A contient un sous-ensemble pédagogique
+> (~80–120 comptes des classes 1, 2, 4, 5, 6, 7) couvrant les besoins
+> typiques d'élaboration budgétaire (charges et produits) et de bilan
+> ALM minimal. Ce sous-ensemble n'a pas vocation à être exhaustif ni à
+> faire foi. En production, la banque cliente importe son fichier PCB
+> révisé officiel via la route `POST /api/v1/referentiels/comptes/import`
+> (premier vrai usage de `CsvImportService` posé en Lot 2.1).
 
 | Colonne                | Type      | Contraintes              | Description                                      |
 |------------------------|-----------|--------------------------|--------------------------------------------------|
@@ -218,6 +228,25 @@ d'axe d'agrégation comptable et de pivot vers le poste budgétaire.
 | date_fin_validite      | date      | NULL                     | SCD2                                             |
 | version_courante       | boolean   | NOT NULL                 |                                                  |
 | est_actif              | boolean   | NOT NULL                 |                                                  |
+
+> **Stratégie de FK auto-référente `fk_compte_parent`** : stratégie A
+> (lien vivant), comme pour `fk_structure` dans `dim_centre_responsabilite`
+> (§3.3 et `scd2-pattern.md` §8). Quand un compte parent reçoit une
+> nouvelle version SCD2 (modification de libellé, mapping budgétaire,
+> sens), les comptes enfants sont automatiquement re-pointés vers la
+> nouvelle version via un hook applicatif dans
+> `CompteService.createNewVersionCompte`. Cohérent avec la nature du
+> PCB révisé (figé par la BCEAO, changements rares et peu structurants).
+> Si une restructuration profonde du PCB intervient (mise à jour BCEAO
+> majeure), elle peut être traitée par un script d'administration
+> dédié hors du flot SCD2 standard.
+
+> **`code_poste_budgetaire`** : chaîne libre au Lot 2 (validation :
+> longueur uniquement, max 50 caractères). Le format normatif (masque,
+> vocabulaire contrôlé) sera figé au Lot 4 (PNB + Charges) avec le
+> contrôle de gestion de la banque cliente. À ce moment, ajouter une
+> table `ref_poste_budgetaire` avec une FK depuis `dim_compte` sera
+> une extension non-cassante.
 
 ---
 
@@ -274,6 +303,12 @@ Segmentation clientèle.
 | date_fin_validite      | date      | NULL                     | SCD2                                             |
 | version_courante       | boolean   | NOT NULL                 |                                                  |
 | est_actif              | boolean   | NOT NULL                 |                                                  |
+
+> Pas de `fk_segment_parent` au MVP. La segmentation est plate (6
+> catégories listées dans l'enum `categorie`). Si la banque cliente
+> requiert des sous-segments (ex. `particulier_premium` /
+> `particulier_mass_market`), ajouter une colonne `fk_segment_parent`
+> et `niveau` sera une extension non-cassante en V2.
 
 ---
 
@@ -572,6 +607,24 @@ permettant les agrégations par business key.
 | Utilisation dans les FK des faits | Non                       | Oui                                |
 | Utilisation pour rapprocher des versions | Oui                | Non                                |
 | Affichage utilisateur    | Oui                                | Non                                |
+
+### 6.5 Stratégies de FK entre dimensions SCD2
+
+Quand une dimension SCD2 référence une autre dimension SCD2 — soit en
+auto-référence hiérarchique (`dim_compte → dim_compte` parent,
+`dim_produit → dim_produit` parent, `dim_ligne_metier → dim_ligne_metier`
+parent), soit vers une dimension distincte
+(`dim_centre_responsabilite → dim_structure`) — MIZNAS applique la
+**stratégie A (lien vivant)** documentée dans `scd2-pattern.md` §8.
+La FK pointe toujours vers la version courante de la dimension cible
+et est mise à jour automatiquement quand la dimension cible reçoit
+une nouvelle version SCD2, via un hook applicatif dans le service
+de la dimension cible.
+
+Validé en condition réelle au Lot 2.3B (`StructureService.createNewVersionStructure`
+→ `CrService.relinkAfterStructureRevision`). Le pattern sera appliqué
+uniformément à `dim_compte` (Lot 2.4A) et `dim_ligne_metier` /
+`dim_produit` (Lot 2.4B).
 
 ---
 
