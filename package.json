@@ -25,7 +25,8 @@
     "migration:revert": "npm run typeorm -- migration:revert",
     "migration:show": "npm run typeorm -- migration:show",
     "seed:auth": "ts-node src/seeds/auth-seed.ts",
-    "seed:temps": "ts-node src/seeds/temps-seed.ts"
+    "seed:temps": "ts-node src/seeds/temps-seed.ts",
+    "seed:devises": "ts-node src/seeds/devise-seed.ts"
   },
   "dependencies": {
     "@nestjs/common": "^11.0.1",
