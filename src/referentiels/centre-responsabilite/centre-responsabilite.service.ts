@@ -21,6 +21,8 @@
  */
 import {
   ConflictException,
+  forwardRef,
+  Inject,
   Injectable,
   NotFoundException,
   UnprocessableEntityException,
@@ -81,6 +83,12 @@ export class CentreResponsabiliteService extends Scd2Service<DimCentreResponsabi
     @InjectRepository(DimCentreResponsabilite)
     repo: Repository<DimCentreResponsabilite>,
     dataSource: DataSource,
+    /**
+     * `@Inject(forwardRef(...))` car StructureService est dans un
+     * cycle avec ce service (cf. `scd2-pattern.md` §8). Symétrique du
+     * forwardRef côté StructureService.
+     */
+    @Inject(forwardRef(() => StructureService))
     private readonly structureService: StructureService,
   ) {
     super(repo, 'codeCr', dataSource);
