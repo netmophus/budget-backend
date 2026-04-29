@@ -15,6 +15,7 @@ import { HealthModule } from './health/health.module';
 import { CentreResponsabiliteModule } from './referentiels/centre-responsabilite/centre-responsabilite.module';
 import { CompteModule } from './referentiels/compte/compte.module';
 import { DeviseModule } from './referentiels/devise/devise.module';
+import { LigneMetierModule } from './referentiels/ligne-metier/ligne-metier.module';
 import { StructureModule } from './referentiels/structure/structure.module';
 import { TempsModule } from './referentiels/temps/temps.module';
 import { RolesModule } from './roles/roles.module';
@@ -78,6 +79,7 @@ import { UsersModule } from './users/users.module';
     StructureModule,
     CentreResponsabiliteModule,
     CompteModule,
+    LigneMetierModule,
   ],
   controllers: [AppController],
   providers: [
