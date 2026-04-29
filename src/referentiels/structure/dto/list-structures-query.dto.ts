@@ -15,8 +15,10 @@ import {
 
 import {
   CODES_PAYS_UEMOA,
-  CodePaysUemoa,
   TYPES_STRUCTURE,
+} from '../entities/dim-structure.entity';
+import type {
+  CodePaysUemoa,
   TypeStructure,
 } from '../entities/dim-structure.entity';
 
