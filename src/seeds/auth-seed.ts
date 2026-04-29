@@ -82,14 +82,14 @@ export function assertProductionPasswordPolicy(envVarName: string): void {
   }
 }
 
-interface PermissionSeed {
+export interface PermissionSeed {
   code: string;
   libelle: string;
   module: string;
   description?: string;
 }
 
-const PERMISSIONS: PermissionSeed[] = [
+export const PERMISSIONS: PermissionSeed[] = [
   {
     code: 'SYSTEM.ADMIN',
     libelle: 'Administration système',
@@ -122,6 +122,17 @@ const PERMISSIONS: PermissionSeed[] = [
     code: 'AUDIT.LIRE',
     libelle: 'Consulter le journal d’audit',
     module: 'AUDIT',
+  },
+  {
+    code: 'REFERENTIEL.LIRE',
+    libelle: 'Lire les référentiels',
+    module: 'REFERENTIEL',
+  },
+  {
+    code: 'REFERENTIEL.GERER',
+    libelle: 'Gérer les référentiels',
+    module: 'REFERENTIEL',
+    description: 'Créer, modifier, désactiver les éléments des référentiels (devises, calendrier, etc.).',
   },
 ];
 

@@ -1,4 +1,25 @@
-import { assertProductionPasswordPolicy } from './auth-seed';
+import { assertProductionPasswordPolicy, PERMISSIONS } from './auth-seed';
+
+describe('PERMISSIONS seed list', () => {
+  it('contains the two REFERENTIEL permissions', () => {
+    const codes = PERMISSIONS.map((p) => p.code);
+    expect(codes).toContain('REFERENTIEL.LIRE');
+    expect(codes).toContain('REFERENTIEL.GERER');
+  });
+
+  it('declares REFERENTIEL.LIRE under module REFERENTIEL', () => {
+    const lire = PERMISSIONS.find((p) => p.code === 'REFERENTIEL.LIRE');
+    expect(lire?.module).toBe('REFERENTIEL');
+    expect(lire?.libelle).toBe('Lire les référentiels');
+  });
+
+  it('declares REFERENTIEL.GERER under module REFERENTIEL with a description', () => {
+    const gerer = PERMISSIONS.find((p) => p.code === 'REFERENTIEL.GERER');
+    expect(gerer?.module).toBe('REFERENTIEL');
+    expect(gerer?.description).toBeDefined();
+  });
+});
+
 
 describe('assertProductionPasswordPolicy', () => {
   const ENV_VAR = 'SEED_TEST_PASSWORD';
