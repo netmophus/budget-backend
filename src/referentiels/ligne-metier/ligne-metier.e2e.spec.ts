@@ -372,6 +372,53 @@ describe('LigneMetier (e2e) — SCD2 hiérarchique + relink auto-référence str
       .expect(422);
   });
 
+  it('GET /lignes-metier/racines → 2 racines (RETAIL, CORPORATE)', async () => {
+    const res = await request(app.getHttpServer())
+      .get('/api/v1/referentiels/lignes-metier/racines')
+      .set('Authorization', `Bearer ${lecteurToken}`)
+      .expect(200);
+    expect(
+      res.body
+        .map((r: { codeLigneMetier: string }) => r.codeLigneMetier)
+        .sort(),
+    ).toEqual(['CORPORATE', 'RETAIL']);
+  });
+
+  it('GET /lignes-metier/par-code/RETAIL → version courante', async () => {
+    const res = await request(app.getHttpServer())
+      .get('/api/v1/referentiels/lignes-metier/par-code/RETAIL')
+      .set('Authorization', `Bearer ${lecteurToken}`)
+      .expect(200);
+    expect(res.body.codeLigneMetier).toBe('RETAIL');
+    expect(res.body.versionCourante).toBe(true);
+  });
+
+  it('GET /lignes-metier/par-code/RETAIL/historique → 1 version', async () => {
+    const res = await request(app.getHttpServer())
+      .get('/api/v1/referentiels/lignes-metier/par-code/RETAIL/historique')
+      .set('Authorization', `Bearer ${lecteurToken}`)
+      .expect(200);
+    expect(res.body).toHaveLength(1);
+  });
+
+  it('GET /lignes-metier/:idRetailPart/ancetres → [RETAIL]', async () => {
+    const res = await request(app.getHttpServer())
+      .get(`/api/v1/referentiels/lignes-metier/${ids.idRetailPart}/ancetres`)
+      .set('Authorization', `Bearer ${lecteurToken}`)
+      .expect(200);
+    expect(
+      res.body.map((r: { codeLigneMetier: string }) => r.codeLigneMetier),
+    ).toEqual(['RETAIL']);
+  });
+
+  it('GET /lignes-metier/:idRetail/enfants → 2 enfants', async () => {
+    const res = await request(app.getHttpServer())
+      .get(`/api/v1/referentiels/lignes-metier/${ids.idRetail}/enfants`)
+      .set('Authorization', `Bearer ${lecteurToken}`)
+      .expect(200);
+    expect(res.body.length).toBe(2);
+  });
+
   it('GET /:idRetail/descendants → toute la sous-arborescence RETAIL', async () => {
     const res = await request(app.getHttpServer())
       .get(`/api/v1/referentiels/lignes-metier/${ids.idRetail}/descendants`)

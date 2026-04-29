@@ -342,6 +342,50 @@ describe('Produit (e2e) — SCD2 hiérarchique + relink auto-référence straté
       .expect(422);
   });
 
+  it('GET /produits/racines → 2 racines (CREDIT_GRP, DEPOT_GRP)', async () => {
+    const res = await request(app.getHttpServer())
+      .get('/api/v1/referentiels/produits/racines')
+      .set('Authorization', `Bearer ${lecteurToken}`)
+      .expect(200);
+    expect(res.body.map((r: { codeProduit: string }) => r.codeProduit).sort()).toEqual([
+      'CREDIT_GRP',
+      'DEPOT_GRP',
+    ]);
+  });
+
+  it('GET /produits/par-code/DEPOT_GRP → version courante', async () => {
+    const res = await request(app.getHttpServer())
+      .get('/api/v1/referentiels/produits/par-code/DEPOT_GRP')
+      .set('Authorization', `Bearer ${lecteurToken}`)
+      .expect(200);
+    expect(res.body.codeProduit).toBe('DEPOT_GRP');
+    expect(res.body.versionCourante).toBe(true);
+  });
+
+  it('GET /produits/par-code/DEPOT_GRP/historique → 1 version', async () => {
+    const res = await request(app.getHttpServer())
+      .get('/api/v1/referentiels/produits/par-code/DEPOT_GRP/historique')
+      .set('Authorization', `Bearer ${lecteurToken}`)
+      .expect(200);
+    expect(res.body).toHaveLength(1);
+  });
+
+  it('GET /produits/:idDepotGrp/enfants → 3 enfants', async () => {
+    const res = await request(app.getHttpServer())
+      .get(`/api/v1/referentiels/produits/${ids.idDepotGrp}/enfants`)
+      .set('Authorization', `Bearer ${lecteurToken}`)
+      .expect(200);
+    expect(res.body.length).toBe(3);
+  });
+
+  it('GET /produits/:idDepotGrp/descendants → 3 descendants', async () => {
+    const res = await request(app.getHttpServer())
+      .get(`/api/v1/referentiels/produits/${ids.idDepotGrp}/descendants`)
+      .set('Authorization', `Bearer ${lecteurToken}`)
+      .expect(200);
+    expect(res.body.length).toBe(3);
+  });
+
   it('GET /produits?typeProduit=depot → 4 produits depot', async () => {
     const res = await request(app.getHttpServer())
       .get('/api/v1/referentiels/produits')
@@ -349,6 +393,24 @@ describe('Produit (e2e) — SCD2 hiérarchique + relink auto-référence straté
       .set('Authorization', `Bearer ${lecteurToken}`)
       .expect(200);
     expect(res.body.total).toBe(4); // DEPOT_GRP + 3 enfants
+  });
+
+  it('GET /produits?estPorteurInterets=true → 0 produits (aucun seed est porteur)', async () => {
+    const res = await request(app.getHttpServer())
+      .get('/api/v1/referentiels/produits')
+      .query({ estPorteurInterets: 'true' })
+      .set('Authorization', `Bearer ${lecteurToken}`)
+      .expect(200);
+    expect(res.body.total).toBe(0); // aucun seed n'a estPorteurInterets=true
+  });
+
+  it('GET /produits?versionCouranteUniquement=false → inclut les versions historisées', async () => {
+    const res = await request(app.getHttpServer())
+      .get('/api/v1/referentiels/produits')
+      .query({ versionCouranteUniquement: 'false' })
+      .set('Authorization', `Bearer ${lecteurToken}`)
+      .expect(200);
+    expect(res.body.total).toBeGreaterThanOrEqual(5);
   });
 
   it('PATCH /par-code/DEPOT_VUE estActif=false → in-place', async () => {
