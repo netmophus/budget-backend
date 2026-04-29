@@ -1,0 +1,15 @@
+code_compte,libelle,classe,sous_classe,code_compte_parent,niveau,sens,code_poste_budgetaire,est_compte_collectif,est_porteur_interets
+6,CHARGES,6,,,1,D,,true,false
+7,PRODUITS,7,,,1,C,,true,false
+60,Charges d'exploitation bancaire,6,,6,2,D,,true,false
+61,Charges de personnel,6,,6,2,D,,true,false
+70,Produits d'exploitation bancaire,7,,7,2,C,,true,false
+76,Intérêts perçus,7,,7,2,C,,true,true
+601,Achats consommables,6,,60,3,D,,true,false
+611,Rémunérations du personnel,6,,61,3,D,,true,false
+761,Intérêts sur prêts CT,7,,76,3,C,,true,true
+601100,Fournitures de bureau,6,,601,4,D,ACHATS_DIVERS,false,false
+611100,Salaires bruts,6,,611,4,D,MASSE_SALARIALE,false,false
+611200,Primes et bonus,6,,611,4,D,MASSE_SALARIALE,false,false
+761100,Intérêts sur prêts particuliers CT,7,,761,4,C,PNB_INTERETS_RETAIL,false,true
+761200,Intérêts sur prêts entreprises CT,7,,761,4,C,PNB_INTERETS_CORPORATE,false,true

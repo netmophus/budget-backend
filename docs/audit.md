@@ -24,7 +24,7 @@ debug — volatiles).
 | `CREATE` / `UPDATE` / `DELETE` | Endpoints décorés `@Auditable({ typeAction: ... })` — sur opérations métier. | success ou failure | body sanitisé, idCible si extracteur fourni |
 | `VALIDATE` | Validation métier (ex. version budget). | success ou failure | (à venir aux Lots 3+) |
 | `FREEZE` | Gel d'une version (irréversible). | success ou failure | (à venir au Lot 3) |
-| `EXPORT` / `IMPORT` | Transferts en masse (Excel, CSV). | success ou failure | (à venir aux Lots 5+) |
+| `EXPORT` / `IMPORT` | Transferts en masse (Excel, CSV). | success ou failure | `IMPORT` : première utilisation Lot 2.4A.2 sur `POST /referentiels/comptes/import` — `payloadApres` contient le rapport `ImportRapportDto` complet (totalLines, imported, updated, skipped, errors[]). Conservation 10 ans comme les autres types. `EXPORT` à venir Lots 5+. |
 | `LIRE_AUDIT` | Méta-audit : un utilisateur (≠ `system`) consulte `/audit-logs`. | success | commentaire = filtres JSON appliqués |
 
 ---

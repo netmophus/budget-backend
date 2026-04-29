@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -9,11 +10,16 @@ import {
   Patch,
   Post,
   Query,
+  UploadedFile,
+  UseInterceptors,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import {
   ApiBadRequestResponse,
   ApiBearerAuth,
+  ApiBody,
   ApiConflictResponse,
+  ApiConsumes,
   ApiCreatedResponse,
   ApiNoContentResponse,
   ApiNotFoundResponse,
@@ -27,18 +33,36 @@ import { Auditable } from '../../audit/decorators/auditable.decorator';
 import { CurrentUser } from '../../auth/decorators/current-user.decorator';
 import type { AuthUser } from '../../auth/decorators/current-user.decorator';
 import { RequirePermissions } from '../../auth/decorators/require-permissions.decorator';
+import { CompteImportService } from './compte-import.service';
 import { CompteService } from './compte.service';
 import { CompteResponseDto } from './dto/compte-response.dto';
 import { CreateCompteDto } from './dto/create-compte.dto';
+import { ImportRapportDto } from './dto/import-rapport.dto';
+import type { ImportMode } from './dto/import-request.dto';
 import { ListComptesQueryDto } from './dto/list-comptes-query.dto';
 import { PaginatedComptesDto } from './dto/paginated-comptes.dto';
 import { UpdateCompteDto } from './dto/update-compte.dto';
+
+/**
+ * Type local minimal pour le fichier uploadé (multer). On évite
+ * d'ajouter `@types/multer` comme dépendance — seuls les champs
+ * effectivement consommés sont déclarés.
+ */
+interface UploadedCsvFile {
+  buffer: Buffer;
+  originalname: string;
+  mimetype: string;
+  size: number;
+}
 
 @ApiTags('referentiels-compte')
 @ApiBearerAuth()
 @Controller('referentiels/comptes')
 export class CompteController {
-  constructor(private readonly compteService: CompteService) {}
+  constructor(
+    private readonly compteService: CompteService,
+    private readonly compteImportService: CompteImportService,
+  ) {}
 
   // ─── Lecture
 
@@ -124,6 +148,57 @@ export class CompteController {
   }
 
   // ─── Mutation
+
+  @Post('import')
+  @RequirePermissions('REFERENTIEL.GERER')
+  @UseInterceptors(FileInterceptor('file'))
+  @Auditable({ typeAction: 'IMPORT', entiteCible: 'dim_compte' })
+  @ApiOperation({
+    summary:
+      'Import en masse du PCB UMOA révisé depuis un fichier CSV (multipart/form-data, field "file"). Premier vrai usage de CsvImportService (socle 2.1).',
+  })
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        file: { type: 'string', format: 'binary' },
+        mode: {
+          type: 'string',
+          enum: ['insert-only', 'upsert'],
+          default: 'insert-only',
+        },
+      },
+      required: ['file'],
+    },
+  })
+  @ApiOkResponse({ type: ImportRapportDto })
+  @ApiBadRequestResponse({ description: 'Fichier manquant ou invalide.' })
+  async importCsv(
+    @UploadedFile() file: UploadedCsvFile | undefined,
+    @Query('mode') mode: ImportMode = 'insert-only',
+    @CurrentUser() user: AuthUser,
+  ): Promise<ImportRapportDto> {
+    if (!file) {
+      throw new BadRequestException(
+        "Fichier CSV requis (form-data field 'file').",
+      );
+    }
+    // Valider grossièrement l'extension / mimetype pour rejeter
+    // immédiatement les uploads PDF / xlsx — le parsing CSV ferait
+    // de toute façon échouer chaque ligne, mais autant donner un
+    // message clair côté API.
+    const isCsv =
+      file.mimetype.includes('csv') ||
+      file.mimetype === 'text/plain' ||
+      file.originalname.toLowerCase().endsWith('.csv');
+    if (!isCsv) {
+      throw new BadRequestException(
+        `Type de fichier non supporté (mimetype=${file.mimetype}, nom=${file.originalname}). Attendu : .csv`,
+      );
+    }
+    return this.compteImportService.importBuffer(file.buffer, mode, user.email);
+  }
 
   @Post()
   @RequirePermissions('REFERENTIEL.GERER')
