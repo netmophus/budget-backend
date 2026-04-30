@@ -24,6 +24,19 @@ import { StructureModule } from './referentiels/structure/structure.module';
 import { TauxChangeModule } from './referentiels/taux-change/taux-change.module';
 import { TempsModule } from './referentiels/temps/temps.module';
 import { VersionModule } from './referentiels/version/version.module';
+import { RefCategorieSegmentModule } from './referentiels-secondaires/categorie-segment/ref-categorie-segment.module';
+import { RefClasseCompteModule } from './referentiels-secondaires/classe-compte/ref-classe-compte.module';
+import { RefPaysModule } from './referentiels-secondaires/pays/ref-pays.module';
+import { RefSensCompteModule } from './referentiels-secondaires/sens-compte/ref-sens-compte.module';
+import { RefStatutScenarioModule } from './referentiels-secondaires/statut-scenario/ref-statut-scenario.module';
+import { RefStatutVersionModule } from './referentiels-secondaires/statut-version/ref-statut-version.module';
+import { RefTypeActionAuditModule } from './referentiels-secondaires/type-action-audit/ref-type-action-audit.module';
+import { RefTypeCrModule } from './referentiels-secondaires/type-cr/ref-type-cr.module';
+import { RefTypeProduitModule } from './referentiels-secondaires/type-produit/ref-type-produit.module';
+import { RefTypeScenarioModule } from './referentiels-secondaires/type-scenario/ref-type-scenario.module';
+import { RefTypeStructureModule } from './referentiels-secondaires/type-structure/ref-type-structure.module';
+import { RefTypeTauxModule } from './referentiels-secondaires/type-taux/ref-type-taux.module';
+import { RefTypeVersionModule } from './referentiels-secondaires/type-version/ref-type-version.module';
 import { RolesModule } from './roles/roles.module';
 import { UsersModule } from './users/users.module';
 
@@ -92,6 +105,20 @@ import { UsersModule } from './users/users.module';
     TauxChangeModule,
     VersionModule,
     FaitBudgetModule,
+    // Référentiels secondaires (énumérations) — Lot 2.5-bis-A.
+    RefTypeStructureModule,
+    RefPaysModule,
+    RefTypeCrModule,
+    RefSensCompteModule,
+    RefClasseCompteModule,
+    RefTypeProduitModule,
+    RefCategorieSegmentModule,
+    RefTypeVersionModule,
+    RefStatutVersionModule,
+    RefTypeScenarioModule,
+    RefStatutScenarioModule,
+    RefTypeTauxModule,
+    RefTypeActionAuditModule,
   ],
   controllers: [AppController],
   providers: [
