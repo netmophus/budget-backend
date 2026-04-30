@@ -169,6 +169,93 @@ describe('Scd2Service', () => {
     });
   });
 
+  describe('resolveVersionAtDate', () => {
+    it('cas nominal : version unique trouvée et id retourné', async () => {
+      const seeded = await seed(repo, {
+        codeTest: 'A',
+        libelle: 'unique',
+        dateDebutValidite: '2025-01-01',
+        dateFinValidite: null,
+        versionCourante: true,
+      });
+
+      const result = await service.resolveVersionAtDate(
+        'A',
+        new Date('2025-06-15'),
+      );
+      expect(result).not.toBeNull();
+      expect(result!.id).toBe(String(seeded.id));
+      expect(result!.version.libelle).toBe('unique');
+    });
+
+    it('cas multi-versions : retourne celle valide à la date (Option B)', async () => {
+      const v1 = await seed(repo, {
+        codeTest: 'A',
+        libelle: 'v1-ancienne',
+        dateDebutValidite: '2025-01-01',
+        dateFinValidite: '2025-07-01',
+        versionCourante: false,
+      });
+      const v2 = await seed(repo, {
+        codeTest: 'A',
+        libelle: 'v2-courante',
+        dateDebutValidite: '2025-07-01',
+        dateFinValidite: null,
+        versionCourante: true,
+      });
+
+      // 2025-04-15 → V1 (entre les deux dates de la V1)
+      const r1 = await service.resolveVersionAtDate('A', '2025-04-15');
+      expect(r1!.id).toBe(String(v1.id));
+      expect(r1!.version.libelle).toBe('v1-ancienne');
+
+      // 2025-08-15 → V2 (la courante)
+      const r2 = await service.resolveVersionAtDate('A', '2025-08-15');
+      expect(r2!.id).toBe(String(v2.id));
+      expect(r2!.version.libelle).toBe('v2-courante');
+    });
+
+    it('cas date trop ancienne (avant toute version) → null', async () => {
+      await seed(repo, {
+        codeTest: 'A',
+        libelle: 'v1',
+        dateDebutValidite: '2025-01-01',
+        dateFinValidite: null,
+        versionCourante: true,
+      });
+      const result = await service.resolveVersionAtDate('A', '2024-06-30');
+      expect(result).toBeNull();
+    });
+
+    it('cas date trop récente après softClose → null (la version a une fin)', async () => {
+      // Simule l'état post-softClose : dateFinValidite posée,
+      // versionCourante=false, plus aucune ligne courante.
+      await seed(repo, {
+        codeTest: 'A',
+        libelle: 'fermée',
+        dateDebutValidite: '2025-01-01',
+        dateFinValidite: '2025-12-31',
+        versionCourante: false,
+        estActif: false,
+      });
+      const result = await service.resolveVersionAtDate('A', '2026-06-15');
+      expect(result).toBeNull();
+    });
+
+    it('cas date trop récente sans softClose → retourne la courante (fin nulle)', async () => {
+      await seed(repo, {
+        codeTest: 'A',
+        libelle: 'courante',
+        dateDebutValidite: '2025-01-01',
+        dateFinValidite: null,
+        versionCourante: true,
+      });
+      const result = await service.resolveVersionAtDate('A', '2099-12-31');
+      expect(result).not.toBeNull();
+      expect(result!.version.libelle).toBe('courante');
+    });
+  });
+
   describe('findHistory', () => {
     it('returns versions in ascending chronological order', async () => {
       await seed(repo, {

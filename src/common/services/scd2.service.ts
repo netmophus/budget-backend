@@ -60,6 +60,34 @@ export class Scd2Service<T extends Scd2Entity> {
       .getOne();
   }
 
+  /**
+   * Résout le surrogate id d'une dimension SCD2 vers la version
+   * VALIDE À LA DATE MÉTIER fournie. Implémente Option B
+   * (cf. `docs/modele-donnees.md` §6.3) — utilisable par toutes les
+   * tables de faits (`fait_budget` au Lot 3.2B, puis fait_realise /
+   * fait_capex / fait_bilan plus tard).
+   *
+   * Wrapper sur `findValidAt` avec :
+   *  - acceptation d'une date sous forme `Date` ou `string` ISO
+   *    (`YYYY-MM-DD`) — pratique pour les DTO sérialisés.
+   *  - retour structuré `{ id, version }` : l'`id` est extrait pour
+   *    l'utilisation directe en FK, la `version` pour les contrôles
+   *    métier (lecture de `estActif`, `libelle`, etc.) côté caller.
+   *  - `null` si aucune version valide à cette date — le caller
+   *    doit gérer (typiquement 422 avec message indiquant LAQUELLE).
+   */
+  async resolveVersionAtDate(
+    businessKey: string,
+    dateMetier: Date | string,
+  ): Promise<{ id: string; version: T } | null> {
+    const date =
+      typeof dateMetier === 'string' ? new Date(dateMetier) : dateMetier;
+    const version = await this.findValidAt(businessKey, date);
+    if (!version) return null;
+    const id = (version as unknown as { id: string | number }).id;
+    return { id: String(id), version };
+  }
+
   /** Historique chronologique d'une business key. */
   async findHistory(businessKey: string): Promise<T[]> {
     const where = {
