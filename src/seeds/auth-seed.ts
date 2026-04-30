@@ -152,6 +152,20 @@ export const PERMISSIONS: PermissionSeed[] = [
     module: 'BUDGET',
     description: 'Supprimer une ligne de fait_budget (autorisé uniquement si la version est ouverte).',
   },
+  {
+    code: 'CONFIGURATION.LIRE',
+    libelle: 'Lire la configuration (référentiels secondaires)',
+    module: 'CONFIGURATION',
+    description:
+      "Consulter les énumérations métier (types structure / pays / classes compte / etc.).",
+  },
+  {
+    code: 'CONFIGURATION.GERER',
+    libelle: 'Gérer la configuration (référentiels secondaires)',
+    module: 'CONFIGURATION',
+    description:
+      "Créer, modifier, désactiver, supprimer les valeurs des référentiels secondaires.",
+  },
 ];
 
 interface RoleSeed {
