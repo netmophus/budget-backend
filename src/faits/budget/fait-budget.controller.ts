@@ -28,7 +28,9 @@ import { Auditable } from '../../audit/decorators/auditable.decorator';
 import { CurrentUser } from '../../auth/decorators/current-user.decorator';
 import type { AuthUser } from '../../auth/decorators/current-user.decorator';
 import { RequirePermissions } from '../../auth/decorators/require-permissions.decorator';
+import { CreateFaitBudgetFromBusinessKeysDto } from './dto/create-fait-budget-from-business-keys.dto';
 import { CreateFaitBudgetDto } from './dto/create-fait-budget.dto';
+import { FaitBudgetFromBusinessKeysResponseDto } from './dto/fait-budget-from-business-keys-response.dto';
 import { FaitBudgetResponseDto } from './dto/fait-budget-response.dto';
 import { ListFaitBudgetQueryDto } from './dto/list-fait-budget-query.dto';
 import { PaginatedFaitBudgetDto } from './dto/paginated-fait-budget.dto';
@@ -89,7 +91,7 @@ export class FaitBudgetController {
   @Auditable({ typeAction: 'CREATE', entiteCible: 'fait_budget' })
   @ApiOperation({
     summary:
-      "Crée un fait budget. Au Lot 3.2A, le caller fournit les 10 FK explicitement ; la résolution dynamique par codes business + date métier (Option B SCD2) arrive au Lot 3.2B.",
+      "Crée un fait budget à partir des 10 FK techniques (réservé imports/scripts). Pour la saisie utilisateur, préférer POST /from-business-keys.",
   })
   @ApiCreatedResponse({ type: FaitBudgetResponseDto })
   @ApiConflictResponse({
@@ -103,6 +105,63 @@ export class FaitBudgetController {
     @CurrentUser() user: AuthUser,
   ): Promise<FaitBudgetResponseDto> {
     return this.service.create(dto, user.email);
+  }
+
+  @Post('from-business-keys')
+  @RequirePermissions('BUDGET.SAISIR')
+  @Auditable({ typeAction: 'CREATE', entiteCible: 'fait_budget' })
+  @ApiOperation({
+    summary:
+      'Saisie budget — endpoint principal pour saisie utilisateur',
+    description: `Crée un fait budget à partir des codes business des 9 dimensions + une date métier.
+
+**Algorithme (Option B, cf. modele-donnees.md §6.3)** :
+
+1. Résolution \`dateMetier\` (YYYY-MM-01) → \`fk_temps\` via \`TempsService.findByDate\`.
+2. Résolution des 6 dimensions SCD2 (structure / centre / compte / ligne_metier / produit / segment) vers la version VALIDE À LA DATE MÉTIER — pas la version courante. Garantit que les reportings historiques restent stables même si une dimension est révisée plus tard.
+3. Résolution des 3 dimensions non-SCD2 (devise par codeIso, version par codeVersion, scénario par codeScenario).
+4. Validation business : version doit être en statut \`'ouvert'\`, scénario en \`'actif'\`. Cohérence devise pivot XOF / taux=1.0.
+5. Résolution du taux de change :
+   - Si \`tauxChangeApplique\` fourni → utilisé tel quel (override manuel).
+   - Sinon si devise = pivot XOF → 1.0.
+   - Sinon → \`TauxChangeService.findTauxApplicable\` avec \`typeTaux\` (par défaut : \`'fixe_budgetaire'\` pour budget_initial / atterrissage, \`'cloture'\` pour reforecast).
+6. Calcul automatique \`montantFcfa = montantDevise × tauxChangeApplique\` (4 décimales). Si fourni, cohérence vérifiée à 0.01 près.
+7. INSERT via la même méthode que POST / (validation grain unique \`uq_fait_budget_grain\`).
+
+**Codes erreur** :
+- 201 : succès, retour avec \`resolutionDetails\`.
+- 400 : DTO invalide (date pas un 1er du mois, code ISO mal formaté, etc.).
+- 401 / 403 : non authentifié / pas la permission BUDGET.SAISIR.
+- 404 : date métier introuvable dans \`dim_temps\`, ou \`codeDevise\` / \`codeVersion\` / \`codeScenario\` inexistant.
+- 409 : version cible non \`'ouvert'\`, scénario archivé, ou grain dupliqué (uq_fait_budget_grain).
+- 422 : aucune version SCD2 valide à la date métier pour une des 6 dimensions, devise XOF avec taux ≠ 1, montantFcfa fourni incohérent avec montantDevise × taux, ou aucun taux applicable trouvé.
+
+**Champs de \`resolutionDetails\`** (audit + debug + UI Lot 3.5) :
+- \`tauxChangeSource\` : \`'fourni-utilisateur'\` | \`'auto-pivot-xof'\` | \`'auto-fixe-budgetaire'\` | \`'auto-cloture'\` | \`'auto-moyen-mensuel'\`.
+- \`dateApplicableTaux\` : date du taux retenu côté \`ref_taux_change\` (null si XOF ou taux fourni manuellement).
+- \`montantFcfaSource\` : \`'fourni-utilisateur'\` | \`'calcule-automatique'\`.
+- \`dimensionsResolues\` : tableau des 6 résolutions SCD2 avec les bornes de validité de chaque version retenue.
+
+L'audit_log capture la requête + la réponse (y compris \`resolutionDetails\`), donc tout le contexte de résolution est tracé.`,
+  })
+  @ApiCreatedResponse({ type: FaitBudgetFromBusinessKeysResponseDto })
+  @ApiBadRequestResponse({ description: 'Validation DTO invalide.' })
+  @ApiNotFoundResponse({
+    description:
+      'Date métier introuvable ou codeDevise/codeVersion/codeScenario inconnu.',
+  })
+  @ApiConflictResponse({
+    description: 'Version non ouverte, scénario archivé, ou grain dupliqué.',
+  })
+  @ApiUnprocessableEntityResponse({
+    description:
+      "Aucune version SCD2 valide à la date métier pour une dimension, ou cohérence devise/taux/montant violée.",
+  })
+  createFromBusinessKeys(
+    @Body() dto: CreateFaitBudgetFromBusinessKeysDto,
+    @CurrentUser() user: AuthUser,
+  ): Promise<FaitBudgetFromBusinessKeysResponseDto> {
+    return this.service.createFromBusinessKeys(dto, user.email);
   }
 
   @Patch(':id')
