@@ -1,16 +1,18 @@
 /**
- * FaitBudgetService — CRUD basique sur la table de faits
- * `fait_budget`. Cf. `docs/modele-donnees.md` §4.1.
+ * FaitBudgetService — CRUD sur `fait_budget` + résolution SCD2
+ * dynamique (Option B). Cf. `docs/modele-donnees.md` §4.1 et §6.3.
  *
  * **Portée Lot 3.2A** :
  *  - CRUD des 10 FK (fournies par le caller, pas résolues
  *    automatiquement)
  *  - Validation grain unique (uq_fait_budget_grain)
  *  - Refus PATCH/DELETE si la version cible n'est pas 'ouvert'
- *  - PAS de résolution SCD2 dynamique (Option B §6.3) → Lot 3.2B
- *  - PAS de calcul automatique `montant_fcfa = montant_devise ×
- *    taux_change_applique` → Lot 3.2B
- *  - PAS d'agrégation/synthèse → Lot 5
+ *
+ * **Portée Lot 3.2B** :
+ *  - `createFromBusinessKeys` : résolution SCD2 dynamique des
+ *    6 dimensions versionnées vers la version VALIDE À LA DATE
+ *    MÉTIER (Option B), résolution des 3 dimensions non-SCD2,
+ *    calcul automatique du taux et de `montant_fcfa`.
  */
 import {
   ConflictException,
@@ -21,8 +23,30 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 
+import type { Scd2Entity } from '../../common/entities/scd2.entity';
+import type { Scd2Service } from '../../common/services/scd2.service';
+import { CentreResponsabiliteService } from '../../referentiels/centre-responsabilite/centre-responsabilite.service';
+import { CompteService } from '../../referentiels/compte/compte.service';
+import { DeviseService } from '../../referentiels/devise/devise.service';
+import { LigneMetierService } from '../../referentiels/ligne-metier/ligne-metier.service';
+import { ProduitService } from '../../referentiels/produit/produit.service';
+import { ScenarioService } from '../../referentiels/scenario/scenario.service';
+import { SegmentService } from '../../referentiels/segment/segment.service';
+import { StructureService } from '../../referentiels/structure/structure.service';
+import { TauxChangeService } from '../../referentiels/taux-change/taux-change.service';
+import type { TypeTaux } from '../../referentiels/taux-change/entities/ref-taux-change.entity';
+import { TempsService } from '../../referentiels/temps/temps.service';
 import { DimVersion } from '../../referentiels/version/entities/dim-version.entity';
+import { VersionService } from '../../referentiels/version/version.service';
+import { CreateFaitBudgetFromBusinessKeysDto } from './dto/create-fait-budget-from-business-keys.dto';
 import { CreateFaitBudgetDto } from './dto/create-fait-budget.dto';
+import {
+  DimensionResolueDto,
+  FaitBudgetFromBusinessKeysResponseDto,
+  MontantFcfaSource,
+  ResolutionDetailsDto,
+  TauxChangeSource,
+} from './dto/fait-budget-from-business-keys-response.dto';
 import {
   FaitBudgetDimensionRef,
   FaitBudgetResponseDto,
@@ -147,6 +171,17 @@ export class FaitBudgetService {
     private readonly repo: Repository<FaitBudget>,
     @InjectRepository(DimVersion)
     private readonly versionRepo: Repository<DimVersion>,
+    private readonly tempsService: TempsService,
+    private readonly structureService: StructureService,
+    private readonly centreService: CentreResponsabiliteService,
+    private readonly compteService: CompteService,
+    private readonly ligneMetierService: LigneMetierService,
+    private readonly produitService: ProduitService,
+    private readonly segmentService: SegmentService,
+    private readonly deviseService: DeviseService,
+    private readonly versionService: VersionService,
+    private readonly scenarioService: ScenarioService,
+    private readonly tauxChangeService: TauxChangeService,
   ) {}
 
   // ─── Lecture
@@ -392,6 +427,258 @@ export class FaitBudgetService {
 
     const result = await this.repo.delete({ id });
     return (result.affected ?? 0) > 0;
+  }
+
+  // ─── Lot 3.2B — Résolution SCD2 dynamique (Option B) ──────────────
+
+  /**
+   * Crée un fait budget à partir des codes business des dimensions +
+   * une date métier. Résout automatiquement :
+   *  a) Toutes les FK SCD2 vers la version valide à la date métier
+   *     (Option B, cf. `modele-donnees.md` §6.3) — garantit que les
+   *     reportings historiques restent stables même quand une
+   *     dimension est révisée plus tard.
+   *  b) Les FK non-SCD2 (devise, version, scénario, temps).
+   *  c) Le taux de change applicable via
+   *     `TauxChangeService.findTauxApplicable` (sauf si fourni).
+   *  d) `montant_fcfa = montant_devise × taux` (sauf si fourni — la
+   *     cohérence est alors validée à 0.01 près).
+   *
+   * **Choix retenu sur `est_actif=false`** : la résolution réussit
+   * (l'inactivité est un signal UI, pas un invariant historique).
+   * Cohérent avec `findValidAt` qui ne filtre pas non plus.
+   *
+   * Point d'entrée principal pour la saisie utilisateur (Lot 3.5).
+   * La saisie via FK brutes (`create`) reste disponible pour les
+   * imports / scripts.
+   */
+  async createFromBusinessKeys(
+    dto: CreateFaitBudgetFromBusinessKeysDto,
+    utilisateur: string,
+  ): Promise<FaitBudgetFromBusinessKeysResponseDto> {
+    // a) Date métier → fk_temps
+    let temps;
+    try {
+      temps = await this.tempsService.findByDate(dto.dateMetier);
+    } catch (err) {
+      if (err instanceof NotFoundException) {
+        throw new NotFoundException(
+          `Date métier ${dto.dateMetier} introuvable dans dim_temps. ` +
+            `Vérifiez le seed temps ou choisissez une date dans le calendrier.`,
+        );
+      }
+      throw err;
+    }
+    const fkTemps = String(temps.id);
+
+    // b) Résolution SCD2 (6 axes) à la date métier — Option B
+    const dimensionsResolues: DimensionResolueDto[] = [];
+
+    const resolveSCD2 = async <T extends Scd2Entity>(
+      axe: string,
+      codeBusiness: string,
+      service: Scd2Service<T>,
+    ): Promise<{ id: string; version: T }> => {
+      const r = await service.resolveVersionAtDate(
+        codeBusiness,
+        dto.dateMetier,
+      );
+      if (!r) {
+        throw new UnprocessableEntityException(
+          `Aucune version de dim_${axe} '${codeBusiness}' valide au ${dto.dateMetier}. ` +
+            `Vérifiez l'existence de la dimension ou ses dates de validité SCD2 ` +
+            `(Option B, cf. modele-donnees §6.3).`,
+        );
+      }
+      dimensionsResolues.push({
+        axe,
+        codeBusiness,
+        fkResolu: r.id,
+        dateDebutValidite: r.version.dateDebutValidite,
+        dateFinValidite: r.version.dateFinValidite,
+      });
+      return r;
+    };
+
+    const structure = await resolveSCD2(
+      'structure',
+      dto.codeStructure,
+      this.structureService,
+    );
+    const centre = await resolveSCD2(
+      'centre_responsabilite',
+      dto.codeCentre,
+      this.centreService,
+    );
+    const compte = await resolveSCD2(
+      'compte',
+      dto.codeCompte,
+      this.compteService,
+    );
+    const ligneMetier = await resolveSCD2(
+      'ligne_metier',
+      dto.codeLigneMetier,
+      this.ligneMetierService,
+    );
+    const produit = await resolveSCD2(
+      'produit',
+      dto.codeProduit,
+      this.produitService,
+    );
+    const segment = await resolveSCD2(
+      'segment',
+      dto.codeSegment,
+      this.segmentService,
+    );
+
+    // c) Dimensions non-SCD2 : devise, version, scénario
+    const devise = await this.deviseService.findByCodeIso(dto.codeDevise);
+    if (!devise) {
+      throw new NotFoundException(
+        `Devise ${dto.codeDevise} introuvable dans dim_devise.`,
+      );
+    }
+    // findByCode lance NotFoundException si introuvable — on laisse
+    // remonter (404 cohérent).
+    const version = await this.versionService.findByCode(dto.codeVersion);
+    const scenario = await this.scenarioService.findByCode(dto.codeScenario);
+
+    // d) Validations business
+    if (version.statut !== 'ouvert') {
+      throw new ConflictException(
+        `Saisie impossible : la version ${version.codeVersion} a le statut ` +
+          `'${version.statut}', seul 'ouvert' autorise la saisie. ` +
+          `Le workflow soumettre/valider/geler arrive en Lot 3.3.`,
+      );
+    }
+    if (scenario.statut === 'archive') {
+      throw new ConflictException(
+        `Saisie impossible : le scénario ${scenario.codeScenario} est archivé. ` +
+          `Choisissez un scénario actif.`,
+      );
+    }
+    if (
+      devise.estDevisePivot &&
+      dto.tauxChangeApplique !== undefined &&
+      dto.tauxChangeApplique !== 1
+    ) {
+      throw new UnprocessableEntityException(
+        `Devise pivot ${devise.codeIso} : tauxChangeApplique doit valoir 1.0 ` +
+          `(reçu : ${dto.tauxChangeApplique}).`,
+      );
+    }
+
+    // e) Résolution du taux de change
+    let tauxChangeApplique: number;
+    let tauxChangeSource: TauxChangeSource;
+    let dateApplicableTaux: string | null = null;
+
+    if (dto.tauxChangeApplique !== undefined) {
+      tauxChangeApplique = dto.tauxChangeApplique;
+      tauxChangeSource = 'fourni-utilisateur';
+    } else if (devise.estDevisePivot) {
+      tauxChangeApplique = 1;
+      tauxChangeSource = 'auto-pivot-xof';
+    } else {
+      const typeTauxRetenu: TypeTaux =
+        dto.typeTaux ?? this.defaultTypeTauxFor(version.typeVersion);
+      const tauxApplicable = await this.tauxChangeService.findTauxApplicable(
+        dto.codeDevise,
+        dto.dateMetier,
+        typeTauxRetenu,
+      );
+      if (!tauxApplicable) {
+        throw new UnprocessableEntityException(
+          `Aucun taux ${typeTauxRetenu} applicable pour ${dto.codeDevise} ` +
+            `au ${dto.dateMetier}. Saisissez un taux dans ref_taux_change ` +
+            `ou fournissez tauxChangeApplique explicitement.`,
+        );
+      }
+      tauxChangeApplique = Number(tauxApplicable.tauxVersPivot);
+      dateApplicableTaux = tauxApplicable.dateApplicable;
+      tauxChangeSource = this.tauxSourceFor(typeTauxRetenu);
+    }
+
+    // f) Calcul / validation du montant FCFA
+    const calcule =
+      Math.round(dto.montantDevise * tauxChangeApplique * 10000) / 10000;
+    let montantFcfa: number;
+    let montantFcfaSource: MontantFcfaSource;
+    if (dto.montantFcfa !== undefined) {
+      const ecart = Math.abs(dto.montantFcfa - calcule);
+      // Tolérance : max(1 centime, 0.01% du calculé) — cohérent avec
+      // numeric(20,4) et arrondis intermédiaires.
+      const tolerance = Math.max(0.01, Math.abs(calcule) * 0.0001);
+      if (ecart > tolerance) {
+        throw new UnprocessableEntityException(
+          `Incohérence montantFcfa : reçu ${dto.montantFcfa}, attendu ≈ ` +
+            `${calcule} (montantDevise=${dto.montantDevise} × taux=${tauxChangeApplique}). ` +
+            `Écart ${ecart.toFixed(4)} > tolérance ${tolerance.toFixed(4)}.`,
+        );
+      }
+      montantFcfa = dto.montantFcfa;
+      montantFcfaSource = 'fourni-utilisateur';
+    } else {
+      montantFcfa = calcule;
+      montantFcfaSource = 'calcule-automatique';
+    }
+
+    // g) Insertion via la méthode `create` (3.2A) qui couvre :
+    //    - validation grain unique (uq_fait_budget_grain)
+    //    - assertVersionOuverte (déjà fait au d), 2ᵉ ligne de défense)
+    //    - mapping FK + retour FaitBudgetResponseDto
+    const created = await this.create(
+      {
+        fkTemps,
+        fkCompte: compte.id,
+        fkStructure: structure.id,
+        fkCentre: centre.id,
+        fkLigneMetier: ligneMetier.id,
+        fkProduit: produit.id,
+        fkSegment: segment.id,
+        fkDevise: String(devise.id),
+        fkVersion: String(version.id),
+        fkScenario: String(scenario.id),
+        montantDevise: dto.montantDevise,
+        montantFcfa,
+        tauxChangeApplique,
+      },
+      utilisateur,
+    );
+
+    // h) Réponse étendue avec les détails de résolution
+    const resolutionDetails: ResolutionDetailsDto = {
+      tauxChangeSource,
+      dateApplicableTaux,
+      montantFcfaSource,
+      dimensionsResolues,
+    };
+    return { ...created, resolutionDetails };
+  }
+
+  /**
+   * Mapping `type_version` → `type_taux` par défaut. Heuristique MVP
+   * du contrôle de gestion : budget initial / atterrissage utilisent
+   * un taux fixe budgétaire ; les reforecast utilisent le taux de
+   * clôture du dernier mois clos. À confirmer en pratique mais bon
+   * défaut pour la saisie sans paramètre `typeTaux` explicite.
+   */
+  private defaultTypeTauxFor(typeVersion: string): TypeTaux {
+    if (typeVersion === 'budget_initial' || typeVersion === 'atterrissage') {
+      return 'fixe_budgetaire';
+    }
+    return 'cloture';
+  }
+
+  private tauxSourceFor(typeTaux: TypeTaux): TauxChangeSource {
+    switch (typeTaux) {
+      case 'fixe_budgetaire':
+        return 'auto-fixe-budgetaire';
+      case 'cloture':
+        return 'auto-cloture';
+      case 'moyen_mensuel':
+        return 'auto-moyen-mensuel';
+    }
   }
 
   /**
