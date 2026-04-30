@@ -32,6 +32,7 @@ import { ProduitModule } from '../../referentiels/produit/produit.module';
 import { ScenarioModule } from '../../referentiels/scenario/scenario.module';
 import { SegmentModule } from '../../referentiels/segment/segment.module';
 import { StructureModule } from '../../referentiels/structure/structure.module';
+import { TauxChangeModule } from '../../referentiels/taux-change/taux-change.module';
 import { TempsModule } from '../../referentiels/temps/temps.module';
 import { VersionModule } from '../../referentiels/version/version.module';
 import { RolesModule } from '../../roles/roles.module';
@@ -284,6 +285,7 @@ describe('FaitBudget (e2e)', () => {
         SegmentModule,
         VersionModule,
         ScenarioModule,
+        TauxChangeModule,
         FaitBudgetModule,
       ],
       providers: [
@@ -330,6 +332,7 @@ describe('FaitBudget (e2e)', () => {
   beforeEach(async () => {
     await dataSource.query('DELETE FROM audit_log');
     await dataSource.query('DELETE FROM fait_budget');
+    await dataSource.query('DELETE FROM ref_taux_change');
     await dataSource.query('UPDATE dim_compte SET fk_compte_parent = NULL');
     await dataSource.query('DELETE FROM dim_compte');
     await dataSource.query('UPDATE dim_structure SET fk_structure_parent = NULL');
@@ -586,5 +589,251 @@ describe('FaitBudget (e2e)', () => {
       .set('Authorization', `Bearer ${adminToken}`)
       .send(buildBody())
       .expect(409);
+  });
+
+  // ─── 3.2B — POST /from-business-keys
+
+  function buildBkBody(
+    overrides: Partial<{
+      dateMetier: string;
+      codeStructure: string;
+      codeCentre: string;
+      codeCompte: string;
+      codeLigneMetier: string;
+      codeProduit: string;
+      codeSegment: string;
+      codeDevise: string;
+      codeVersion: string;
+      codeScenario: string;
+      montantDevise: number;
+      tauxChangeApplique: number;
+      montantFcfa: number;
+      typeTaux: string;
+    }> = {},
+  ) {
+    return {
+      dateMetier: '2026-04-01',
+      codeStructure: 'AG_TEST',
+      codeCentre: 'CR_TEST',
+      codeCompte: '611100',
+      codeLigneMetier: 'RETAIL',
+      codeProduit: 'DEPOT_VUE',
+      codeSegment: 'PARTICULIER',
+      codeDevise: 'XOF',
+      codeVersion: 'BUDGET_INITIAL_2026',
+      codeScenario: 'CENTRAL',
+      montantDevise: 1000000,
+      ...overrides,
+    };
+  }
+
+  it('LECTEUR : POST /from-business-keys → 403', async () => {
+    await request(app.getHttpServer())
+      .post('/api/v1/faits/budget/from-business-keys')
+      .set('Authorization', `Bearer ${lecteurToken}`)
+      .send(buildBkBody())
+      .expect(403);
+  });
+
+  it('POST /from-business-keys avec date pas un 1er du mois → 400', async () => {
+    await request(app.getHttpServer())
+      .post('/api/v1/faits/budget/from-business-keys')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send(buildBkBody({ dateMetier: '2026-04-15' }))
+      .expect(400);
+  });
+
+  it('POST /from-business-keys cas nominal XOF → 201 + resolutionDetails', async () => {
+    const r = await request(app.getHttpServer())
+      .post('/api/v1/faits/budget/from-business-keys')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send(buildBkBody())
+      .expect(201);
+    expect(r.body.compte.code).toBe('611100');
+    expect(r.body.tauxChangeApplique).toBe(1);
+    expect(r.body.montantFcfa).toBe(1000000);
+    expect(r.body.resolutionDetails.tauxChangeSource).toBe('auto-pivot-xof');
+    expect(r.body.resolutionDetails.dimensionsResolues).toHaveLength(6);
+  });
+
+  // SCÉNARIO CRITIQUE 1 — résolution Option B multi-versions du compte
+  it('SCÉNARIO CRITIQUE 1 : 2 dates → 2 fk_compte différents (Option B)', async () => {
+    // Créer V2 du compte 611100 (V1 existait depuis 2026-01-01)
+    await dataSource.query(
+      `UPDATE dim_compte SET date_fin_validite='2026-04-01', version_courante=false
+       WHERE code_compte='611100'`,
+    );
+    await dataSource.query(
+      `INSERT INTO dim_compte
+        ("code_compte","libelle","classe","fk_compte_parent","niveau",
+         "date_debut_validite","date_fin_validite","version_courante","est_actif","utilisateur_creation")
+       VALUES ('611100','Salaires révisés',6,NULL,4,'2026-04-01',NULL,true,true,'system')`,
+    );
+    // Insérer 2026-02-01 dans dim_temps
+    await dataSource.query(
+      `INSERT INTO dim_temps
+        ("date","annee","trimestre","mois","jour","jour_ouvre","est_fin_de_mois",
+         "est_fin_de_trimestre","est_fin_d_annee","exercice_fiscal","libelle_mois")
+       VALUES ('2026-02-01',2026,1,2,1,true,false,false,false,2026,'Février')`,
+    );
+    // Pour le 2e POST sur 2026-04-01 : on a déjà fkCompte=V2,
+    // on diversifie un autre axe via un 2nd scénario
+    await dataSource.query(
+      `INSERT INTO dim_scenario
+        ("code_scenario","libelle","type_scenario","statut","utilisateur_creation")
+       VALUES ('HAUT','Haut','haut','actif','system')`,
+    );
+
+    const v1Rows = (await dataSource.query(
+      `SELECT id FROM dim_compte WHERE code_compte='611100' AND date_debut_validite='2026-01-01'`,
+    )) as Array<{ id: string | number }>;
+    const v2Rows = (await dataSource.query(
+      `SELECT id FROM dim_compte WHERE code_compte='611100' AND date_debut_validite='2026-04-01'`,
+    )) as Array<{ id: string | number }>;
+    const fkV1 = String(v1Rows[0]!.id);
+    const fkV2 = String(v2Rows[0]!.id);
+
+    // a) POST 2026-02-01 → V1
+    const r1 = await request(app.getHttpServer())
+      .post('/api/v1/faits/budget/from-business-keys')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send(buildBkBody({ dateMetier: '2026-02-01' }))
+      .expect(201);
+    expect(r1.body.fkCompte).toBe(fkV1);
+
+    // b) POST 2026-04-01 (autre scénario) → V2
+    const r2 = await request(app.getHttpServer())
+      .post('/api/v1/faits/budget/from-business-keys')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send(buildBkBody({ dateMetier: '2026-04-01', codeScenario: 'HAUT' }))
+      .expect(201);
+    expect(r2.body.fkCompte).toBe(fkV2);
+    expect(r1.body.fkCompte).not.toBe(r2.body.fkCompte);
+
+    // c) Vérification SQL : 2 lignes fait_budget avec 2 fk_compte
+    //    différents pour le même code_compte '611100'.
+    const sql = (await dataSource.query(
+      `SELECT fb.fk_compte, c.code_compte, c.date_debut_validite, c.date_fin_validite, t.date AS date_metier
+       FROM fait_budget fb
+       JOIN dim_compte c ON c.id = fb.fk_compte
+       JOIN dim_temps t ON t.id = fb.fk_temps
+       ORDER BY t.date`,
+    )) as Array<{
+      fk_compte: string | number;
+      code_compte: string;
+      date_debut_validite: string;
+      date_fin_validite: string | null;
+      date_metier: string;
+    }>;
+    expect(sql).toHaveLength(2);
+    expect(sql[0]!.code_compte).toBe('611100');
+    expect(String(sql[0]!.fk_compte)).toBe(fkV1);
+    expect(String(sql[1]!.fk_compte)).toBe(fkV2);
+    // V1 doit englober 2026-02-01, V2 doit englober 2026-04-01.
+    // pg-mem renvoie les colonnes `date` en `Date` ; on slice à 10 char.
+    const ymd = (d: unknown): string =>
+      d instanceof Date ? d.toISOString().slice(0, 10) : String(d);
+    expect(ymd(sql[0]!.date_debut_validite)).toBe('2026-01-01');
+    expect(ymd(sql[0]!.date_fin_validite)).toBe('2026-04-01');
+    expect(ymd(sql[1]!.date_debut_validite)).toBe('2026-04-01');
+    expect(sql[1]!.date_fin_validite).toBeNull();
+  });
+
+  // SCÉNARIO CRITIQUE 2 — calcul auto FCFA depuis taux EUR
+  it('SCÉNARIO CRITIQUE 2 : EUR → tauxChangeApplique + montantFcfa calculés', async () => {
+    // a) Pré-requis : EUR + taux fixe_budgetaire 655.957 au 2026-03-31
+    await dataSource.query(
+      `INSERT INTO dim_devise
+        ("code_iso","libelle","symbole","nb_decimales","est_devise_pivot","est_active","utilisateur_creation")
+       VALUES ('EUR','Euro','€',2,false,true,'system')`,
+    );
+    await dataSource.query(
+      `INSERT INTO dim_temps
+        ("date","annee","trimestre","mois","jour","jour_ouvre","est_fin_de_mois",
+         "est_fin_de_trimestre","est_fin_d_annee","exercice_fiscal","libelle_mois")
+       VALUES ('2026-03-31',2026,1,3,31,true,true,true,false,2026,'Mars')`,
+    );
+    const eur = (await dataSource.query(
+      `SELECT id FROM dim_devise WHERE code_iso='EUR'`,
+    )) as Array<{ id: string | number }>;
+    const tps = (await dataSource.query(
+      `SELECT id FROM dim_temps WHERE date='2026-03-31'`,
+    )) as Array<{ id: string | number }>;
+    await dataSource.query(
+      `INSERT INTO ref_taux_change
+        ("fk_devise","fk_temps","taux_vers_pivot","source","type_taux","utilisateur_creation")
+       VALUES ($1,$2,'655.95700000','BCEAO','fixe_budgetaire','system')`,
+      [String(eur[0]!.id), String(tps[0]!.id)],
+    );
+
+    // b) POST sans tauxChangeApplique ni montantFcfa
+    const r = await request(app.getHttpServer())
+      .post('/api/v1/faits/budget/from-business-keys')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send(
+        buildBkBody({
+          codeDevise: 'EUR',
+          montantDevise: 1000,
+        }),
+      )
+      .expect(201);
+
+    // c) Vérifications
+    expect(r.body.tauxChangeApplique).toBe(655.957);
+    expect(r.body.montantFcfa).toBe(655957);
+    expect(r.body.resolutionDetails.tauxChangeSource).toBe(
+      'auto-fixe-budgetaire',
+    );
+    expect(r.body.resolutionDetails.dateApplicableTaux).toBe('2026-03-31');
+    expect(r.body.resolutionDetails.montantFcfaSource).toBe(
+      'calcule-automatique',
+    );
+  });
+
+  // SCÉNARIO 3 — défense en profondeur statut version
+  it('SCÉNARIO 3 : version forcée à statut soumis → 409, puis ouvert → 201', async () => {
+    // a) Forcer en SQL le statut version à 'soumis'
+    await dataSource.query(
+      `UPDATE dim_version SET statut='soumis' WHERE code_version='BUDGET_INITIAL_2026'`,
+    );
+    // b) POST → 409 avec message clair sur le workflow
+    const ko = await request(app.getHttpServer())
+      .post('/api/v1/faits/budget/from-business-keys')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send(buildBkBody())
+      .expect(409);
+    expect(ko.body.message).toMatch(/'soumis'/);
+    expect(ko.body.message).toMatch(/Lot 3\.3|workflow/);
+
+    // c) Réouvrir
+    await dataSource.query(
+      `UPDATE dim_version SET statut='ouvert' WHERE code_version='BUDGET_INITIAL_2026'`,
+    );
+    // d) POST → succès
+    await request(app.getHttpServer())
+      .post('/api/v1/faits/budget/from-business-keys')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send(buildBkBody())
+      .expect(201);
+  });
+
+  it('POST /from-business-keys consigne resolutionDetails dans audit_log payload_apres', async () => {
+    await request(app.getHttpServer())
+      .post('/api/v1/faits/budget/from-business-keys')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send(buildBkBody())
+      .expect(201);
+    const audits = (await dataSource.query(
+      `SELECT type_action, statut, payload_apres FROM audit_log
+       WHERE entite_cible='fait_budget'`,
+    )) as Array<{
+      type_action: string;
+      statut: string;
+      payload_apres: { body?: unknown; response?: { resolutionDetails?: unknown } };
+    }>;
+    expect(audits).toHaveLength(1);
+    expect(audits[0]!.type_action).toBe('CREATE');
+    expect(audits[0]!.statut).toBe('success');
+    expect(audits[0]!.payload_apres.response?.resolutionDetails).toBeDefined();
   });
 });

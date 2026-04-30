@@ -10,13 +10,25 @@
  *    version != ouvert
  *  - remove : succès + 409 si version != ouvert
  *
+ * Couvre la portée 3.2B (createFromBusinessKeys) :
+ *  - cas nominal (10 codes valides + date)
+ *  - rejet date métier inexistante / pas un 1er du mois (e2e)
+ *  - dimension SCD2 sans version valide à la date → 422
+ *  - multi-versions Option B : ancienne version résolue selon la date
+ *  - devise XOF → taux=1.0 auto
+ *  - devise non-pivot sans taux applicable → 422
+ *  - tauxChangeApplique fourni → pas d'appel findTauxApplicable
+ *  - montantFcfa fourni avec écart > tolérance → 422
+ *  - version statut!=ouvert → 409, scénario archivé → 409
+ *  - cohérence devise XOF / taux≠1 → 422
+ *
  * Limitations pg-mem documentées :
  *  - L'index UNIQUE composite sur 10 colonnes est créé par
  *    `synchronize:true` mais l'invariant est protégé en première
  *    ligne par la vérification applicative (`findOne` avant INSERT).
  *  - Les FK ne sont pas auto-créées par pg-mem si onDelete RESTRICT
  *    est posé sur des entités non chargées dans le DataSource — on
- *    charge donc explicitement les 11 entités.
+ *    charge donc explicitement les 12 entités (avec ref_taux_change).
  */
 import {
   ConflictException,
@@ -26,16 +38,28 @@ import {
 import { DataType, IMemoryDb, newDb } from 'pg-mem';
 import { DataSource, Repository } from 'typeorm';
 
+import { CentreResponsabiliteService } from '../../referentiels/centre-responsabilite/centre-responsabilite.service';
 import { DimCentreResponsabilite } from '../../referentiels/centre-responsabilite/entities/dim-centre-responsabilite.entity';
+import { CompteService } from '../../referentiels/compte/compte.service';
 import { DimCompte } from '../../referentiels/compte/entities/dim-compte.entity';
+import { DeviseService } from '../../referentiels/devise/devise.service';
 import { DimDevise } from '../../referentiels/devise/entities/dim-devise.entity';
 import { DimLigneMetier } from '../../referentiels/ligne-metier/entities/dim-ligne-metier.entity';
+import { LigneMetierService } from '../../referentiels/ligne-metier/ligne-metier.service';
 import { DimProduit } from '../../referentiels/produit/entities/dim-produit.entity';
+import { ProduitService } from '../../referentiels/produit/produit.service';
 import { DimScenario } from '../../referentiels/scenario/entities/dim-scenario.entity';
+import { ScenarioService } from '../../referentiels/scenario/scenario.service';
 import { DimSegment } from '../../referentiels/segment/entities/dim-segment.entity';
+import { SegmentService } from '../../referentiels/segment/segment.service';
 import { DimStructure } from '../../referentiels/structure/entities/dim-structure.entity';
+import { StructureService } from '../../referentiels/structure/structure.service';
+import { RefTauxChange } from '../../referentiels/taux-change/entities/ref-taux-change.entity';
+import { TauxChangeService } from '../../referentiels/taux-change/taux-change.service';
 import { DimTemps } from '../../referentiels/temps/entities/dim-temps.entity';
+import { TempsService } from '../../referentiels/temps/temps.service';
 import { DimVersion } from '../../referentiels/version/entities/dim-version.entity';
+import { VersionService } from '../../referentiels/version/version.service';
 import { FaitBudget } from './entities/fait-budget.entity';
 import { FaitBudgetService } from './fait-budget.service';
 
@@ -72,11 +96,62 @@ async function createDataSource(): Promise<DataSource> {
       DimDevise,
       DimVersion,
       DimScenario,
+      RefTauxChange,
     ],
     synchronize: true,
   });
   await ds.initialize();
   return ds;
+}
+
+/**
+ * Construit un FaitBudgetService instancié avec ses 11 dépendances
+ * réelles + DataSource. Les `crService` / `structureService`
+ * cross-références ne sont pas appelés depuis `createFromBusinessKeys`
+ * (qui ne touche que `findValidAt` / `findCurrent` du socle Scd2),
+ * donc undefined-cast est sûr ici.
+ */
+function buildService(ds: DataSource): FaitBudgetService {
+  const tempsService = new TempsService(ds.getRepository(DimTemps));
+  const structureService = new StructureService(
+    ds.getRepository(DimStructure),
+    ds,
+  );
+  const centreService = new CentreResponsabiliteService(
+    ds.getRepository(DimCentreResponsabilite),
+    ds,
+    structureService,
+  );
+  const compteService = new CompteService(ds.getRepository(DimCompte), ds);
+  const ligneMetierService = new LigneMetierService(
+    ds.getRepository(DimLigneMetier),
+    ds,
+  );
+  const produitService = new ProduitService(ds.getRepository(DimProduit), ds);
+  const segmentService = new SegmentService(ds.getRepository(DimSegment), ds);
+  const deviseService = new DeviseService(ds.getRepository(DimDevise));
+  const versionService = new VersionService(ds.getRepository(DimVersion));
+  const scenarioService = new ScenarioService(ds.getRepository(DimScenario));
+  const tauxChangeService = new TauxChangeService(
+    ds.getRepository(RefTauxChange),
+    ds.getRepository(DimDevise),
+    ds.getRepository(DimTemps),
+  );
+  return new FaitBudgetService(
+    ds.getRepository(FaitBudget),
+    ds.getRepository(DimVersion),
+    tempsService,
+    structureService,
+    centreService,
+    compteService,
+    ligneMetierService,
+    produitService,
+    segmentService,
+    deviseService,
+    versionService,
+    scenarioService,
+    tauxChangeService,
+  );
 }
 
 interface SeededIds {
@@ -209,7 +284,7 @@ describe('FaitBudgetService', () => {
     dataSource = await createDataSource();
     repo = dataSource.getRepository(FaitBudget);
     versionRepo = dataSource.getRepository(DimVersion);
-    service = new FaitBudgetService(repo, versionRepo);
+    service = buildService(dataSource);
   });
 
   afterAll(async () => {
@@ -218,6 +293,7 @@ describe('FaitBudgetService', () => {
 
   beforeEach(async () => {
     await dataSource.query('DELETE FROM fait_budget');
+    await dataSource.query('DELETE FROM ref_taux_change');
     await dataSource.query('UPDATE dim_compte SET fk_compte_parent = NULL');
     await dataSource.query('DELETE FROM dim_compte');
     await dataSource.query('UPDATE dim_structure SET fk_structure_parent = NULL');
@@ -478,6 +554,286 @@ describe('FaitBudgetService', () => {
 
     it('retourne false si id inconnu', async () => {
       expect(await service.remove('999999')).toBe(false);
+    });
+  });
+
+  // ─── 3.2B : createFromBusinessKeys
+
+  describe('createFromBusinessKeys', () => {
+    /**
+     * Helper pour seeder un taux de change EUR au 2026-03-31.
+     */
+    async function seedTauxEur(
+      taux = '655.95700000',
+      typeTaux = 'fixe_budgetaire',
+    ): Promise<void> {
+      // dim_devise EUR si pas déjà
+      await dataSource.query(
+        `INSERT INTO dim_devise
+          ("code_iso","libelle","symbole","nb_decimales","est_devise_pivot","est_active","utilisateur_creation")
+         VALUES ('EUR','Euro','€',2,false,true,'system')`,
+      );
+      // dim_temps 2026-03-31 si pas déjà
+      await dataSource.query(
+        `INSERT INTO dim_temps
+          ("date","annee","trimestre","mois","jour","jour_ouvre","est_fin_de_mois",
+           "est_fin_de_trimestre","est_fin_d_annee","exercice_fiscal","libelle_mois")
+         VALUES ('2026-03-31',2026,1,3,31,true,true,true,false,2026,'Mars')`,
+      );
+      const eur = (await dataSource.query(
+        `SELECT id FROM dim_devise WHERE code_iso='EUR'`,
+      )) as Array<{ id: string | number }>;
+      const tps = (await dataSource.query(
+        `SELECT id FROM dim_temps WHERE date='2026-03-31'`,
+      )) as Array<{ id: string | number }>;
+      await dataSource.query(
+        `INSERT INTO ref_taux_change
+          ("fk_devise","fk_temps","taux_vers_pivot","source","type_taux","utilisateur_creation")
+         VALUES ($1,$2,$3,'BCEAO',$4,'system')`,
+        [String(eur[0]!.id), String(tps[0]!.id), taux, typeTaux],
+      );
+    }
+
+    function buildDto(
+      overrides: Partial<{
+        dateMetier: string;
+        codeStructure: string;
+        codeCentre: string;
+        codeCompte: string;
+        codeLigneMetier: string;
+        codeProduit: string;
+        codeSegment: string;
+        codeDevise: string;
+        codeVersion: string;
+        codeScenario: string;
+        montantDevise: number;
+        tauxChangeApplique?: number;
+        montantFcfa?: number;
+        typeTaux?: 'cloture' | 'moyen_mensuel' | 'fixe_budgetaire';
+      }> = {},
+    ) {
+      return {
+        dateMetier: '2026-04-01',
+        codeStructure: 'AG_TEST',
+        codeCentre: 'CR_TEST',
+        codeCompte: '611100',
+        codeLigneMetier: 'RETAIL',
+        codeProduit: 'DEPOT_VUE',
+        codeSegment: 'PARTICULIER',
+        codeDevise: 'XOF',
+        codeVersion: 'BUDGET_INITIAL_2026',
+        codeScenario: 'CENTRAL',
+        montantDevise: 1000000,
+        ...overrides,
+      };
+    }
+
+    it('cas nominal : 10 codes valides + date → fait créé avec FK résolues', async () => {
+      const r = await service.createFromBusinessKeys(buildDto(), 'admin');
+      expect(r.id).toBeDefined();
+      expect(r.compte?.code).toBe('611100');
+      expect(r.fkCompte).toBe(ids.fkCompte);
+      expect(r.fkStructure).toBe(ids.fkStructure);
+      expect(r.tauxChangeApplique).toBe(1);
+      expect(r.montantFcfa).toBe(1000000);
+      expect(r.resolutionDetails.tauxChangeSource).toBe('auto-pivot-xof');
+      expect(r.resolutionDetails.montantFcfaSource).toBe('calcule-automatique');
+      expect(r.resolutionDetails.dimensionsResolues).toHaveLength(6);
+      expect(
+        r.resolutionDetails.dimensionsResolues.find((d) => d.axe === 'compte'),
+      ).toMatchObject({
+        codeBusiness: '611100',
+        fkResolu: ids.fkCompte,
+      });
+    });
+
+    it('date métier inexistante dans dim_temps → 404', async () => {
+      await expect(
+        service.createFromBusinessKeys(
+          buildDto({ dateMetier: '2099-01-01' }),
+          'admin',
+        ),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('SCD2 sans version valide à la date → 422 avec message indiquant LAQUELLE', async () => {
+      // Insérer une 2e date dans dim_temps : 2025-04-01 (avant l'unique
+      // version SCD2 du compte qui débute 2026-01-01)
+      await dataSource.query(
+        `INSERT INTO dim_temps
+          ("date","annee","trimestre","mois","jour","jour_ouvre","est_fin_de_mois",
+           "est_fin_de_trimestre","est_fin_d_annee","exercice_fiscal","libelle_mois")
+         VALUES ('2025-04-01',2025,2,4,1,true,false,false,false,2025,'Avril')`,
+      );
+      await expect(
+        service.createFromBusinessKeys(
+          buildDto({ dateMetier: '2025-04-01' }),
+          'admin',
+        ),
+      ).rejects.toMatchObject({
+        message: expect.stringMatching(/dim_(structure|centre_responsabilite|compte|ligne_metier|produit|segment).*'.+'.*valide au 2025-04-01/),
+      });
+    });
+
+    it('multi-versions : ancienne version résolue à la date métier (Option B)', async () => {
+      // Ajouter une 2e version SCD2 du compte 611100 : V1 valide
+      // 2026-01-01 → 2026-04-01, V2 valide 2026-04-01 → ouverte.
+      // (V1 a déjà été créée par seedDimensions avec début 2026-01-01.)
+      await dataSource.query(
+        `UPDATE dim_compte SET date_fin_validite='2026-04-01', version_courante=false
+         WHERE code_compte='611100'`,
+      );
+      await dataSource.query(
+        `INSERT INTO dim_compte
+          ("code_compte","libelle","classe","fk_compte_parent","niveau",
+           "date_debut_validite","date_fin_validite","version_courante","est_actif","utilisateur_creation")
+         VALUES ('611100','Salaires révisés',6,NULL,4,'2026-04-01',NULL,true,true,'system')`,
+      );
+      // Insérer la date 2026-02-01 pour pouvoir y placer un fait
+      await dataSource.query(
+        `INSERT INTO dim_temps
+          ("date","annee","trimestre","mois","jour","jour_ouvre","est_fin_de_mois",
+           "est_fin_de_trimestre","est_fin_d_annee","exercice_fiscal","libelle_mois")
+         VALUES ('2026-02-01',2026,1,2,1,true,false,false,false,2026,'Février')`,
+      );
+      const v1 = (await dataSource.query(
+        `SELECT id FROM dim_compte WHERE code_compte='611100' AND date_debut_validite='2026-01-01'`,
+      )) as Array<{ id: string | number }>;
+      const v2 = (await dataSource.query(
+        `SELECT id FROM dim_compte WHERE code_compte='611100' AND date_debut_validite='2026-04-01'`,
+      )) as Array<{ id: string | number }>;
+      expect(String(v1[0]!.id)).not.toBe(String(v2[0]!.id));
+
+      // Saisie au 2026-02-01 → V1
+      const r1 = await service.createFromBusinessKeys(
+        buildDto({ dateMetier: '2026-02-01' }),
+        'admin',
+      );
+      expect(r1.fkCompte).toBe(String(v1[0]!.id));
+      // Saisie au 2026-04-01 → V2 (sur le grain par défaut, donc on
+      // doit varier un autre axe pour éviter le doublon — ici on
+      // change le scénario en créant un 2e scénario).
+      await dataSource.query(
+        `INSERT INTO dim_scenario
+          ("code_scenario","libelle","type_scenario","statut","utilisateur_creation")
+         VALUES ('HAUT','Haut','haut','actif','system')`,
+      );
+      const r2 = await service.createFromBusinessKeys(
+        buildDto({ dateMetier: '2026-04-01', codeScenario: 'HAUT' }),
+        'admin',
+      );
+      expect(r2.fkCompte).toBe(String(v2[0]!.id));
+      expect(r1.fkCompte).not.toBe(r2.fkCompte);
+    });
+
+    it('devise EUR + version BUDGET_INITIAL → typeTaux fixe_budgetaire et résolution OK', async () => {
+      await seedTauxEur('655.95700000', 'fixe_budgetaire');
+      const r = await service.createFromBusinessKeys(
+        buildDto({ codeDevise: 'EUR', montantDevise: 1000 }),
+        'admin',
+      );
+      expect(r.tauxChangeApplique).toBe(655.957);
+      expect(r.montantFcfa).toBe(655957);
+      expect(r.resolutionDetails.tauxChangeSource).toBe('auto-fixe-budgetaire');
+      expect(r.resolutionDetails.dateApplicableTaux).toBe('2026-03-31');
+      expect(r.resolutionDetails.montantFcfaSource).toBe('calcule-automatique');
+    });
+
+    it('devise EUR sans taux applicable → 422', async () => {
+      // Pas de seedTauxEur — l'EUR existe mais aucun taux.
+      await dataSource.query(
+        `INSERT INTO dim_devise
+          ("code_iso","libelle","symbole","nb_decimales","est_devise_pivot","est_active","utilisateur_creation")
+         VALUES ('EUR','Euro','€',2,false,true,'system')`,
+      );
+      await expect(
+        service.createFromBusinessKeys(
+          buildDto({ codeDevise: 'EUR', montantDevise: 1000 }),
+          'admin',
+        ),
+      ).rejects.toThrow(UnprocessableEntityException);
+    });
+
+    it('tauxChangeApplique fourni → tauxChangeSource=fourni-utilisateur', async () => {
+      await dataSource.query(
+        `INSERT INTO dim_devise
+          ("code_iso","libelle","symbole","nb_decimales","est_devise_pivot","est_active","utilisateur_creation")
+         VALUES ('EUR','Euro','€',2,false,true,'system')`,
+      );
+      const r = await service.createFromBusinessKeys(
+        buildDto({
+          codeDevise: 'EUR',
+          montantDevise: 1000,
+          tauxChangeApplique: 700,
+        }),
+        'admin',
+      );
+      expect(r.tauxChangeApplique).toBe(700);
+      expect(r.montantFcfa).toBe(700000);
+      expect(r.resolutionDetails.tauxChangeSource).toBe('fourni-utilisateur');
+      expect(r.resolutionDetails.dateApplicableTaux).toBeNull();
+    });
+
+    it('montantFcfa fourni avec écart > tolérance → 422', async () => {
+      // tolérance = max(0.01, |calcule|*0.0001) → pour 1_000_000 = 100.
+      // On envoie un écart de 200 → KO.
+      await expect(
+        service.createFromBusinessKeys(
+          buildDto({
+            codeDevise: 'XOF',
+            montantDevise: 1000000,
+            montantFcfa: 1000200,
+          }),
+          'admin',
+        ),
+      ).rejects.toThrow(UnprocessableEntityException);
+    });
+
+    it('montantFcfa fourni avec écart ≤ tolérance → OK et source=fourni-utilisateur', async () => {
+      const r = await service.createFromBusinessKeys(
+        buildDto({
+          montantDevise: 1000000,
+          montantFcfa: 1000000.005, // dans la tolérance 0.01
+        }),
+        'admin',
+      );
+      expect(r.resolutionDetails.montantFcfaSource).toBe('fourni-utilisateur');
+    });
+
+    it('version statut=soumis → 409', async () => {
+      await dataSource.query(
+        `UPDATE dim_version SET statut='soumis' WHERE code_version='BUDGET_INITIAL_2026'`,
+      );
+      await expect(
+        service.createFromBusinessKeys(buildDto(), 'admin'),
+      ).rejects.toMatchObject({
+        message: expect.stringContaining("statut 'soumis'"),
+      });
+    });
+
+    it('scénario archivé → 409', async () => {
+      await dataSource.query(
+        `UPDATE dim_scenario SET statut='archive' WHERE code_scenario='CENTRAL'`,
+      );
+      await expect(
+        service.createFromBusinessKeys(buildDto(), 'admin'),
+      ).rejects.toThrow(ConflictException);
+    });
+
+    it('grain dupliqué (même 10-uplet de codes) → 409', async () => {
+      await service.createFromBusinessKeys(buildDto(), 'admin');
+      await expect(
+        service.createFromBusinessKeys(buildDto(), 'admin'),
+      ).rejects.toThrow(ConflictException);
+    });
+
+    it('cohérence devise XOF + tauxChangeApplique=2.5 → 422', async () => {
+      await expect(
+        service.createFromBusinessKeys(
+          buildDto({ codeDevise: 'XOF', tauxChangeApplique: 2.5 }),
+          'admin',
+        ),
+      ).rejects.toThrow(UnprocessableEntityException);
     });
   });
 });
