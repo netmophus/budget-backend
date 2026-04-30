@@ -55,7 +55,7 @@ async function rawInsert(
   attrs: {
     codeCompte: string;
     libelle?: string;
-    classe?: number;
+    classe?: string;
     niveau?: number;
     parentId?: string | null;
     sens?: string | null;
@@ -79,7 +79,7 @@ async function rawInsert(
     [
       attrs.codeCompte,
       attrs.libelle ?? attrs.codeCompte,
-      attrs.classe ?? 6,
+      attrs.classe ?? '6',
       attrs.parentId ?? null,
       attrs.niveau ?? 1,
       attrs.sens ?? null,
@@ -238,7 +238,7 @@ describe('CompteImportService', () => {
   it('mode insert-only : doublon existant → skipped (pas d\'erreur)', async () => {
     await rawInsert(dataSource, {
       codeCompte: '6',
-      classe: 6,
+      classe: '6',
       niveau: 1,
       sens: 'D',
     });
@@ -268,7 +268,7 @@ describe('CompteImportService', () => {
     await rawInsert(dataSource, {
       codeCompte: '6',
       libelle: 'CHARGES',
-      classe: 6,
+      classe: '6',
       niveau: 1,
       sens: 'D',
     });
@@ -300,7 +300,7 @@ describe('CompteImportService', () => {
     await rawInsert(dataSource, {
       codeCompte: '6',
       libelle: 'CHARGES',
-      classe: 6,
+      classe: '6',
       niveau: 1,
       sens: 'D',
     });

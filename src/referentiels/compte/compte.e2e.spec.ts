@@ -334,7 +334,7 @@ describe('Compte (e2e) — 3ᵉ dimension SCD2 + relink auto-référence straté
     await request(app.getHttpServer())
       .post('/api/v1/referentiels/comptes')
       .set('Authorization', `Bearer ${lecteurToken}`)
-      .send({ codeCompte: '999', libelle: 'X', classe: 6, niveau: 2, codeCompteParent: '6' })
+      .send({ codeCompte: '999', libelle: 'X', classe: '6', niveau: 2, codeCompteParent: '6' })
       .expect(403);
   });
 
@@ -345,7 +345,7 @@ describe('Compte (e2e) — 3ᵉ dimension SCD2 + relink auto-référence straté
       .send({
         codeCompte: '611300',
         libelle: 'Avantages en nature',
-        classe: 6,
+        classe: '6',
         niveau: 4,
         codeCompteParent: '611',
         sens: 'D',
@@ -367,7 +367,7 @@ describe('Compte (e2e) — 3ᵉ dimension SCD2 + relink auto-référence straté
       .send({
         codeCompte: '611100',
         libelle: 'Doublon',
-        classe: 6,
+        classe: '6',
         niveau: 4,
         codeCompteParent: '611',
         sens: 'D',
@@ -382,7 +382,7 @@ describe('Compte (e2e) — 3ᵉ dimension SCD2 + relink auto-référence straté
       .send({
         codeCompte: '999',
         libelle: 'X',
-        classe: 6,
+        classe: '6',
         niveau: 2,
         codeCompteParent: 'INEXISTANT',
       })
@@ -396,7 +396,7 @@ describe('Compte (e2e) — 3ᵉ dimension SCD2 + relink auto-référence straté
       .send({
         codeCompte: '999',
         libelle: 'X',
-        classe: 6,
+        classe: '6',
         niveau: 4, // doit être 3 puisque parent (60) est niveau 2
         codeCompteParent: '60',
         sens: 'D',
@@ -407,12 +407,12 @@ describe('Compte (e2e) — 3ᵉ dimension SCD2 + relink auto-référence straté
   it('GET /comptes?classe=6 → uniquement comptes classe 6', async () => {
     const res = await request(app.getHttpServer())
       .get('/api/v1/referentiels/comptes')
-      .query({ classe: 6 })
+      .query({ classe: '6' })
       .set('Authorization', `Bearer ${lecteurToken}`)
       .expect(200);
     expect(res.body.total).toBe(6);
-    for (const c of res.body.items as Array<{ classe: number }>) {
-      expect(c.classe).toBe(6);
+    for (const c of res.body.items as Array<{ classe: string }>) {
+      expect(c.classe).toBe('6');
     }
   });
 

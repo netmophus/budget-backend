@@ -2,6 +2,7 @@ import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform, Type } from 'class-transformer';
 import {
   IsBoolean,
+  IsIn,
   IsInt,
   IsOptional,
   IsString,
@@ -9,6 +10,8 @@ import {
   MaxLength,
   Min,
 } from 'class-validator';
+
+const CLASSES_PCB: readonly string[] = ['1', '2', '3', '4', '5', '6', '7', '8', '9'];
 
 export class ListComptesQueryDto {
   @ApiPropertyOptional({ example: 1, default: 1, minimum: 1 })
@@ -26,13 +29,11 @@ export class ListComptesQueryDto {
   @Max(200)
   limit: number = 50;
 
-  @ApiPropertyOptional({ example: 6, minimum: 1, maximum: 9 })
+  @ApiPropertyOptional({ example: '6', enum: CLASSES_PCB })
   @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  @Min(1)
-  @Max(9)
-  classe?: number;
+  @IsString()
+  @IsIn(CLASSES_PCB)
+  classe?: string;
 
   @ApiPropertyOptional({ description: 'Filtre LIKE %libelle% case-insensitive.' })
   @IsOptional()

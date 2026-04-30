@@ -73,7 +73,14 @@ const ligneCompteSchema = z.object({
     .max(20)
     .regex(/^[0-9]+$/, 'code_compte doit être numérique'),
   libelle: z.string().min(1).max(200),
-  classe: z.coerce.number().int().min(1).max(9),
+  // Lot 2.5-bis-B : classe stockée en varchar(50) (FK ref_classe_compte).
+  // Le CSV peut envoyer 6 ou '6' — on coerce en string et on valide.
+  classe: z
+    .preprocess(
+      (v) => (v === undefined || v === null ? v : String(v)),
+      z.string().regex(/^[1-9]$/, 'classe doit être 1..9'),
+    )
+    .pipe(z.string()),
   sous_classe: z.preprocess(emptyToUndefined, z.string().max(20).optional()),
   code_compte_parent: z.preprocess(
     emptyToUndefined,

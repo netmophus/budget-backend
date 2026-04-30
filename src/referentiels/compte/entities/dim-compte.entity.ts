@@ -40,8 +40,13 @@ export class DimCompte extends Scd2Entity {
   @Column({ name: 'libelle', type: 'varchar', length: 200 })
   libelle!: string;
 
-  @Column({ name: 'classe', type: 'int' })
-  classe!: number;
+  /**
+   * Classe PCB UMOA (1..9). Type `varchar(50)` depuis 2.5-bis-B —
+   * cohérent avec `ref_classe_compte.code`. FK active à partir de
+   * la migration 1779100000050.
+   */
+  @Column({ name: 'classe', type: 'varchar', length: 50 })
+  classe!: string;
 
   @Column({ name: 'sous_classe', type: 'varchar', length: 20, nullable: true })
   sousClasse!: string | null;

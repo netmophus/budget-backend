@@ -48,7 +48,7 @@ async function rawInsert(
   attrs: {
     codeCompte: string;
     libelle?: string;
-    classe?: number;
+    classe?: string;
     niveau?: number;
     parentId?: string | null;
     sens?: string | null;
@@ -72,7 +72,7 @@ async function rawInsert(
     [
       attrs.codeCompte,
       attrs.libelle ?? attrs.codeCompte,
-      attrs.classe ?? 6,
+      attrs.classe ?? '6',
       attrs.parentId ?? null,
       attrs.niveau ?? 1,
       attrs.sens ?? null,
@@ -116,7 +116,7 @@ describe('CompteService', () => {
 
   describe('SCD2 inherited (smoke)', () => {
     it('findCurrent / findHistory work', async () => {
-      await rawInsert(dataSource, { codeCompte: '6', classe: 6, niveau: 1 });
+      await rawInsert(dataSource, { codeCompte: '6', classe: '6', niveau: 1 });
       const current = await service.findCurrent('6');
       expect(current?.codeCompte).toBe('6');
       const history = await service.findHistory('6');
@@ -133,10 +133,10 @@ describe('CompteService', () => {
     let id601100: string;
 
     beforeEach(async () => {
-      id6 = await rawInsert(dataSource, { codeCompte: '6', classe: 6, niveau: 1, sens: 'D' });
-      id60 = await rawInsert(dataSource, { codeCompte: '60', classe: 6, niveau: 2, parentId: id6, sens: 'D' });
-      id601 = await rawInsert(dataSource, { codeCompte: '601', classe: 6, niveau: 3, parentId: id60, sens: 'D' });
-      id601100 = await rawInsert(dataSource, { codeCompte: '601100', classe: 6, niveau: 4, parentId: id601, sens: 'D' });
+      id6 = await rawInsert(dataSource, { codeCompte: '6', classe: '6', niveau: 1, sens: 'D' });
+      id60 = await rawInsert(dataSource, { codeCompte: '60', classe: '6', niveau: 2, parentId: id6, sens: 'D' });
+      id601 = await rawInsert(dataSource, { codeCompte: '601', classe: '6', niveau: 3, parentId: id60, sens: 'D' });
+      id601100 = await rawInsert(dataSource, { codeCompte: '601100', classe: '6', niveau: 4, parentId: id601, sens: 'D' });
     });
 
     it('findChildren returns direct children', async () => {
@@ -160,8 +160,8 @@ describe('CompteService', () => {
     });
 
     it('findByClasse filters by classe', async () => {
-      await rawInsert(dataSource, { codeCompte: '7', classe: 7, niveau: 1, sens: 'C' });
-      const c6 = await service.findByClasse(6);
+      await rawInsert(dataSource, { codeCompte: '7', classe: '7', niveau: 1, sens: 'C' });
+      const c6 = await service.findByClasse('6');
       expect(c6.map((c) => c.codeCompte).sort()).toEqual(['6', '60', '601', '601100']);
     });
   });
@@ -170,17 +170,17 @@ describe('CompteService', () => {
 
   describe('validateNoCycle', () => {
     it('rejects self-cycle', async () => {
-      const id = await rawInsert(dataSource, { codeCompte: '6', classe: 6, niveau: 1 });
+      const id = await rawInsert(dataSource, { codeCompte: '6', classe: '6', niveau: 1 });
       await expect(service.validateNoCycle(id, id)).rejects.toThrow(
         UnprocessableEntityException,
       );
     });
 
     it('rejects descendant-as-parent cycle', async () => {
-      const idP = await rawInsert(dataSource, { codeCompte: '6', classe: 6, niveau: 1 });
+      const idP = await rawInsert(dataSource, { codeCompte: '6', classe: '6', niveau: 1 });
       const idC = await rawInsert(dataSource, {
         codeCompte: '60',
-        classe: 6,
+        classe: '6',
         niveau: 2,
         parentId: idP,
       });
@@ -199,7 +199,7 @@ describe('CompteService', () => {
           'X',
           {
             libelle: 'X',
-            classe: 6,
+            classe: '6',
             niveau: 2,
             fkCompteParent: '999999',
           } as Partial<DimCompte>,
@@ -209,13 +209,13 @@ describe('CompteService', () => {
     });
 
     it('rejects when child niveau != parent niveau + 1', async () => {
-      const idP = await rawInsert(dataSource, { codeCompte: '6', classe: 6, niveau: 1 });
+      const idP = await rawInsert(dataSource, { codeCompte: '6', classe: '6', niveau: 1 });
       await expect(
         service.createNewVersionCompte(
           'X',
           {
             libelle: 'X',
-            classe: 6,
+            classe: '6',
             niveau: 4, // doit être 2
             fkCompteParent: idP,
           } as Partial<DimCompte>,
@@ -225,13 +225,13 @@ describe('CompteService', () => {
     });
 
     it('rejects when child classe != parent classe', async () => {
-      const idP = await rawInsert(dataSource, { codeCompte: '6', classe: 6, niveau: 1 });
+      const idP = await rawInsert(dataSource, { codeCompte: '6', classe: '6', niveau: 1 });
       await expect(
         service.createNewVersionCompte(
           'X',
           {
             libelle: 'X',
-            classe: 7,
+            classe: '7',
             niveau: 2,
             fkCompteParent: idP,
           } as Partial<DimCompte>,
@@ -249,14 +249,14 @@ describe('CompteService', () => {
     beforeEach(async () => {
       idP = await rawInsert(dataSource, {
         codeCompte: '6',
-        classe: 6,
+        classe: '6',
         niveau: 1,
         sens: 'D',
         dateDebutValidite: '2024-01-01',
       });
       await rawInsert(dataSource, {
         codeCompte: '60',
-        classe: 6,
+        classe: '6',
         niveau: 2,
         parentId: idP,
         sens: 'D',
@@ -280,7 +280,7 @@ describe('CompteService', () => {
       await dataSource.query("DELETE FROM dim_compte WHERE code_compte = '60'");
       await rawInsert(dataSource, {
         codeCompte: '60',
-        classe: 6,
+        classe: '6',
         niveau: 2,
         parentId: idP,
         sens: 'D',
@@ -317,16 +317,16 @@ describe('CompteService', () => {
 
   describe('relinkAfterCompteRevision', () => {
     it('updates 1 enfant pointing to old parent id', async () => {
-      const oldP = await rawInsert(dataSource, { codeCompte: '6', classe: 6, niveau: 1 });
+      const oldP = await rawInsert(dataSource, { codeCompte: '6', classe: '6', niveau: 1 });
       await rawInsert(dataSource, {
         codeCompte: '60',
-        classe: 6,
+        classe: '6',
         niveau: 2,
         parentId: oldP,
       });
       const newP = await rawInsert(dataSource, {
         codeCompte: '6_NEW',
-        classe: 6,
+        classe: '6',
         niveau: 1,
       });
 
@@ -341,8 +341,8 @@ describe('CompteService', () => {
     });
 
     it('returns count=0 when no child points to the old id', async () => {
-      const oldP = await rawInsert(dataSource, { codeCompte: '6', classe: 6, niveau: 1 });
-      const newP = await rawInsert(dataSource, { codeCompte: '6_NEW', classe: 6, niveau: 1 });
+      const oldP = await rawInsert(dataSource, { codeCompte: '6', classe: '6', niveau: 1 });
+      const newP = await rawInsert(dataSource, { codeCompte: '6_NEW', classe: '6', niveau: 1 });
       const result = await service.relinkAfterCompteRevision(oldP, newP, 'tester');
       expect(result.count).toBe(0);
     });
@@ -352,10 +352,10 @@ describe('CompteService', () => {
 
   describe('desactiver', () => {
     it('refuses when the compte has current children', async () => {
-      const idP = await rawInsert(dataSource, { codeCompte: '6', classe: 6, niveau: 1 });
+      const idP = await rawInsert(dataSource, { codeCompte: '6', classe: '6', niveau: 1 });
       await rawInsert(dataSource, {
         codeCompte: '60',
-        classe: 6,
+        classe: '6',
         niveau: 2,
         parentId: idP,
       });
@@ -365,7 +365,7 @@ describe('CompteService', () => {
     });
 
     it('soft-closes a leaf compte', async () => {
-      await rawInsert(dataSource, { codeCompte: '6', classe: 6, niveau: 1 });
+      await rawInsert(dataSource, { codeCompte: '6', classe: '6', niveau: 1 });
       await service.desactiver('6', 'admin@miznas.local');
       const history = await service.findHistory('6');
       expect(history[0]!.versionCourante).toBe(false);
@@ -381,7 +381,7 @@ describe('CompteService', () => {
         {
           codeCompte: '6',
           libelle: 'CHARGES',
-          classe: 6,
+          classe: '6',
           niveau: 1,
           sens: 'D',
         },
@@ -396,7 +396,7 @@ describe('CompteService', () => {
           {
             codeCompte: '6',
             libelle: 'CHARGES',
-            classe: 6,
+            classe: '6',
             niveau: 2,
           },
           'admin@miznas.local',
@@ -405,13 +405,13 @@ describe('CompteService', () => {
     });
 
     it('rejects duplicate codeCompte', async () => {
-      await rawInsert(dataSource, { codeCompte: '6', classe: 6, niveau: 1 });
+      await rawInsert(dataSource, { codeCompte: '6', classe: '6', niveau: 1 });
       await expect(
         service.create(
           {
             codeCompte: '6',
             libelle: 'Dup',
-            classe: 6,
+            classe: '6',
             niveau: 1,
           },
           'admin@miznas.local',

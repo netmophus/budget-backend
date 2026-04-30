@@ -30,8 +30,11 @@ export class CompteResponseDto {
   @ApiProperty({ example: 'Fournitures de bureau' })
   libelle!: string;
 
-  @ApiProperty({ example: 6 })
-  classe!: number;
+  @ApiProperty({
+    example: '6',
+    description: "Classe PCB UMOA stockée en varchar (Lot 2.5-bis-B).",
+  })
+  classe!: string;
 
   @ApiPropertyOptional({ example: '60', nullable: true })
   sousClasse!: string | null;

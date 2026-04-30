@@ -15,6 +15,24 @@ import type { SensCompte } from '../entities/dim-compte.entity';
 
 const SENS_VALUES: readonly SensCompte[] = ['D', 'C', 'M'];
 
+/**
+ * Classes PCB UMOA Révisé (1..9). Validation applicative — la FK
+ * vers ref_classe_compte (Lot 2.5-bis-B) est la source de vérité,
+ * cet enum sert juste à produire un 400 plus parlant que le 23503
+ * Postgres.
+ */
+const CLASSES_PCB: readonly string[] = [
+  '1',
+  '2',
+  '3',
+  '4',
+  '5',
+  '6',
+  '7',
+  '8',
+  '9',
+];
+
 export class CreateCompteDto {
   @ApiProperty({
     example: '601100',
@@ -30,11 +48,15 @@ export class CreateCompteDto {
   @MaxLength(200)
   libelle!: string;
 
-  @ApiProperty({ example: 6, minimum: 1, maximum: 9 })
-  @IsInt()
-  @Min(1)
-  @Max(9)
-  classe!: number;
+  @ApiProperty({
+    example: '6',
+    enum: CLASSES_PCB,
+    description:
+      "Classe PCB UMOA. Stockée en varchar(50) avec FK vers ref_classe_compte (Lot 2.5-bis-B) ; valeurs valides : '1' à '9'.",
+  })
+  @IsString()
+  @IsIn(CLASSES_PCB)
+  classe!: string;
 
   @ApiPropertyOptional({ example: '60', maxLength: 20 })
   @IsOptional()

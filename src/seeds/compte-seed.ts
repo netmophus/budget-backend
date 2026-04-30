@@ -236,7 +236,11 @@ async function seedComptes(): Promise<void> {
         [
           c.codeCompte,
           c.libelle,
-          c.classe,
+          // Lot 2.5-bis-B : la colonne classe est varchar(50) (FK
+          // ref_classe_compte). On garde le type `number` côté seed
+          // pour ne pas changer 95 littéraux ; la conversion en
+          // string est faite ici, avant le binding pg.
+          String(c.classe),
           c.sousClasse,
           parentId,
           c.niveau,

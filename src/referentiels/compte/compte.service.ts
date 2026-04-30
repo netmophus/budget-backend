@@ -216,7 +216,7 @@ export class CompteService extends Scd2Service<DimCompte> {
     });
   }
 
-  async findByClasse(classe: number): Promise<DimCompte[]> {
+  async findByClasse(classe: string): Promise<DimCompte[]> {
     return this.repo.find({
       where: { classe, versionCourante: true },
       order: { codeCompte: 'ASC' },
@@ -277,8 +277,8 @@ export class CompteService extends Scd2Service<DimCompte> {
   }
 
   private assertParentClasseCoherence(
-    parentClasse: number,
-    enfantClasse: number,
+    parentClasse: string,
+    enfantClasse: string,
   ): void {
     if (enfantClasse !== parentClasse) {
       throw new UnprocessableEntityException(
