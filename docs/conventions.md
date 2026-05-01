@@ -321,6 +321,39 @@ export class Role {
 - Bridges (`bridge_*`) : entités explicites, **pas** `@ManyToMany +
   @JoinTable`. Cf. ADR #3 dans `docs/architecture.md` §12.
 
+### 4.3 Énumérations métier — FK `ref_*` paramétrables (Lot 2.5-bis)
+
+> **Règle pour toute nouvelle dimension ou tout nouveau module**
+> Tout nouveau champ avec un domaine de valeurs restreintes
+> (énumération métier — type, statut, catégorie, sens, etc.) DOIT
+> être stocké comme **FK vers un `ref_*` existant ou nouvellement
+> créé**. Les `enum` TypeScript hardcodés et les `CHECK` constraints
+> SQL ne sont **plus** la convention. Cf. ADR #17.
+
+Pourquoi : extension sans redéploiement, contrôle utilisateur via
+l'UI Configuration, traçabilité audit. Les 13 référentiels existants
+(`ref_type_structure`, `ref_pays`, etc.) sont documentés dans
+`docs/referentiels-secondaires.md`.
+
+Pratique côté backend :
+- Pour un nouveau référentiel, suivre le pattern de
+  `src/referentiels-secondaires/<nom>/` (1 fichier compact qui hérite
+  de `BaseRefSecondaire` / `BaseRefSecondaireService` /
+  `createRefSecondaireControllerClass`).
+- Migration : helper DRY `createRefSecondaireTable` dans
+  `src/migrations/_helpers/`. Inclure les seeds initiaux dans la
+  migration (cf. §5.4).
+- FK vers `code` (varchar) **pas** `id` (bigint), `ON UPDATE CASCADE
+  / ON DELETE RESTRICT`.
+
+Pratique côté frontend :
+- Selects dynamiques alimentés par `useRefSecondaireOptions(refKey)`
+  (cache 60s, filtre `est_actif=true`). Cf. `src/lib/hooks/`.
+- Helpers de format (`libelleX(code)`, `badgeClassX(code)`) restent
+  acceptables dans `lib/labels/` pour la résolution rapide
+  code → libellé/couleur dans les cellules de tableau (hors composant
+  React, hooks impossibles).
+
 ---
 
 ## 5. Migrations TypeORM

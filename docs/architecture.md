@@ -292,6 +292,10 @@ règles applicatives, transactions. Elle ne connaît ni HTTP ni Express
 | `referentiels/ligne-metier` | 2.4B livré | `dim_ligne_metier` (SCD2 hiérarchique) |
 | `referentiels/produit` | 2.4B livré | `dim_produit` (SCD2 hiérarchique + porteur intérêts) |
 | `referentiels/segment` | 2.4B livré | `dim_segment` (SCD2 plat) |
+| `referentiels/structure` (CRUD UI) | ✅ 2.5A + 2.5-bis-D | UI Nouvelle / Modifier / Désactiver + selects dynamiques `ref_type_structure` + `ref_pays` |
+| `referentiels/{cr,compte,ligne-metier,produit,segment}` (CRUD UI) | À venir 2.5B → 2.5F | Pattern symétrique à `structure` (cf. `docs/roadmap-mvp.md`) |
+| `referentiels-secondaires` (13 modules paramétrables) | ✅ 2.5-bis-A | Énumérations métier centralisées (`ref_type_structure`, `ref_pays`, …) — cf. `docs/referentiels-secondaires.md` |
+| `configuration` (page UI unique) | ✅ 2.5-bis-C | `/configuration` — navigation 5 catégories × 13 sous-tableaux, gardée par `CONFIGURATION.LIRE` / `CONFIGURATION.GERER` |
 | `budget-campaigns`, `budget-entries`, `budget-workflow`, `budget-versions` | 3 | Cycle d'élaboration budgétaire |
 | `pnb`, `expenses` | 4 | PNB et charges |
 | `capex`, `alm`, `actuals`, `variances`, `reforecast`, `reporting` | 5 | CAPEX, bilan/ALM, exécution, reforecast, restitution |
@@ -708,3 +712,4 @@ projet grossit, ces lignes seront extraites en fichiers séparés sous
 | 14 | `synchronize: false` dès le Lot 1.2 + migrations versionnées + `down()` complet | Conformité industrialisation, déploiements reproductibles, rollback testé | `synchronize: true` en dev (dérive du schéma) | — |
 | 15 | Préfixe API global `/api/v1` | Versionner la frontière contractuelle dès le démarrage — autorise un futur `/api/v2` sans rupture | Pas de préfixe / pas de version | — |
 | 16 | Backend Jest, Frontend Vitest (deux testeurs) | Chaque écosystème utilise son testeur natif (intégration CLI) | Outil unifié | — |
+| 17 | Référentiels secondaires paramétrables — 13 tables `ref_*` extraites des `CHECK` constraints / enum hardcodés (Lot 2.5-bis) | Extension sans redéploiement (un client banque ajoute son propre type d'organisation), contrôle utilisateur, traçabilité audit. FK vers `code` (varchar) plutôt que `id` (bigint) pour rétrocompat CSV + lisibilité SQL. `ON UPDATE CASCADE / ON DELETE RESTRICT` sur les 13 FK | `CHECK` constraints SQL figés ; enum TypeScript hardcodés ; table polymorphique unique (FK contraintes inopérantes cross-référentiel) | Validation `ON UPDATE CASCADE` réelle Postgres en recette psql (pg-mem ne joue pas les migrations TypeORM). Cf. `docs/referentiels-secondaires.md` |
