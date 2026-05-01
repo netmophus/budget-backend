@@ -147,16 +147,64 @@ Caractéristiques :
 - `refresh()` bypass le cache après une modification dans
   `/configuration` depuis un autre onglet.
 
-Pattern d'usage dupliqué à ce jour dans 2 contextes :
-- `StructureFormDrawer` — sélects type de structure + pays (Lot
-  2.5-bis-D).
-- `SegmentFormDrawer` — sélect catégorie de segment (Lot 2.5B).
+Pattern d'usage à ce jour dans 3 drawers, tous **consommateurs du
+composant `<RefSecondaireSelect>`** factorisé en Lot 2.5C :
+- `StructureFormDrawer` — sélects type de structure + pays.
+- `SegmentFormDrawer` — sélect catégorie de segment.
+- `ProduitFormDrawer` — sélect type de produit.
 
-La factorisation en composant `<RefSecondaireSelect>` (qui
-encapsulera le pattern complet : loading, error, valeur
-désactivée + prepend, fallback message) est repoussée au **3ᵉ cas
-concret** (Lot 2.5C/Produit ou 2.5D/Ligne métier — règle « factoriser
-à 3 cas concrets »).
+## 7-bis. Pattern factorisation 3 cas concrets (Lot 2.5C)
+
+Le Lot 2.5C a déclenché la factorisation des 2 patterns SCD2 +
+référentiel répétés sur Structure / Segment / Produit. Règle
+appliquée : **factoriser au 3ᵉ cas concret, pas avant** — tant que
+seuls 2 écrans partageaient le pattern, la duplication restait
+moins coûteuse que l'abstraction prématurée.
+
+**Composant `<RefSecondaireSelect>`** (`src/components/common/`) —
+encapsule pour chaque sélect alimenté par un `ref_*` :
+- appel `useRefSecondaireOptions(refKey)` ;
+- gestion loading / error avec message inline ;
+- détection valeur désactivée (prepend `"X (désactivé)"` pour
+  rester sélectionnable côté édition) ;
+- warning visuel optionnel en dessous (`showWarningIfDisabled`).
+
+```tsx
+<RefSecondaireSelect
+  refKey="type-structure"
+  value={form.typeStructure}
+  onValueChange={(v) => setForm({ ...form, typeStructure: v })}
+  labelChamp="le type de structure"
+/>
+```
+
+**Hook `useScd2EditDiff<T>`** (`src/lib/hooks/`) — calcule le diff
+champs SCD2 modifiés / non modifiés, prédit le `modeMaj` que le
+backend appliquera (`no_op` / `in_place_est_actif` /
+`ecrasement_intra_jour` / `nouvelle_version`) et renvoie le bandeau
+adapté (jaune SCD2, bleu intra-jour, info no-op). Les drawers
+n'ont plus à dupliquer la logique 4-cas du backend.
+
+```typescript
+const { diff, modeMaj, bandeau } = useScd2EditDiff({
+  initial,            // entité courante (ou null en création)
+  current: form,
+  scd2Fields: ['libelle', 'typeStructure', 'codePays'],
+  today: new Date().toISOString().slice(0, 10),
+});
+```
+
+**Gains mesurés sur les drawers existants** :
+- `StructureFormDrawer` : 508 → 430 lignes (−80, −15 %).
+- `SegmentFormDrawer` : 407 → 285 lignes (−120, −30 %).
+- Couverture tests préservée (15 + 13) sans modification du
+  contrat externe des composants.
+
+**Prochain candidat** : `ProduitFormDrawer` consomme directement la
+factorisation dès sa création (pas de phase de duplication).
+`LigneMetierFormDrawer` (Lot 2.5D), `CompteFormDrawer` (Lot 2.5E)
+et `CrFormDrawer` (Lot 2.5F) suivront le même pattern dès leur
+livraison.
 
 ## 8. Décisions architecturales
 

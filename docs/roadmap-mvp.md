@@ -45,7 +45,7 @@ Prochaine étape : **Lot 3** — Module B Élaboration budgétaire
 |-------|---------------|-----------------------------------------------------------|-----------------|
 | Lot 0 | 1 semaine     | Initialisation projet, choix techniques, cadrage          | Terminé         |
 | Lot 1 | 3 semaines    | Socle transverse (auth, RBAC, audit, Swagger, CORS)       | Terminé         |
-| Lot 2 | 4 semaines    | Module A — Référentiels (PCB UMOA, structure, axes)       | **Livré — 29/04/2026** (CRUD UI 2.5B-F en cours) |
+| Lot 2 | 4 semaines    | Module A — Référentiels (PCB UMOA, structure, axes)       | **Livré — 29/04/2026** (CRUD UI 2.5C livré 30/04 ; 2.5D-F à venir) |
 | Lot 2.5-bis | 1 semaine | Référentiels secondaires paramétrables (13 `ref_*` + UI Configuration) | **✅ Livré — 01/05/2026** (5 sous-étapes A-E) |
 | Lot 3 | 5 semaines    | Module B — Élaboration budgétaire (cycle, versions, WF)   | En attente      |
 | Lot 4 | 4 semaines    | Modules C (PNB) et D (Charges)                            | En attente      |
@@ -252,7 +252,7 @@ en 6 sous-étapes pour rester livrable par incréments de ~½ journée.
 |---|---|---|
 | 2.5A | CRUD UI **Structure** (drawer + bandeau SCD2 + désactivation) | ✅ Livré |
 | 2.5B | CRUD UI **Segment** (filtre catégorie + bandeau SCD2 + désactivation) | ✅ Livré — 01/05/2026 |
-| 2.5C | CRUD UI **Produit** (+ seed `PRODUIT_TRANSVERSE`) | À venir |
+| 2.5C | CRUD UI **Produit** (+ factorisation `RefSecondaireSelect` / `useScd2EditDiff` + seed `PRODUIT_TRANSVERSE`) | ✅ Livré — 30/04/2026 |
 | 2.5D | CRUD UI **Ligne métier** | À venir |
 | 2.5E | CRUD UI **Compte** (avec import CSV PCB déjà livré 2.4A.2) | À venir |
 | 2.5F | CRUD UI **CR** | À venir |
@@ -278,6 +278,31 @@ en base (15 → 41, +26 : 13 ref + 13 FK). Cf.
 `docs/referentiels-secondaires.md` pour l'architecture détaillée et
 `docs/qa-smoke-2.5-bis.md` pour la checklist de validation
 post-déploiement.
+
+### Lot 2.5C — CRUD UI Produit + factorisation [LIVRÉ — 30/04/2026]
+
+3 phases A → C qui livrent le CRUD UI Produit (hiérarchie 4 niveaux
+avec anti-cycle), factorisent les 2 patterns récurrents identifiés
+sur Structure / Segment / Produit, et ajoutent une sentinelle
+`PRODUIT_TRANSVERSE` pour les charges sans produit bancaire associé.
+
+| Phase | Périmètre | Livraison |
+|---|---|---|
+| A.1 | Composant générique `RefSecondaireSelect` (encapsule loading / error / valeur désactivée pour les 13 selects `ref_*`) | ✅ |
+| A.2 | Hook `useScd2EditDiff<T>` (calcul diff + prédiction `modeMaj` + bandeau jaune/bleu/info) | ✅ |
+| A.3 | Refactor `StructureFormDrawer` (-80 lignes) et `SegmentFormDrawer` (-120 lignes) consommant la factorisation | ✅ |
+| B | CRUD UI Produit : `ProduitFormDrawer` hiérarchique + actions sur `ProduitsPage` (Modifier / Désactiver / Nouveau) | ✅ |
+| C | Seed `PRODUIT_TRANSVERSE` (sentinelle racine type=`autre` pour charges support sans produit bancaire) | ✅ |
+
+**Chiffres de livraison 2.5C** : 672 tests backend verts (671 →
+672, +1 nouveau test seed `PRODUIT_TRANSVERSE`), 190 tests frontend
+verts (176 → 190, +14 : 7 hook + 5 select générique + 4 page +
+10 drawer − 12 doublons supprimés par refactor). Application du
+**pattern de factorisation à 3 cas concrets** : extraction
+déclenchée par le 3ᵉ écran (Produit) après accumulation sur
+Structure et Segment. Cf. `docs/referentiels-secondaires.md` §
+*Pattern factorisation 3 cas concrets* pour la décision et les
+gains.
 
 ---
 
