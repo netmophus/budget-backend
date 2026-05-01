@@ -240,6 +240,8 @@ Nx, Lerna). Chaque projet se gère et se déploie indépendamment.
 | [`docs/glossaire.md`](docs/glossaire.md)             | Vocabulaire métier UEMOA, comptable, prudentiel, technique. Enrichi au fil des lots. |
 | [`docs/audit.md`](docs/audit.md)                     | Politique d'audit applicatif réglementaire (10 ans de rétention)               |
 | [`docs/scd2-pattern.md`](docs/scd2-pattern.md)       | Pattern SCD2 (entité, helpers de migration, service générique)                 |
+| [`docs/referentiels-secondaires.md`](docs/referentiels-secondaires.md) | Architecture des 13 référentiels secondaires paramétrables (Lot 2.5-bis)  |
+| [`docs/qa-smoke-2.5-bis.md`](docs/qa-smoke-2.5-bis.md) | Checklist manuelle de validation bout-en-bout du Lot 2.5-bis post-déploiement   |
 
 Sources de référence interne :
 - `Specs_Module_Budgetaire_Bancaire_UEMOA.docx` — spécifications V1.0
@@ -267,15 +269,18 @@ Toute évolution fonctionnelle doit être tracée par rapport à ces référenti
 
 ## 9. Statut du projet
 
-**Lot 2 LIVRÉ — 29/04/2026**. 8 dimensions du modèle dimensionnel
-sont livrées en base, seedées et exposées via API + frontend lecture
-seule. Prochaine étape : Lot 3 (Élaboration budgétaire).
+**Lot 2.5-bis LIVRÉ — 01/05/2026**. Le socle référentiel est complété
+par 13 énumérations métier paramétrables (`ref_*`) avec leur UI
+Configuration unifiée. Lot 2 dans son ensemble en cours de finition
+(2.1, 2.2, 2.3, 2.5A et 2.5-bis livrés ; 2.5B-F restants — CRUD UI des
+5 dimensions métier — avant d'attaquer le Lot 3).
 
 | Lot                                 | Statut |
 | ----------------------------------- | ------ |
 | Lot 0 — Documentation               | ✅ Livré |
 | Lot 1 — Socle transverse            | ✅ Livré |
-| Lot 2 — Référentiels SCD2           | ✅ **Livré — 29/04/2026** |
+| Lot 2 — Référentiels SCD2           | 🟡 En cours (2.1, 2.2, 2.3, 2.5A, 2.5-bis livrés ; 2.5B-F à venir) |
+| Lot 2.5-bis — Référentiels secondaires paramétrables | ✅ **Livré — 01/05/2026** (5 sous-étapes A-E) |
 | Lot 3 — Élaboration budgétaire      | ⏳ À venir |
 | Lot 4 — PNB / Charges               | ⏳ À venir |
 | Lot 5 — Reporting / ALM             | ⏳ À venir |
@@ -283,11 +288,16 @@ seule. Prochaine étape : Lot 3 (Élaboration budgétaire).
 
 **Chiffres clés actuels** :
 
-- 11 migrations en base (3 Lot 1 + 8 dimensions Lot 2)
-- **8 dimensions livrées sur 10** du modèle dimensionnel (les 2
+- **41 migrations en base** (3 Lot 1 + 12 dimensions/faits Lot 2 + 13
+  ref secondaires Lot 2.5-bis-A + 13 FK Lot 2.5-bis-B)
+- **8 dimensions** livrées sur 10 du modèle dimensionnel (les 2
   restantes — `dim_version` et `dim_scenario` — relèvent du Lot 3)
-- **449 tests backend verts** (jest + pg-mem)
-- **49 tests frontend verts** (vitest + testing-library)
+- **13 référentiels secondaires** paramétrables (cf.
+  `docs/referentiels-secondaires.md`)
+- **671 tests backend verts** (jest + pg-mem) — 449 → 671 (+222 sur
+  3.x et 2.5-bis)
+- **145 tests frontend verts** (vitest + testing-library) — 49 → 145
+  (+96 sur 3.5-mini et 2.5-bis)
 - **2 dépôts GitHub** : `budget-backend` (porte également `docs/`) +
   `budget-frontend`
 

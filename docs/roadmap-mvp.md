@@ -45,7 +45,8 @@ Prochaine étape : **Lot 3** — Module B Élaboration budgétaire
 |-------|---------------|-----------------------------------------------------------|-----------------|
 | Lot 0 | 1 semaine     | Initialisation projet, choix techniques, cadrage          | Terminé         |
 | Lot 1 | 3 semaines    | Socle transverse (auth, RBAC, audit, Swagger, CORS)       | Terminé         |
-| Lot 2 | 4 semaines    | Module A — Référentiels (PCB UMOA, structure, axes)       | **Livré — 29/04/2026** |
+| Lot 2 | 4 semaines    | Module A — Référentiels (PCB UMOA, structure, axes)       | **Livré — 29/04/2026** (CRUD UI 2.5B-F en cours) |
+| Lot 2.5-bis | 1 semaine | Référentiels secondaires paramétrables (13 `ref_*` + UI Configuration) | **✅ Livré — 01/05/2026** (5 sous-étapes A-E) |
 | Lot 3 | 5 semaines    | Module B — Élaboration budgétaire (cycle, versions, WF)   | En attente      |
 | Lot 4 | 4 semaines    | Modules C (PNB) et D (Charges)                            | En attente      |
 | Lot 5 | 6 semaines    | Modules E (CAPEX), F (Bilan/ALM), H (Exécution), I (Reforecast), L (Reporting) | En attente      |
@@ -240,6 +241,43 @@ budgétaire) — pas du Lot 2.
 [Definition of Done](#definition-of-done-dod) du Lot 2 sont validés
 sur `main` (449 tests backend + 49 tests frontend verts). Aucun reste
 à charge en backlog post-Lot-2.
+
+### CRUD UI des dimensions — sous-étapes 2.5A → 2.5F
+
+État actuel : Lot 2 quasi terminé. Le CRUD UI des dimensions métier
+(création / modification / désactivation côté frontend) est découpé
+en 6 sous-étapes pour rester livrable par incréments de ~½ journée.
+
+| Sous-étape | Périmètre | Statut |
+|---|---|---|
+| 2.5A | CRUD UI **Structure** (drawer + bandeau SCD2 + désactivation) | ✅ Livré |
+| 2.5B | CRUD UI **Segment** | À venir |
+| 2.5C | CRUD UI **Produit** (+ seed `PRODUIT_TRANSVERSE`) | À venir |
+| 2.5D | CRUD UI **Ligne métier** | À venir |
+| 2.5E | CRUD UI **Compte** (avec import CSV PCB déjà livré 2.4A.2) | À venir |
+| 2.5F | CRUD UI **CR** | À venir |
+
+### Lot 2.5-bis — Référentiels secondaires paramétrables [LIVRÉ — 01/05/2026]
+
+5 sous-étapes A → E qui ont extrait les 13 énumérations métier
+(types de structure, pays UEMOA, statuts de version, etc.) des
+`CHECK` constraints SQL et enum hardcodés vers des tables `ref_*`
+paramétrables via une UI Configuration unifiée.
+
+| Sous-étape | Périmètre | Livraison |
+|---|---|---|
+| 2.5-bis-A | Backend : 13 tables `ref_*` + 13 modules génériques + permissions `CONFIGURATION.LIRE/GERER` | ✅ |
+| 2.5-bis-B | Backend : 13 migrations FK des dimensions vers `ref_*(code)` + conversion `dim_compte.classe int → varchar` | ✅ |
+| 2.5-bis-C | Frontend : page `/configuration` unique avec navigation 5 catégories × 13 sous-tableaux | ✅ |
+| 2.5-bis-D | Frontend : hook `useRefSecondaireOptions` + sélects dynamiques dans `StructureFormDrawer` (pattern réutilisable pour 2.5B-F) | ✅ |
+| 2.5-bis-E | Documentation consolidée + audit non-régression | ✅ |
+
+**Chiffres de livraison 2.5-bis** : 671 tests backend verts (449 →
+671, +222), 145 tests frontend verts (49 → 145, +96), 41 migrations
+en base (15 → 41, +26 : 13 ref + 13 FK). Cf.
+`docs/referentiels-secondaires.md` pour l'architecture détaillée et
+`docs/qa-smoke-2.5-bis.md` pour la checklist de validation
+post-déploiement.
 
 ---
 
