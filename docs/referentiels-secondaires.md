@@ -147,9 +147,16 @@ Caractéristiques :
 - `refresh()` bypass le cache après une modification dans
   `/configuration` depuis un autre onglet.
 
-Pattern d'usage à dupliquer dans les futurs FormDrawers (Lot 2.5B+).
-La factorisation en composant `<RefSecondaireSelect>` est repoussée au
-Lot 6 (règle « factoriser à 3 cas concrets »).
+Pattern d'usage dupliqué à ce jour dans 2 contextes :
+- `StructureFormDrawer` — sélects type de structure + pays (Lot
+  2.5-bis-D).
+- `SegmentFormDrawer` — sélect catégorie de segment (Lot 2.5B).
+
+La factorisation en composant `<RefSecondaireSelect>` (qui
+encapsulera le pattern complet : loading, error, valeur
+désactivée + prepend, fallback message) est repoussée au **3ᵉ cas
+concret** (Lot 2.5C/Produit ou 2.5D/Ligne métier — règle « factoriser
+à 3 cas concrets »).
 
 ## 8. Décisions architecturales
 

@@ -251,7 +251,7 @@ en 6 sous-étapes pour rester livrable par incréments de ~½ journée.
 | Sous-étape | Périmètre | Statut |
 |---|---|---|
 | 2.5A | CRUD UI **Structure** (drawer + bandeau SCD2 + désactivation) | ✅ Livré |
-| 2.5B | CRUD UI **Segment** | À venir |
+| 2.5B | CRUD UI **Segment** (filtre catégorie + bandeau SCD2 + désactivation) | ✅ Livré — 01/05/2026 |
 | 2.5C | CRUD UI **Produit** (+ seed `PRODUIT_TRANSVERSE`) | À venir |
 | 2.5D | CRUD UI **Ligne métier** | À venir |
 | 2.5E | CRUD UI **Compte** (avec import CSV PCB déjà livré 2.4A.2) | À venir |
