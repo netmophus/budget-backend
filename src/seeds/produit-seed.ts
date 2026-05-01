@@ -83,6 +83,24 @@ export const PRODUITS_INITIAUX: readonly ProduitSeedRow[] = [
   // Marché FOREX
   row('FOREX_SPOT', 'Change au comptant', 'marche', 3, 'MARCHE_FOREX', false),
   row('FOREX_TERME', 'Change à terme', 'marche', 3, 'MARCHE_FOREX', true),
+
+  // ─── Sentinelle PRODUIT_TRANSVERSE (Lot 2.5C)
+  // Produit racine pour les charges sans produit bancaire associé
+  // (achats IT, RH, immobilier, frais généraux). Permet de respecter
+  // la contrainte NOT NULL de fk_produit dans fait_budget tout en
+  // gardant une sémantique honnête.
+  //
+  // Type 'autre' retenu (ref_type_produit n'a pas de code 'support' ;
+  // l'ajouter demanderait d'assouplir le DTO backend qui contient un
+  // IsIn strict — décision repoussée à 2.5-bis-F ou Lot 6).
+  row(
+    'PRODUIT_TRANSVERSE',
+    'Produit transverse (charges support)',
+    'autre',
+    1,
+    null,
+    false,
+  ),
 ];
 
 async function seedProduits(): Promise<void> {
@@ -158,8 +176,11 @@ async function seedProduits(): Promise<void> {
       racines: number;
       porteurs: number;
     };
+    const racinesAttendues = PRODUITS_INITIAUX.filter(
+      (p) => p.parentCode === null,
+    ).length;
     console.log(
-      `[seed:produits] total=${r0.total} courants=${r0.courants} racines=${r0.racines} porteurs_interets=${r0.porteurs} (attendu : ${PRODUITS_INITIAUX.length} / ${PRODUITS_INITIAUX.length} / 4)`,
+      `[seed:produits] total=${r0.total} courants=${r0.courants} racines=${r0.racines} porteurs_interets=${r0.porteurs} (attendu : ${PRODUITS_INITIAUX.length} / ${PRODUITS_INITIAUX.length} / ${racinesAttendues})`,
     );
   } finally {
     await AppDataSource.destroy();

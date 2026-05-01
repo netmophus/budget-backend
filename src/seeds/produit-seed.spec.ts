@@ -6,19 +6,31 @@ describe('produit-seed (data shape)', () => {
     expect(PRODUITS_INITIAUX.length).toBeLessThanOrEqual(30);
   });
 
-  it('has 4 racines (CREDIT_GRP / DEPOT_GRP / SERVICE_GRP / MARCHE_GRP)', () => {
+  it('has 5 racines (4 grpes métier + PRODUIT_TRANSVERSE)', () => {
     const racines = PRODUITS_INITIAUX.filter((p) => p.parentCode === null);
-    expect(racines).toHaveLength(4);
+    expect(racines).toHaveLength(5);
     const codes = racines.map((r) => r.codeProduit).sort();
     expect(codes).toEqual([
       'CREDIT_GRP',
       'DEPOT_GRP',
       'MARCHE_GRP',
+      'PRODUIT_TRANSVERSE',
       'SERVICE_GRP',
     ]);
     for (const r of racines) {
       expect(r.niveau).toBe(1);
     }
+  });
+
+  it('PRODUIT_TRANSVERSE est sentinelle racine type=autre, non porteur intérêts', () => {
+    const transverse = PRODUITS_INITIAUX.find(
+      (p) => p.codeProduit === 'PRODUIT_TRANSVERSE',
+    );
+    expect(transverse).toBeDefined();
+    expect(transverse!.parentCode).toBeNull();
+    expect(transverse!.niveau).toBe(1);
+    expect(transverse!.typeProduit).toBe('autre');
+    expect(transverse!.estPorteurInterets).toBe(false);
   });
 
   it('lists parents before their children', () => {
