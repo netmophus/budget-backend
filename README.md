@@ -269,19 +269,22 @@ Toute évolution fonctionnelle doit être tracée par rapport à ces référenti
 
 ## 9. Statut du projet
 
-**Lot 2.5-bis LIVRÉ — 01/05/2026**. Le socle référentiel est complété
-par 13 énumérations métier paramétrables (`ref_*`) avec leur UI
-Configuration unifiée. Lot 2 dans son ensemble en cours de finition
-(2.1, 2.2, 2.3, 2.5A et 2.5-bis livrés ; 2.5B-F restants — CRUD UI des
-5 dimensions métier — avant d'attaquer le Lot 3).
+**Lot 2.5 INTÉGRALEMENT LIVRÉ — 02/05/2026**. Les 6 CRUDs UI des
+dimensions référentielles métier (Structure, Segment, Produit, Ligne
+métier, Compte avec import CSV, CR) sont opérationnels. Le pattern
+de factorisation Phase A 2.5C (`<RefSecondaireSelect>` +
+`useScd2EditDiff`) compte 7 instances et 6 consommateurs
+respectivement, sur l'ensemble du Lot 2.5. L'application est prête
+pour le **Lot 3 (Module B — Élaboration budgétaire)**.
 
 | Lot                                 | Statut |
 | ----------------------------------- | ------ |
 | Lot 0 — Documentation               | ✅ Livré |
 | Lot 1 — Socle transverse            | ✅ Livré |
-| Lot 2 — Référentiels SCD2           | 🟡 En cours (2.1, 2.2, 2.3, 2.5A, 2.5-bis livrés ; 2.5B-F à venir) |
+| Lot 2 — Référentiels SCD2           | ✅ **Livré** (2.1, 2.2, 2.3, 2.4, 2.5A-F livrés) |
+| Lot 2.5 — CRUD UI dimensions        | ✅ **Livré — 02/05/2026** (6 sous-étapes A-F : 6/6 CRUDs UI) |
 | Lot 2.5-bis — Référentiels secondaires paramétrables | ✅ **Livré — 01/05/2026** (5 sous-étapes A-E) |
-| Lot 3 — Élaboration budgétaire      | ⏳ À venir |
+| Lot 3 — Élaboration budgétaire      | 🟡 À démarrer |
 | Lot 4 — PNB / Charges               | ⏳ À venir |
 | Lot 5 — Reporting / ALM             | ⏳ À venir |
 | Lot 6 — Stabilisation               | ⏳ À venir |
@@ -290,14 +293,16 @@ Configuration unifiée. Lot 2 dans son ensemble en cours de finition
 
 - **41 migrations en base** (3 Lot 1 + 12 dimensions/faits Lot 2 + 13
   ref secondaires Lot 2.5-bis-A + 13 FK Lot 2.5-bis-B)
-- **8 dimensions** livrées sur 10 du modèle dimensionnel (les 2
-  restantes — `dim_version` et `dim_scenario` — relèvent du Lot 3)
+- **10 dimensions / 10 référentielles** livrées via UI complète
+  (Structure, Segment, Produit, Ligne métier, Compte, CR, Calendrier,
+  Devises, Comptes import CSV, Configuration ref_*) ; les 2
+  restantes — `dim_version` et `dim_scenario` — relèvent du Lot 3
 - **13 référentiels secondaires** paramétrables (cf.
   `docs/referentiels-secondaires.md`)
-- **671 tests backend verts** (jest + pg-mem) — 449 → 671 (+222 sur
-  3.x et 2.5-bis)
-- **145 tests frontend verts** (vitest + testing-library) — 49 → 145
-  (+96 sur 3.5-mini et 2.5-bis)
+- **658 tests backend verts** (jest + pg-mem) — `fk-ref-secondaire.spec.ts`
+  déplacé hors du périmètre `jest src/` standard
+- **239 tests frontend verts** (vitest + testing-library) — 49 → 239
+  sur l'ensemble du Lot 2.5 (+190 nets)
 - **2 dépôts GitHub** : `budget-backend` (porte également `docs/`) +
   `budget-frontend`
 

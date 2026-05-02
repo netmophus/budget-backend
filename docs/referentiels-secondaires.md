@@ -207,7 +207,7 @@ le pattern, mais sans `<RefSecondaireSelect>` car `dim_ligne_metier`
 n'a aucune FK `ref_*`. `CompteFormDrawer` (Lot 2.5E) et
 `CrFormDrawer` (Lot 2.5F) restent à livrer.
 
-**Consommateurs courants au 02/05/2026** :
+**Consommateurs courants au 02/05/2026 (Lot 2.5 clôturé)** :
 
 | Drawer | `<RefSecondaireSelect>` | `useScd2EditDiff` |
 |---|---|---|
@@ -216,12 +216,15 @@ n'a aucune FK `ref_*`. `CompteFormDrawer` (Lot 2.5E) et
 | `ProduitFormDrawer` | ✅ × 1 (type produit) | ✅ |
 | `LigneMetierFormDrawer` | ❌ (aucune FK `ref_*`) | ✅ |
 | `CompteFormDrawer` (Lot 2.5E) | ✅ × 2 (classe PCB, sens D/C/M) | ✅ |
+| `CrFormDrawer` (Lot 2.5F) | ✅ × 1 (type CR) | ✅ |
 
-`useScd2EditDiff` a **5 consommateurs** ; `<RefSecondaireSelect>` en
-a **6 instances** réparties sur 4 drawers + le filtre
-`ComptesPage` (classe). Le composant `<RefSecondaireSelect>` est
-également utilisé hors drawer pour les filtres de pages quand le
-référentiel a peu de valeurs (8 classes PCB, 3 sens).
+`useScd2EditDiff` a **6 consommateurs** (un par dimension métier).
+`<RefSecondaireSelect>` totalise **7 instances** sur 5 drawers + 2
+filtres de page (`ComptesPage` classe, `CentresResponsabilitePage`
+type CR). Le pattern de factorisation 3-cas-concrets a parcouru ses
+6 cas de consommation prévus et n'a généré aucune nouvelle
+abstraction au-delà : la facto initiale couvre l'intégralité du
+besoin Lot 2.5.
 
 ## 8. Décisions architecturales
 

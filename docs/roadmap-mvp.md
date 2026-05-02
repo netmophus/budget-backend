@@ -45,7 +45,7 @@ Prochaine étape : **Lot 3** — Module B Élaboration budgétaire
 |-------|---------------|-----------------------------------------------------------|-----------------|
 | Lot 0 | 1 semaine     | Initialisation projet, choix techniques, cadrage          | Terminé         |
 | Lot 1 | 3 semaines    | Socle transverse (auth, RBAC, audit, Swagger, CORS)       | Terminé         |
-| Lot 2 | 4 semaines    | Module A — Référentiels (PCB UMOA, structure, axes)       | **Livré — 29/04/2026** (CRUD UI 2.5E livré 02/05 ; 2.5F à venir) |
+| Lot 2 | 4 semaines    | Module A — Référentiels (PCB UMOA, structure, axes)       | **Livré — 29/04/2026** + Lot 2.5 (6/6 CRUDs UI) clôturé 02/05/2026 |
 | Lot 2.5-bis | 1 semaine | Référentiels secondaires paramétrables (13 `ref_*` + UI Configuration) | **✅ Livré — 01/05/2026** (5 sous-étapes A-E) |
 | Lot 3 | 5 semaines    | Module B — Élaboration budgétaire (cycle, versions, WF)   | En attente      |
 | Lot 4 | 4 semaines    | Modules C (PNB) et D (Charges)                            | En attente      |
@@ -255,7 +255,7 @@ en 6 sous-étapes pour rester livrable par incréments de ~½ journée.
 | 2.5C | CRUD UI **Produit** (+ factorisation `RefSecondaireSelect` / `useScd2EditDiff` + seed `PRODUIT_TRANSVERSE`) | ✅ Livré — 30/04/2026 |
 | 2.5D | CRUD UI **Ligne métier** (consomme `useScd2EditDiff` ; aucune FK `ref_*` → pas de `RefSecondaireSelect`) | ✅ Livré — 02/05/2026 |
 | 2.5E | CRUD UI **Compte** (10 champs, 2× `RefSecondaireSelect`, import CSV multipart connecté à 2.4A.2) | ✅ Livré — 02/05/2026 |
-| 2.5F | CRUD UI **CR** | À venir |
+| 2.5F | CRUD UI **CR** (5 champs, FK SCD2-vers-SCD2 vers `dim_structure`, 6ᵉ et dernier consommateur du pattern factorisation) | ✅ Livré — 02/05/2026 |
 
 ### Lot 2.5-bis — Référentiels secondaires paramétrables [LIVRÉ — 01/05/2026]
 
@@ -363,6 +363,57 @@ seul, pas de modif backend), 223 tests frontend verts (204 → 223,
 +19 nets après refonte ComptesPage + nouveaux drawers + import).
 Build vite : chunk `ComptesPage` passe de 6.77 kB à 29.28 kB
 (+CRUD + import dialog).
+
+### Lot 2.5F — CRUD UI Centre de responsabilité [LIVRÉ — 02/05/2026]
+
+6ᵉ et **dernier** CRUD UI du Lot 2.5. Cas particulier : pas de
+hiérarchie auto-référencée mais une FK SCD2-vers-SCD2 vers
+`dim_structure` (stratégie A — `relinkAfterStructureRevision` côté
+backend, transparent pour l'UI). 6ᵉ consommateur de
+`useScd2EditDiff` ; le pattern de factorisation a parcouru ses 6
+cas concrets ciblés à l'issue du Lot 2.5.
+
+| Phase | Périmètre | Livraison |
+|---|---|---|
+| Backend | Audit `centre-responsabilite` (Scd2Service + 8 routes + relinkAfterStructureRevision livré 2.3B) — aucune modification | ✅ Audité, conforme |
+| Client API | Ajout `getCrById`, `getCrHistorique`, `createCr`, `updateCr`, `deleteCr` + DTOs Create/Update + `CrModeMaj` | ✅ |
+| `CrFormDrawer` | 5 champs (code immuable, libellé, libellé court, type CR via `<RefSecondaireSelect refKey="type-cr">`, structure rattachée via Select hiérarchique) ; pas de hiérarchie auto-référencée → drawer simple | ✅ |
+| Refonte `CentresResponsabilitePage` | Bouton + Nouveau (REFERENTIEL.GERER), filtre Type CR via `<RefSecondaireSelect>` (au lieu de `TYPES_CR` hardcodé), DetailDrawer avec section Voir-la-structure (lien navigation), actions Modifier/Désactiver, ConfirmDialog 409 | ✅ |
+| Tests | 9 page + 10 drawer = 19 tests (DoD ≥ 235 atteinte à 239) | ✅ |
+
+**Chiffres de livraison 2.5F** : 658 tests backend verts (audit
+seul), **239 tests frontend verts** (223 → 239, +16). Build vite
+sans warning.
+
+---
+
+### Bilan Lot 2.5 — 6 CRUDs UI livrés ✅
+
+À l'issue du 02/05/2026, **les 6 dimensions référentielles métier
+disposent toutes d'un CRUD UI complet** :
+
+| # | Dimension | Sous-étape | Particularité |
+|---|---|---|---|
+| 1 | Structure | 2.5A | Hiérarchie 5 niveaux + 2× `RefSecondaireSelect` (type, pays) |
+| 2 | Segment | 2.5B | Plat + 1× `RefSecondaireSelect` (catégorie) |
+| 3 | Produit | 2.5C | Hiérarchie 4 niveaux + factorisation Phase A déclenchée |
+| 4 | Ligne métier | 2.5D | Hiérarchie 4 niveaux, aucune FK `ref_*` |
+| 5 | Compte (PCB UMOA) | 2.5E | Hiérarchie 4 niveaux + 2× `RefSecondaireSelect` + import CSV |
+| 6 | CR | 2.5F | Plat + FK SCD2-vers-SCD2 + 1× `RefSecondaireSelect` |
+
+**Bilan factorisation Phase A 2.5C** :
+- `<RefSecondaireSelect>` : **7 instances** sur 5 drawers + 2 filtres
+  (Structure ×2, Segment, Produit, Compte ×2, CR ; filtres
+  ComptesPage et CentresResponsabilitePage).
+- `useScd2EditDiff` : **6 consommateurs** (un par dimension).
+- Lignes économisées vs duplication : ~360 lignes (+30 % sur les 2
+  premiers refactors Structure/Segment, ~250 lignes évitées sur
+  Produit/Ligne métier/Compte/CR consommant directement).
+
+L'application est désormais prête pour le **Lot 3 (Module B —
+Élaboration budgétaire)** : tous les axes d'imputation
+(Structure × CR × Compte × Produit × Segment × Ligne métier) sont
+gérables via UI sans intervention DBA.
 
 ---
 
