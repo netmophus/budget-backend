@@ -45,7 +45,7 @@ Prochaine étape : **Lot 3** — Module B Élaboration budgétaire
 |-------|---------------|-----------------------------------------------------------|-----------------|
 | Lot 0 | 1 semaine     | Initialisation projet, choix techniques, cadrage          | Terminé         |
 | Lot 1 | 3 semaines    | Socle transverse (auth, RBAC, audit, Swagger, CORS)       | Terminé         |
-| Lot 2 | 4 semaines    | Module A — Référentiels (PCB UMOA, structure, axes)       | **Livré — 29/04/2026** (CRUD UI 2.5C livré 30/04 ; 2.5D-F à venir) |
+| Lot 2 | 4 semaines    | Module A — Référentiels (PCB UMOA, structure, axes)       | **Livré — 29/04/2026** (CRUD UI 2.5D livré 02/05 ; 2.5E-F à venir) |
 | Lot 2.5-bis | 1 semaine | Référentiels secondaires paramétrables (13 `ref_*` + UI Configuration) | **✅ Livré — 01/05/2026** (5 sous-étapes A-E) |
 | Lot 3 | 5 semaines    | Module B — Élaboration budgétaire (cycle, versions, WF)   | En attente      |
 | Lot 4 | 4 semaines    | Modules C (PNB) et D (Charges)                            | En attente      |
@@ -253,7 +253,7 @@ en 6 sous-étapes pour rester livrable par incréments de ~½ journée.
 | 2.5A | CRUD UI **Structure** (drawer + bandeau SCD2 + désactivation) | ✅ Livré |
 | 2.5B | CRUD UI **Segment** (filtre catégorie + bandeau SCD2 + désactivation) | ✅ Livré — 01/05/2026 |
 | 2.5C | CRUD UI **Produit** (+ factorisation `RefSecondaireSelect` / `useScd2EditDiff` + seed `PRODUIT_TRANSVERSE`) | ✅ Livré — 30/04/2026 |
-| 2.5D | CRUD UI **Ligne métier** | À venir |
+| 2.5D | CRUD UI **Ligne métier** (consomme `useScd2EditDiff` ; aucune FK `ref_*` → pas de `RefSecondaireSelect`) | ✅ Livré — 02/05/2026 |
 | 2.5E | CRUD UI **Compte** (avec import CSV PCB déjà livré 2.4A.2) | À venir |
 | 2.5F | CRUD UI **CR** | À venir |
 
@@ -303,6 +303,30 @@ déclenchée par le 3ᵉ écran (Produit) après accumulation sur
 Structure et Segment. Cf. `docs/referentiels-secondaires.md` §
 *Pattern factorisation 3 cas concrets* pour la décision et les
 gains.
+
+### Lot 2.5D — CRUD UI Ligne métier [LIVRÉ — 02/05/2026]
+
+4ᵉ CRUD UI de la série, et **cas le plus simple** : `dim_ligne_metier`
+n'a aucun champ FK vers les référentiels secondaires. Le drawer
+ne consomme donc PAS `<RefSecondaireSelect>` (volontaire — pas
+d'oubli) mais utilise `useScd2EditDiff` pour le bandeau SCD2 (4ᵉ
+consommateur après Structure / Segment / Produit).
+
+| Phase | Périmètre | Livraison |
+|---|---|---|
+| Backend | Audit du module `ligne-metier` (déjà livré au Lot 2.4B avec Scd2Service, 11 routes, hiérarchie complète, anti-cycle, @Auditable) — aucune modification nécessaire | ✅ Audité, conforme |
+| Frontend client API | 11 fonctions ajoutées : `listLignesMetier`, `listLignesMetierRacines`, `getById/byCode/historique/enfants/descendants/ancetres`, `create/update/delete` + DTOs Create/Update + types `LigneMetierModeMaj` | ✅ |
+| Frontend `LigneMetierFormDrawer` | Drawer 3-champs (code, libellé, niveau, parent) + bandeau SCD2 dynamique + anti-cycle UI BFS — pas de RefSecondaireSelect | ✅ |
+| Frontend `LignesMetierPage` | Refonte CRUD : bouton Nouveau (REFERENTIEL.GERER), filtres (niveau / racines / actives), colonnes Parent + Statut, actions Modifier / Désactiver, ConfirmDialog 409 | ✅ |
+| Tests | 9 tests page + 10 tests drawer ; cible DoD ≥ 200 frontend dépassée (204) | ✅ |
+
+**Chiffres de livraison 2.5D** : 658 tests backend verts (suite
+unchangée, le commit antérieur `ee8f76b` a déplacé
+`fk-ref-secondaire.spec.ts` hors du périmètre `jest` standard —
+indépendant de 2.5D), 204 tests frontend verts (190 → 204, +14 :
++5 nouveaux tests page CRUD + +10 nouveaux tests drawer − 1 test
+détail réécrit). 4ᵉ consommateur de `useScd2EditDiff` ; le pattern
+de factorisation continue de se rentabiliser.
 
 ---
 

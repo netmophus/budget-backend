@@ -202,9 +202,22 @@ const { diff, modeMaj, bandeau } = useScd2EditDiff({
 
 **Prochain candidat** : `ProduitFormDrawer` consomme directement la
 factorisation dès sa création (pas de phase de duplication).
-`LigneMetierFormDrawer` (Lot 2.5D), `CompteFormDrawer` (Lot 2.5E)
-et `CrFormDrawer` (Lot 2.5F) suivront le même pattern dès leur
-livraison.
+`LigneMetierFormDrawer` (Lot 2.5D — livré 02/05/2026) suit également
+le pattern, mais sans `<RefSecondaireSelect>` car `dim_ligne_metier`
+n'a aucune FK `ref_*`. `CompteFormDrawer` (Lot 2.5E) et
+`CrFormDrawer` (Lot 2.5F) restent à livrer.
+
+**Consommateurs courants au 02/05/2026** :
+
+| Drawer | `<RefSecondaireSelect>` | `useScd2EditDiff` |
+|---|---|---|
+| `StructureFormDrawer` | ✅ × 2 (type structure, pays) | ✅ |
+| `SegmentFormDrawer` | ✅ × 1 (catégorie segment) | ✅ |
+| `ProduitFormDrawer` | ✅ × 1 (type produit) | ✅ |
+| `LigneMetierFormDrawer` | ❌ (aucune FK `ref_*`) | ✅ |
+
+`useScd2EditDiff` a 4 consommateurs ; `<RefSecondaireSelect>` en a 4
+instances réparties sur 3 drawers.
 
 ## 8. Décisions architecturales
 
