@@ -215,9 +215,13 @@ n'a aucune FK `ref_*`. `CompteFormDrawer` (Lot 2.5E) et
 | `SegmentFormDrawer` | ✅ × 1 (catégorie segment) | ✅ |
 | `ProduitFormDrawer` | ✅ × 1 (type produit) | ✅ |
 | `LigneMetierFormDrawer` | ❌ (aucune FK `ref_*`) | ✅ |
+| `CompteFormDrawer` (Lot 2.5E) | ✅ × 2 (classe PCB, sens D/C/M) | ✅ |
 
-`useScd2EditDiff` a 4 consommateurs ; `<RefSecondaireSelect>` en a 4
-instances réparties sur 3 drawers.
+`useScd2EditDiff` a **5 consommateurs** ; `<RefSecondaireSelect>` en
+a **6 instances** réparties sur 4 drawers + le filtre
+`ComptesPage` (classe). Le composant `<RefSecondaireSelect>` est
+également utilisé hors drawer pour les filtres de pages quand le
+référentiel a peu de valeurs (8 classes PCB, 3 sens).
 
 ## 8. Décisions architecturales
 

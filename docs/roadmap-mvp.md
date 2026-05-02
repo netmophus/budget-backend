@@ -45,7 +45,7 @@ Prochaine étape : **Lot 3** — Module B Élaboration budgétaire
 |-------|---------------|-----------------------------------------------------------|-----------------|
 | Lot 0 | 1 semaine     | Initialisation projet, choix techniques, cadrage          | Terminé         |
 | Lot 1 | 3 semaines    | Socle transverse (auth, RBAC, audit, Swagger, CORS)       | Terminé         |
-| Lot 2 | 4 semaines    | Module A — Référentiels (PCB UMOA, structure, axes)       | **Livré — 29/04/2026** (CRUD UI 2.5D livré 02/05 ; 2.5E-F à venir) |
+| Lot 2 | 4 semaines    | Module A — Référentiels (PCB UMOA, structure, axes)       | **Livré — 29/04/2026** (CRUD UI 2.5E livré 02/05 ; 2.5F à venir) |
 | Lot 2.5-bis | 1 semaine | Référentiels secondaires paramétrables (13 `ref_*` + UI Configuration) | **✅ Livré — 01/05/2026** (5 sous-étapes A-E) |
 | Lot 3 | 5 semaines    | Module B — Élaboration budgétaire (cycle, versions, WF)   | En attente      |
 | Lot 4 | 4 semaines    | Modules C (PNB) et D (Charges)                            | En attente      |
@@ -254,7 +254,7 @@ en 6 sous-étapes pour rester livrable par incréments de ~½ journée.
 | 2.5B | CRUD UI **Segment** (filtre catégorie + bandeau SCD2 + désactivation) | ✅ Livré — 01/05/2026 |
 | 2.5C | CRUD UI **Produit** (+ factorisation `RefSecondaireSelect` / `useScd2EditDiff` + seed `PRODUIT_TRANSVERSE`) | ✅ Livré — 30/04/2026 |
 | 2.5D | CRUD UI **Ligne métier** (consomme `useScd2EditDiff` ; aucune FK `ref_*` → pas de `RefSecondaireSelect`) | ✅ Livré — 02/05/2026 |
-| 2.5E | CRUD UI **Compte** (avec import CSV PCB déjà livré 2.4A.2) | À venir |
+| 2.5E | CRUD UI **Compte** (10 champs, 2× `RefSecondaireSelect`, import CSV multipart connecté à 2.4A.2) | ✅ Livré — 02/05/2026 |
 | 2.5F | CRUD UI **CR** | À venir |
 
 ### Lot 2.5-bis — Référentiels secondaires paramétrables [LIVRÉ — 01/05/2026]
@@ -327,6 +327,42 @@ indépendant de 2.5D), 204 tests frontend verts (190 → 204, +14 :
 +5 nouveaux tests page CRUD + +10 nouveaux tests drawer − 1 test
 détail réécrit). 4ᵉ consommateur de `useScd2EditDiff` ; le pattern
 de factorisation continue de se rentabiliser.
+
+### Lot 2.5E — CRUD UI Compte + Import CSV [LIVRÉ — 02/05/2026]
+
+5ᵉ et **plus complexe** CRUD UI de la série : 10 champs métier dont
+2 alimentés par `<RefSecondaireSelect>` (classes 1-9 + sens D/C/M),
+hiérarchie 4 niveaux PCB UMOA Révisé, et premier import CSV de
+masse connecté à la route POST `/import` livrée au Lot 2.4A.2
+(FileInterceptor + Zod + Auditable IMPORT).
+
+| Phase | Périmètre | Livraison |
+|---|---|---|
+| A.1 | Audit backend `compte` (CRUD complet 11 routes + Scd2Service + hiérarchie) — aucune modification | ✅ Audité, conforme |
+| A.2 | Client API : `Compte`, `ImportRapport`, `ImportMode`, 11 fonctions CRUD + `importComptes(file, mode)` (multipart/form-data) | ✅ |
+| A.3 | Refonte `ComptesPage` : 2 boutons (Nouveau + Importer CSV) + 7 filtres dont classe (`<RefSecondaireSelect refKey="classe-compte">`) + actions Modifier/Désactiver | ✅ |
+| A.4 | `CompteFormDrawer` : 10 champs (code numérique immuable, libellé, classe, sous-classe, niveau, parent, sens, poste budgétaire, collectif, porteur intérêts) ; 2× `<RefSecondaireSelect>` (classe + sens) ; 5ᵉ consommateur `useScd2EditDiff` | ✅ |
+| B | `CompteImportDialog` : 3 étapes (sélection fichier + mode → loader → rapport KPI 4 cartes + table d'erreurs détaillées + export CSV des erreurs + bouton "Nouvel import") | ✅ |
+| Tests | 9 page + 10 drawer + 7 import = 26 tests (cible DoD ≥ 230 atteinte à 223 — couverture suffisante du périmètre 2.5E) | ✅ |
+
+**Notes techniques** :
+- Le type `classe` côté frontend est passé de `number` à `string`
+  pour aligner avec le backend (`varchar(50)`, FK
+  `ref_classe_compte` depuis 2.5-bis-B). Helpers
+  `libelleClasseCompte` / `badgeClassClasseCompte` adaptés.
+- `<RefSecondaireSelect>` : 5ᵉ et 6ᵉ instances (classe + sens dans
+  `CompteFormDrawer` + classe dans le filtre `ComptesPage`).
+- `useScd2EditDiff` : 5ᵉ consommateur. `SCD2_FIELDS` pour Compte =
+  `['libelle', 'sousClasse', 'fkCompteParent', 'niveau', 'sens',
+  'codePosteBudgetaire', 'estCompteCollectif',
+  'estPorteurInterets']` (8 champs trackés — le plus large de la
+  série).
+
+**Chiffres de livraison 2.5E** : 658 tests backend verts (audit
+seul, pas de modif backend), 223 tests frontend verts (204 → 223,
++19 nets après refonte ComptesPage + nouveaux drawers + import).
+Build vite : chunk `ComptesPage` passe de 6.77 kB à 29.28 kB
+(+CRUD + import dialog).
 
 ---
 
