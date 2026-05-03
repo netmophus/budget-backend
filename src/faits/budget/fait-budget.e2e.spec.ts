@@ -836,4 +836,83 @@ describe('FaitBudget (e2e)', () => {
     expect(audits[0]!.statut).toBe('success');
     expect(audits[0]!.payload_apres.response?.resolutionDetails).toBeDefined();
   });
+
+  // ─── Lot 3.1 : mode ENCOURS_TIE end-to-end
+
+  it('POST mode=MONTANT par défaut → 201, encoursMoyen+tie null en réponse (régression)', async () => {
+    const res = await request(app.getHttpServer())
+      .post('/api/v1/faits/budget')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send(buildBody())
+      .expect(201);
+    expect(res.body.modeSaisie).toBe('MONTANT');
+    expect(res.body.encoursMoyen).toBeNull();
+    expect(res.body.tie).toBeNull();
+    expect(res.body.commentaire).toBeNull();
+  });
+
+  it('POST mode=ENCOURS_TIE sur compte porteur d\'intérêts → 201 + montant recalculé + audit', async () => {
+    // Ajouter un compte porteur d'intérêts au seed
+    await dataSource.query(
+      `INSERT INTO dim_compte
+        ("code_compte","libelle","classe","fk_compte_parent","niveau",
+         "est_porteur_interets","date_debut_validite","date_fin_validite",
+         "version_courante","est_actif","utilisateur_creation")
+       VALUES ('761100','Intérêts perçus PCT',7,NULL,4,
+               true,'2026-01-01',NULL,true,true,'system')`,
+    );
+    const r = (await dataSource.query(
+      `SELECT id FROM dim_compte WHERE code_compte='761100'`,
+    )) as Array<{ id: string | number }>;
+    const fkComptePorteur = String(r[0]!.id);
+
+    const res = await request(app.getHttpServer())
+      .post('/api/v1/faits/budget')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send(
+        buildBody({
+          fkCompte: fkComptePorteur,
+          montantDevise: 0,
+          montantFcfa: 0,
+          modeSaisie: 'ENCOURS_TIE',
+          encoursMoyen: 12000,
+          tie: 0.1,
+          commentaire: 'Hypothèse encours retail PCT',
+        } as never),
+      )
+      .expect(201);
+    // 12 000 × 0.10 / 12 = 100
+    expect(res.body.modeSaisie).toBe('ENCOURS_TIE');
+    expect(res.body.encoursMoyen).toBe(12000);
+    expect(res.body.tie).toBe(0.1);
+    expect(Number(res.body.montantDevise)).toBeCloseTo(100, 4);
+    expect(res.body.commentaire).toBe('Hypothèse encours retail PCT');
+
+    const audits = (await dataSource.query(
+      `SELECT type_action, statut, payload_apres FROM audit_log
+       WHERE entite_cible='fait_budget'`,
+    )) as Array<{
+      type_action: string;
+      statut: string;
+      payload_apres: { body?: { modeSaisie?: string } };
+    }>;
+    expect(audits[0]!.type_action).toBe('CREATE');
+    expect(audits[0]!.statut).toBe('success');
+    expect(audits[0]!.payload_apres.body?.modeSaisie).toBe('ENCOURS_TIE');
+  });
+
+  it('POST mode=ENCOURS_TIE sur compte non porteur (611100) → 400 message clair', async () => {
+    const res = await request(app.getHttpServer())
+      .post('/api/v1/faits/budget')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send(
+        buildBody({
+          modeSaisie: 'ENCOURS_TIE',
+          encoursMoyen: 12000,
+          tie: 0.1,
+        } as never),
+      )
+      .expect(400);
+    expect(res.body.message).toMatch(/n'est pas porteur d'intérêts/);
+  });
 });

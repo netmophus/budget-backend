@@ -836,4 +836,175 @@ describe('FaitBudgetService', () => {
       ).rejects.toThrow(UnprocessableEntityException);
     });
   });
+
+  // ─── Lot 3.1 : mode de saisie MONTANT vs ENCOURS_TIE
+  // Le compte 611100 seedé dans seedDimensions n'est pas porteur
+  // d'intérêts. On en ajoute un 2ᵉ (761100) qui l'est, pour les
+  // tests ENCOURS_TIE.
+
+  describe('mode ENCOURS_TIE', () => {
+    let fkComptePorteur: string;
+
+    beforeEach(async () => {
+      await dataSource.query(
+        `INSERT INTO dim_compte
+          ("code_compte","libelle","classe","fk_compte_parent","niveau",
+           "est_porteur_interets","date_debut_validite","date_fin_validite",
+           "version_courante","est_actif","utilisateur_creation")
+         VALUES ('761100','Intérêts perçus PCT',7,NULL,4,
+                 true,'2026-01-01',NULL,true,true,'system')`,
+      );
+      const r = (await dataSource.query(
+        `SELECT id FROM dim_compte WHERE code_compte='761100'`,
+      )) as Array<{ id: string | number }>;
+      fkComptePorteur = String(r[0]!.id);
+    });
+
+    it("mode MONTANT par défaut : encoursMoyen + tie = null, montant tel que fourni", async () => {
+      const created = await service.create(
+        {
+          ...ids,
+          montantDevise: 1500000,
+          montantFcfa: 1500000,
+          tauxChangeApplique: 1,
+        },
+        'admin',
+      );
+      expect(created.modeSaisie).toBe('MONTANT');
+      expect(created.encoursMoyen).toBeNull();
+      expect(created.tie).toBeNull();
+      expect(created.montantDevise).toBe(1500000);
+    });
+
+    it("mode MONTANT explicite avec encoursMoyen fourni → BadRequestException", async () => {
+      await expect(
+        service.create(
+          {
+            ...ids,
+            montantDevise: 1500000,
+            montantFcfa: 1500000,
+            tauxChangeApplique: 1,
+            modeSaisie: 'MONTANT',
+            encoursMoyen: 12345,
+          },
+          'admin',
+        ),
+      ).rejects.toThrow(/Mode 'MONTANT' incompatible avec encoursMoyen/);
+    });
+
+    it("mode ENCOURS_TIE sur compte NON porteur d'intérêts → BadRequestException", async () => {
+      await expect(
+        service.create(
+          {
+            ...ids,
+            montantDevise: 0, // ignoré
+            montantFcfa: 0,
+            tauxChangeApplique: 1,
+            modeSaisie: 'ENCOURS_TIE',
+            encoursMoyen: 896000000,
+            tie: 0.085,
+          },
+          'admin',
+        ),
+      ).rejects.toThrow(/n'est pas porteur d'intérêts/);
+    });
+
+    it("mode ENCOURS_TIE sur compte porteur : montant recalculé = encours × tie / 12", async () => {
+      const created = await service.create(
+        {
+          ...ids,
+          fkCompte: fkComptePorteur,
+          montantDevise: 0, // valeur ignorée
+          montantFcfa: 0,
+          tauxChangeApplique: 1,
+          modeSaisie: 'ENCOURS_TIE',
+          encoursMoyen: 896000000,
+          tie: 0.085,
+          commentaire: 'Hypothèse encours retail PCT',
+        },
+        'admin',
+      );
+      // 896 000 000 × 0.085 / 12 = 6 346 666.6666… → arrondi 4 décimales = 6 346 666.6667
+      expect(created.modeSaisie).toBe('ENCOURS_TIE');
+      expect(created.encoursMoyen).toBe(896000000);
+      expect(created.tie).toBe(0.085);
+      expect(created.montantDevise).toBeCloseTo(6346666.6667, 4);
+      expect(created.commentaire).toBe('Hypothèse encours retail PCT');
+    });
+
+    it("mode ENCOURS_TIE sans tie → BadRequestException explicite", async () => {
+      await expect(
+        service.create(
+          {
+            ...ids,
+            fkCompte: fkComptePorteur,
+            montantDevise: 0,
+            montantFcfa: 0,
+            tauxChangeApplique: 1,
+            modeSaisie: 'ENCOURS_TIE',
+            encoursMoyen: 896000000,
+          },
+          'admin',
+        ),
+      ).rejects.toThrow(/requiert tie/);
+    });
+
+    it("update : bascule MONTANT → ENCOURS_TIE recalcule montantDevise", async () => {
+      const created = await service.create(
+        {
+          ...ids,
+          fkCompte: fkComptePorteur,
+          montantDevise: 1000,
+          montantFcfa: 1000,
+          tauxChangeApplique: 1,
+        },
+        'admin',
+      );
+
+      const updated = await service.update(
+        created.id,
+        {
+          modeSaisie: 'ENCOURS_TIE',
+          encoursMoyen: 12000,
+          tie: 0.1,
+        },
+        'admin',
+      );
+      // 12 000 × 0.10 / 12 = 100 exactement
+      expect(updated.modeSaisie).toBe('ENCOURS_TIE');
+      expect(updated.encoursMoyen).toBe(12000);
+      expect(updated.tie).toBe(0.1);
+      expect(updated.montantDevise).toBeCloseTo(100, 4);
+    });
+
+    it("update : bascule ENCOURS_TIE → MONTANT remet encoursMoyen + tie à null", async () => {
+      const created = await service.create(
+        {
+          ...ids,
+          fkCompte: fkComptePorteur,
+          montantDevise: 0,
+          montantFcfa: 0,
+          tauxChangeApplique: 1,
+          modeSaisie: 'ENCOURS_TIE',
+          encoursMoyen: 12000,
+          tie: 0.1,
+        },
+        'admin',
+      );
+      expect(created.modeSaisie).toBe('ENCOURS_TIE');
+
+      const updated = await service.update(
+        created.id,
+        {
+          modeSaisie: 'MONTANT',
+          montantDevise: 200,
+        },
+        'admin',
+      );
+      expect(updated.modeSaisie).toBe('MONTANT');
+      expect(updated.encoursMoyen).toBeNull();
+      expect(updated.tie).toBeNull();
+      expect(updated.montantDevise).toBe(200);
+    });
+  });
 });
