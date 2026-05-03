@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 
 import { AuthModule } from '../../auth/auth.module';
+import { BudgetModule } from '../../budget/budget.module';
 import { CentreResponsabiliteModule } from '../../referentiels/centre-responsabilite/centre-responsabilite.module';
 import { CompteModule } from '../../referentiels/compte/compte.module';
 import { DeviseModule } from '../../referentiels/devise/devise.module';
@@ -31,6 +32,8 @@ import { FaitBudgetService } from './fait-budget.service';
   imports: [
     TypeOrmModule.forFeature([FaitBudget, DimVersion]),
     AuthModule,
+    // Lot 3.3 — filtrage périmètre Q5 sur les endpoints fait_budget
+    BudgetModule,
     TempsModule,
     StructureModule,
     CentreResponsabiliteModule,

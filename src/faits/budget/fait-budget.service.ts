@@ -194,6 +194,7 @@ export class FaitBudgetService {
 
   async findAll(
     query: ListFaitBudgetQueryDto,
+    crAutorises: string[] | null = null,
   ): Promise<PaginatedFaitBudgetDto> {
     const qb = this.repo
       .createQueryBuilder('f')
@@ -244,6 +245,18 @@ export class FaitBudgetService {
     }
     if (query.mois !== undefined) {
       qb.andWhere('tps.mois = :mois', { mois: query.mois });
+    }
+
+    // Lot 3.3 — filtrage périmètre (Q5).
+    // crAutorises = null → admin global, pas de filtre.
+    // crAutorises = []   → aucun CR autorisé, ne rien retourner.
+    // crAutorises = [..] → restreindre aux CR autorisés.
+    if (crAutorises !== null) {
+      if (crAutorises.length === 0) {
+        qb.andWhere('1 = 0'); // tautologie fausse → 0 résultat
+      } else {
+        qb.andWhere('f.fkCentre IN (:...crIds)', { crIds: crAutorises });
+      }
     }
 
     qb.orderBy('tps.date', 'ASC')

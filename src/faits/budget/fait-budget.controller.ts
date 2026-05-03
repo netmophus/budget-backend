@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Delete,
+  ForbiddenException,
   Get,
   HttpCode,
   HttpStatus,
@@ -28,6 +29,7 @@ import { Auditable } from '../../audit/decorators/auditable.decorator';
 import { CurrentUser } from '../../auth/decorators/current-user.decorator';
 import type { AuthUser } from '../../auth/decorators/current-user.decorator';
 import { RequirePermissions } from '../../auth/decorators/require-permissions.decorator';
+import { PerimetreService } from '../../budget/services/perimetre.service';
 import { CreateFaitBudgetFromBusinessKeysDto } from './dto/create-fait-budget-from-business-keys.dto';
 import { CreateFaitBudgetDto } from './dto/create-fait-budget.dto';
 import { FaitBudgetFromBusinessKeysResponseDto } from './dto/fait-budget-from-business-keys-response.dto';
@@ -42,19 +44,44 @@ import { FaitBudgetService } from './fait-budget.service';
 @ApiBearerAuth()
 @Controller('faits/budget')
 export class FaitBudgetController {
-  constructor(private readonly service: FaitBudgetService) {}
+  constructor(
+    private readonly service: FaitBudgetService,
+    private readonly perimetreService: PerimetreService,
+  ) {}
+
+  /**
+   * Helper privé : 403 si fkCentre n'est pas dans le périmètre du user
+   * (sauf admin global, où crAutorises === null).
+   */
+  private async assertCrAutorise(
+    fkCentre: string,
+    userId: string,
+  ): Promise<void> {
+    const crs = await this.perimetreService.getCrAutorisesPourUser(userId);
+    if (crs === null) return;
+    if (!crs.includes(String(fkCentre))) {
+      throw new ForbiddenException(
+        `Vous n'avez pas accès au centre de responsabilité ${fkCentre} ` +
+          `(filtrage périmètre Q5).`,
+      );
+    }
+  }
 
   @Get()
   @RequirePermissions('BUDGET.LIRE')
   @ApiOperation({
     summary:
-      'Liste paginée des faits budget (filtres : fkVersion / fkScenario / fkTemps / fkCentre / fkCompte / codeVersion / codeScenario / annee / mois).',
+      'Liste paginée des faits budget (filtres : fkVersion / fkScenario / fkTemps / fkCentre / fkCompte / codeVersion / codeScenario / annee / mois). Filtré par périmètre RBAC du user (Q5).',
   })
   @ApiOkResponse({ type: PaginatedFaitBudgetDto })
-  findAll(
+  async findAll(
     @Query() query: ListFaitBudgetQueryDto,
+    @CurrentUser() user: AuthUser,
   ): Promise<PaginatedFaitBudgetDto> {
-    return this.service.findAll(query);
+    const crAutorises = await this.perimetreService.getCrAutorisesPourUser(
+      user.userId,
+    );
+    return this.service.findAll(query, crAutorises);
   }
 
   @Get('par-grain')
@@ -67,6 +94,7 @@ export class FaitBudgetController {
   @ApiNotFoundResponse()
   async findByGrain(
     @Query() query: ParGrainQueryDto,
+    @CurrentUser() user: AuthUser,
   ): Promise<FaitBudgetResponseDto> {
     const r = await this.service.findByGrain(query);
     if (!r) {
@@ -74,16 +102,22 @@ export class FaitBudgetController {
         'Aucun fait budget trouvé pour ce grain (10-uplet de FK).',
       );
     }
+    await this.assertCrAutorise(r.fkCentre, user.userId);
     return r;
   }
 
   @Get(':id')
   @RequirePermissions('BUDGET.LIRE')
-  @ApiOperation({ summary: 'Récupère un fait budget par son id.' })
+  @ApiOperation({ summary: 'Récupère un fait budget par son id (filtré par périmètre).' })
   @ApiOkResponse({ type: FaitBudgetResponseDto })
   @ApiNotFoundResponse()
-  findById(@Param('id') id: string): Promise<FaitBudgetResponseDto> {
-    return this.service.findById(id);
+  async findById(
+    @Param('id') id: string,
+    @CurrentUser() user: AuthUser,
+  ): Promise<FaitBudgetResponseDto> {
+    const r = await this.service.findById(id);
+    await this.assertCrAutorise(r.fkCentre, user.userId);
+    return r;
   }
 
   @Post()
@@ -100,10 +134,11 @@ export class FaitBudgetController {
   })
   @ApiNotFoundResponse({ description: 'Une des FK pointe vers une dimension inexistante.' })
   @ApiBadRequestResponse({ description: 'Validation DTO invalide.' })
-  create(
+  async create(
     @Body() dto: CreateFaitBudgetDto,
     @CurrentUser() user: AuthUser,
   ): Promise<FaitBudgetResponseDto> {
+    await this.assertCrAutorise(dto.fkCentre, user.userId);
     return this.service.create(dto, user.email);
   }
 
@@ -157,11 +192,27 @@ L'audit_log capture la requête + la réponse (y compris \`resolutionDetails\`),
     description:
       "Aucune version SCD2 valide à la date métier pour une dimension, ou cohérence devise/taux/montant violée.",
   })
-  createFromBusinessKeys(
+  async createFromBusinessKeys(
     @Body() dto: CreateFaitBudgetFromBusinessKeysDto,
     @CurrentUser() user: AuthUser,
   ): Promise<FaitBudgetFromBusinessKeysResponseDto> {
-    return this.service.createFromBusinessKeys(dto, user.email);
+    // Pour la résolution depuis codes business, le check périmètre se
+    // fait APRÈS résolution (on a besoin du fkCentre résolu). Le
+    // service le fait déjà via création — mais on ré-arme ici une
+    // garde minimale : si le user n'a aucun CR autorisé (= []),
+    // refuser tout d'office.
+    const crs = await this.perimetreService.getCrAutorisesPourUser(
+      user.userId,
+    );
+    if (crs !== null && crs.length === 0) {
+      throw new ForbiddenException(
+        "Aucun centre de responsabilité dans votre périmètre. Saisie refusée.",
+      );
+    }
+    const result = await this.service.createFromBusinessKeys(dto, user.email);
+    // Vérifier ex post que le CR résolu est bien dans le périmètre.
+    await this.assertCrAutorise(result.fkCentre, user.userId);
+    return result;
   }
 
   @Patch(':id')
@@ -184,11 +235,14 @@ L'audit_log capture la requête + la réponse (y compris \`resolutionDetails\`),
     description:
       "La version cible est figée (statut != 'ouvert').",
   })
-  update(
+  async update(
     @Param('id') id: string,
     @Body() dto: UpdateFaitBudgetDto,
     @CurrentUser() user: AuthUser,
   ): Promise<FaitBudgetResponseDto> {
+    // Vérifier le périmètre AVANT update (lecture du fait existant).
+    const existing = await this.service.findById(id);
+    await this.assertCrAutorise(existing.fkCentre, user.userId);
     return this.service.update(
       id,
       dto as UpdateFaitBudgetDto & Record<string, unknown>,
@@ -212,7 +266,12 @@ L'audit_log capture la requête + la réponse (y compris \`resolutionDetails\`),
   @ApiConflictResponse({
     description: "Version cible figée — suppression refusée.",
   })
-  async remove(@Param('id') id: string): Promise<void> {
+  async remove(
+    @Param('id') id: string,
+    @CurrentUser() user: AuthUser,
+  ): Promise<void> {
+    const existing = await this.service.findById(id); // 404 si absent
+    await this.assertCrAutorise(existing.fkCentre, user.userId);
     const ok = await this.service.remove(id);
     if (!ok) throw new NotFoundException();
   }
