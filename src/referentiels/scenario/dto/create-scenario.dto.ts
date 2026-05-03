@@ -1,10 +1,13 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
+  IsInt,
   IsIn,
   IsOptional,
   IsString,
   Matches,
+  Max,
   MaxLength,
+  Min,
 } from 'class-validator';
 
 import type { TypeScenario } from '../entities/dim-scenario.entity';
@@ -46,4 +49,15 @@ export class CreateScenarioDto {
   @IsOptional()
   @IsString()
   commentaire?: string;
+
+  /**
+   * Exercice fiscal de rattachement (Lot 3.2). Optionnel — un scénario
+   * macro/transversal peut rester sans rattachement.
+   */
+  @ApiPropertyOptional({ example: 2027, minimum: 2020, maximum: 2050 })
+  @IsOptional()
+  @IsInt()
+  @Min(2020)
+  @Max(2050)
+  exerciceFiscal?: number;
 }

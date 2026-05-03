@@ -34,6 +34,15 @@ export class DimScenario {
   @Column({ name: 'commentaire', type: 'text', nullable: true })
   commentaire!: string | null;
 
+  /**
+   * Exercice fiscal de rattachement (ajouté Lot 3.2). Optionnel : un
+   * scénario peut rester macro/transversal (NULL). Les scénarios
+   * créés automatiquement par le hook Q9 portent l'exercice de la
+   * version qui les a déclenchés.
+   */
+  @Column({ name: 'exercice_fiscal', type: 'int', nullable: true })
+  exerciceFiscal!: number | null;
+
   @Column({
     name: 'date_creation',
     type: 'timestamp',

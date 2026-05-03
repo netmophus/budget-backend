@@ -41,4 +41,12 @@ export class ListScenariosQueryDto {
   @IsOptional()
   @IsIn(TYPE_SCENARIO_VALUES as readonly string[])
   typeScenario?: TypeScenario;
+
+  @ApiPropertyOptional({ example: 2027, minimum: 2020, maximum: 2050 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(2020)
+  @Max(2050)
+  exerciceFiscal?: number;
 }

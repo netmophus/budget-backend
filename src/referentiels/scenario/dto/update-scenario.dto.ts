@@ -1,9 +1,12 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import {
+  IsInt,
   IsIn,
   IsOptional,
   IsString,
+  Max,
   MaxLength,
+  Min,
 } from 'class-validator';
 
 import type { TypeScenario } from '../entities/dim-scenario.entity';
@@ -36,4 +39,11 @@ export class UpdateScenarioDto {
   @IsOptional()
   @IsString()
   commentaire?: string;
+
+  @ApiPropertyOptional({ example: 2027, minimum: 2020, maximum: 2050 })
+  @IsOptional()
+  @IsInt()
+  @Min(2020)
+  @Max(2050)
+  exerciceFiscal?: number;
 }

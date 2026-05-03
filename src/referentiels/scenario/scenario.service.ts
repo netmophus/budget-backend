@@ -29,6 +29,7 @@ function toResponse(s: DimScenario): ScenarioResponseDto {
     typeScenario: s.typeScenario,
     statut: s.statut,
     commentaire: s.commentaire,
+    exerciceFiscal: s.exerciceFiscal,
     dateCreation: s.dateCreation,
     utilisateurCreation: s.utilisateurCreation,
     dateModification: s.dateModification,
@@ -47,6 +48,9 @@ export class ScenarioService {
     const where: Record<string, unknown> = {};
     if (query.statut) where.statut = query.statut;
     if (query.typeScenario) where.typeScenario = query.typeScenario;
+    if (query.exerciceFiscal !== undefined) {
+      where.exerciceFiscal = query.exerciceFiscal;
+    }
 
     const [items, total] = await this.repo.findAndCount({
       where,
@@ -96,10 +100,21 @@ export class ScenarioService {
         typeScenario: dto.typeScenario,
         statut: 'actif',
         commentaire: dto.commentaire ?? null,
+        exerciceFiscal: dto.exerciceFiscal ?? null,
         utilisateurCreation: utilisateur,
       }),
     );
     return toResponse(created);
+  }
+
+  /**
+   * Lookup helper utilisé par le hook Q9 (Lot 3.2) — vérifie s'il
+   * existe au moins un scénario rattaché à l'exercice fiscal donné.
+   * Optimisé via l'index partiel `ix_dim_scenario_exercice`.
+   */
+  async existsForExercice(exerciceFiscal: number): Promise<boolean> {
+    const count = await this.repo.count({ where: { exerciceFiscal } });
+    return count > 0;
   }
 
   async update(
@@ -117,6 +132,8 @@ export class ScenarioService {
     if (dto.libelle !== undefined) current.libelle = dto.libelle;
     if (dto.typeScenario !== undefined) current.typeScenario = dto.typeScenario;
     if (dto.commentaire !== undefined) current.commentaire = dto.commentaire;
+    if (dto.exerciceFiscal !== undefined)
+      current.exerciceFiscal = dto.exerciceFiscal;
 
     current.dateModification = new Date();
     current.utilisateurModification = utilisateur;

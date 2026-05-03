@@ -26,6 +26,9 @@ export class ScenarioResponseDto {
   @ApiPropertyOptional({ example: 'Hypothèses macro de référence', nullable: true })
   commentaire!: string | null;
 
+  @ApiPropertyOptional({ example: 2027, nullable: true })
+  exerciceFiscal!: number | null;
+
   @ApiProperty({ type: String, format: 'date-time' })
   dateCreation!: Date;
 

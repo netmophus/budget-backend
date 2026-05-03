@@ -20,7 +20,9 @@ export type TypeAction =
   | 'EXPORT'
   | 'IMPORT'
   | 'PERMISSION_DENIED'
-  | 'LIRE_AUDIT';
+  | 'LIRE_AUDIT'
+  // Lot 3.2 — hook Q9 : création automatique de scénario
+  | 'AUTO_CREATE_SCENARIO';
 
 export type AuditStatut = 'success' | 'failure';
 
