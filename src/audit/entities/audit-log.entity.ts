@@ -22,7 +22,9 @@ export type TypeAction =
   | 'PERMISSION_DENIED'
   | 'LIRE_AUDIT'
   // Lot 3.2 — hook Q9 : création automatique de scénario
-  | 'AUTO_CREATE_SCENARIO';
+  | 'AUTO_CREATE_SCENARIO'
+  // Lot 3.3 — saisie budgétaire en lot via grille
+  | 'IMPORT_BUDGET';
 
 export type AuditStatut = 'success' | 'failure';
 
