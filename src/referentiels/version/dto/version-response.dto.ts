@@ -47,3 +47,20 @@ export class VersionResponseDto {
   @ApiPropertyOptional({ example: 'admin@miznas.local', nullable: true })
   utilisateurModification!: string | null;
 }
+
+/**
+ * Réponse étendue exclusive à `POST /versions` — porte le code du
+ * scénario auto-créé par le hook Q9 (Lot 3.2) si la création de la
+ * version a déclenché l'ajout d'un MEDIAN_<exercice>.
+ */
+export class CreateVersionResponseDto extends VersionResponseDto {
+  @ApiPropertyOptional({
+    example: 'MEDIAN_2027',
+    nullable: true,
+    description:
+      "Présent (non null) si la création de la version a déclenché " +
+      "le hook Q9 et créé automatiquement un scénario MEDIAN. " +
+      "Null sinon (cas d'un exercice ayant déjà au moins un scénario).",
+  })
+  scenarioAutoCreeCode!: string | null;
+}

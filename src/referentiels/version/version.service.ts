@@ -16,14 +16,26 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { DataSource, Repository } from 'typeorm';
 
+import { AuditService } from '../../audit/audit.service';
+import { DimScenario } from '../scenario/entities/dim-scenario.entity';
 import { CreateVersionDto } from './dto/create-version.dto';
 import { ListVersionsQueryDto } from './dto/list-versions-query.dto';
 import { PaginatedVersionsDto } from './dto/paginated-versions.dto';
 import { UpdateVersionDto } from './dto/update-version.dto';
 import { VersionResponseDto } from './dto/version-response.dto';
 import { DimVersion } from './entities/dim-version.entity';
+
+/**
+ * Détail de la création — quand le hook Q9 a déclenché une
+ * création automatique de scénario, on retourne aussi le code créé
+ * pour que le controller le consigne dans l'audit principal.
+ */
+export interface CreateVersionResult {
+  version: VersionResponseDto;
+  scenarioAutoCreeCode: string | null;
+}
 
 function toResponse(v: DimVersion): VersionResponseDto {
   return {
@@ -48,6 +60,8 @@ export class VersionService {
   constructor(
     @InjectRepository(DimVersion)
     private readonly repo: Repository<DimVersion>,
+    private readonly dataSource: DataSource,
+    private readonly auditService: AuditService,
   ) {}
 
   async findAll(query: ListVersionsQueryDto): Promise<PaginatedVersionsDto> {
@@ -91,30 +105,106 @@ export class VersionService {
     return toResponse(row);
   }
 
+  /**
+   * Création d'une version + hook Q9 (Lot 3.2) : si aucun scénario
+   * n'est rattaché à `exercice_fiscal` au moment de la création,
+   * on en crée un automatiquement (`MEDIAN_<exercice>`,
+   * `type_scenario='central'`, `statut='actif'`). L'opération est
+   * transactionnelle : si le scénario échoue (CHECK / unicité), la
+   * version n'est pas créée non plus.
+   *
+   * Retourne `scenarioAutoCreeCode` non-null si le hook a effectivement
+   * créé un scénario (utilisé par le controller pour la réponse UI).
+   */
   async create(
     dto: CreateVersionDto,
     utilisateur: string,
-  ): Promise<VersionResponseDto> {
-    const existing = await this.repo.findOne({
-      where: { codeVersion: dto.codeVersion },
-    });
-    if (existing) {
-      throw new ConflictException(
-        `La version ${dto.codeVersion} existe déjà.`,
+  ): Promise<CreateVersionResult> {
+    return this.dataSource.transaction(async (manager) => {
+      const versionRepo = manager.getRepository(DimVersion);
+      const scenarioRepo = manager.getRepository(DimScenario);
+
+      const existing = await versionRepo.findOne({
+        where: { codeVersion: dto.codeVersion },
+      });
+      if (existing) {
+        throw new ConflictException(
+          `La version ${dto.codeVersion} existe déjà.`,
+        );
+      }
+
+      // 1. INSERT version
+      const created = await versionRepo.save(
+        versionRepo.create({
+          codeVersion: dto.codeVersion,
+          libelle: dto.libelle,
+          typeVersion: dto.typeVersion,
+          exerciceFiscal: dto.exerciceFiscal,
+          statut: 'ouvert',
+          commentaire: dto.commentaire ?? null,
+          utilisateurCreation: utilisateur,
+        }),
       );
-    }
-    const created = await this.repo.save(
-      this.repo.create({
-        codeVersion: dto.codeVersion,
-        libelle: dto.libelle,
-        typeVersion: dto.typeVersion,
-        exerciceFiscal: dto.exerciceFiscal,
-        statut: 'ouvert',
-        commentaire: dto.commentaire ?? null,
-        utilisateurCreation: utilisateur,
-      }),
-    );
-    return toResponse(created);
+
+      // 2. Hook Q9 : si aucun scénario n'est rattaché à cet exercice,
+      //    créer MEDIAN_<exercice>. La requête est dans la même
+      //    transaction, donc tout rollback ensemble en cas d'erreur.
+      const scenariosForExercice = await scenarioRepo.count({
+        where: { exerciceFiscal: dto.exerciceFiscal },
+      });
+      let scenarioAutoCreeCode: string | null = null;
+      if (scenariosForExercice === 0) {
+        const codeAuto = `MEDIAN_${dto.exerciceFiscal}`;
+        // Garde-fou idempotent : si un scénario MEDIAN_<exercice>
+        // existe déjà sans exercice_fiscal renseigné (héritage Lot 2.4),
+        // on ne crée pas de doublon.
+        const exists = await scenarioRepo.findOne({
+          where: { codeScenario: codeAuto },
+        });
+        if (!exists) {
+          await scenarioRepo.save(
+            scenarioRepo.create({
+              codeScenario: codeAuto,
+              libelle: `Scénario médian ${dto.exerciceFiscal}`,
+              typeScenario: 'central',
+              statut: 'actif',
+              commentaire:
+                `Créé automatiquement à la création de la version ` +
+                `${dto.codeVersion} (hook Q9, Lot 3.2).`,
+              exerciceFiscal: dto.exerciceFiscal,
+              utilisateurCreation: utilisateur,
+            }),
+          );
+          scenarioAutoCreeCode = codeAuto;
+
+          // 3. Audit applicatif AUTO_CREATE_SCENARIO. L'INSERT audit
+          //    est dans la même transaction (rollback solidaire).
+          await this.auditService.log({
+            utilisateur,
+            typeAction: 'AUTO_CREATE_SCENARIO',
+            entiteCible: 'dim_scenario',
+            idCible: codeAuto,
+            statut: 'success',
+            payloadApres: {
+              codeScenario: codeAuto,
+              exerciceFiscal: dto.exerciceFiscal,
+              declencheur: {
+                type: 'creation_version',
+                codeVersion: dto.codeVersion,
+              },
+            },
+            commentaire:
+              `Hook Q9 : auto-création de ${codeAuto} déclenchée par la ` +
+              `création de la version ${dto.codeVersion} (exercice ${dto.exerciceFiscal}).`,
+          });
+        }
+      }
+
+      return {
+        version: toResponse(created),
+        scenarioAutoCreeCode,
+      };
+    });
   }
 
   async update(

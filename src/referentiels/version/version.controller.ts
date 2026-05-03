@@ -30,7 +30,10 @@ import { CreateVersionDto } from './dto/create-version.dto';
 import { ListVersionsQueryDto } from './dto/list-versions-query.dto';
 import { PaginatedVersionsDto } from './dto/paginated-versions.dto';
 import { UpdateVersionDto } from './dto/update-version.dto';
-import { VersionResponseDto } from './dto/version-response.dto';
+import {
+  CreateVersionResponseDto,
+  VersionResponseDto,
+} from './dto/version-response.dto';
 import { VersionService } from './version.service';
 
 @ApiTags('referentiels-version')
@@ -79,13 +82,15 @@ export class VersionController {
     summary:
       "Crée une nouvelle version (statut='ouvert' systématique au Lot 3.1).",
   })
-  @ApiCreatedResponse({ type: VersionResponseDto })
+  @ApiCreatedResponse({ type: CreateVersionResponseDto })
   @ApiConflictResponse({ description: 'codeVersion déjà existant.' })
-  create(
+  async create(
     @Body() dto: CreateVersionDto,
     @CurrentUser() user: AuthUser,
-  ): Promise<VersionResponseDto> {
-    return this.versionService.create(dto, user.email);
+  ): Promise<CreateVersionResponseDto> {
+    const { version, scenarioAutoCreeCode } =
+      await this.versionService.create(dto, user.email);
+    return { ...version, scenarioAutoCreeCode };
   }
 
   @Patch(':id')

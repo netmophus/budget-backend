@@ -130,7 +130,18 @@ function buildService(ds: DataSource): FaitBudgetService {
   const produitService = new ProduitService(ds.getRepository(DimProduit), ds);
   const segmentService = new SegmentService(ds.getRepository(DimSegment), ds);
   const deviseService = new DeviseService(ds.getRepository(DimDevise));
-  const versionService = new VersionService(ds.getRepository(DimVersion));
+  // Lot 3.2 : VersionService consomme DataSource + AuditService pour
+  // le hook Q9. Les tests fait_budget n'utilisent ce service que pour
+  // findAll/findOne/findByCode → on instancie avec un AuditService stub
+  // (le hook Q9 n'est exercé que dans version.service.spec.ts).
+  const auditServiceStub = {
+    log: async () => undefined,
+  } as unknown as import('../../audit/audit.service').AuditService;
+  const versionService = new VersionService(
+    ds.getRepository(DimVersion),
+    ds,
+    auditServiceStub,
+  );
   const scenarioService = new ScenarioService(ds.getRepository(DimScenario));
   const tauxChangeService = new TauxChangeService(
     ds.getRepository(RefTauxChange),

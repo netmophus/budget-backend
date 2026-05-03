@@ -4,7 +4,7 @@
  * Couvre :
  *  - findAll avec filtres exerciceFiscal / statut / typeVersion
  *  - findByCode (404 si absent)
- *  - create (refus doublon)
+ *  - create (refus doublon) + hook Q9 (Lot 3.2)
  *  - update / softDelete : refus si statut != 'ouvert' (409 Conflict)
  */
 import {
@@ -14,6 +14,9 @@ import {
 import { DataType, IMemoryDb, newDb } from 'pg-mem';
 import { DataSource, Repository } from 'typeorm';
 
+import { AuditLog } from '../../audit/entities/audit-log.entity';
+import { AuditService } from '../../audit/audit.service';
+import { DimScenario } from '../scenario/entities/dim-scenario.entity';
 import { VersionService } from './version.service';
 import { DimVersion } from './entities/dim-version.entity';
 
@@ -38,7 +41,9 @@ async function createDataSource(): Promise<DataSource> {
   const db = buildMemDb();
   const ds: DataSource = db.adapters.createTypeormDataSource({
     type: 'postgres',
-    entities: [DimVersion],
+    // Lot 3.2 : DimScenario + AuditLog chargés pour permettre le hook
+    // Q9 (auto-création MEDIAN + log AUTO_CREATE_SCENARIO).
+    entities: [DimVersion, DimScenario, AuditLog],
     synchronize: true,
   });
   await ds.initialize();
@@ -79,11 +84,13 @@ describe('VersionService', () => {
   let dataSource: DataSource;
   let repo: Repository<DimVersion>;
   let service: VersionService;
+  let auditService: AuditService;
 
   beforeAll(async () => {
     dataSource = await createDataSource();
     repo = dataSource.getRepository(DimVersion);
-    service = new VersionService(repo);
+    auditService = new AuditService(dataSource.getRepository(AuditLog));
+    service = new VersionService(repo, dataSource, auditService);
   });
 
   afterAll(async () => {
@@ -91,7 +98,10 @@ describe('VersionService', () => {
   });
 
   beforeEach(async () => {
+    // Ordre : version puis scenario (pas de FK directe entre les 2).
+    await dataSource.query('DELETE FROM audit_log');
     await dataSource.query('DELETE FROM dim_version');
+    await dataSource.query('DELETE FROM dim_scenario');
   });
 
   describe('findAll', () => {
@@ -165,7 +175,7 @@ describe('VersionService', () => {
 
   describe('create', () => {
     it('creates a version with statut=ouvert', async () => {
-      const created = await service.create(
+      const result = await service.create(
         {
           codeVersion: 'BUDGET_INITIAL_2026',
           libelle: 'Budget initial 2026',
@@ -174,7 +184,7 @@ describe('VersionService', () => {
         },
         'admin@miznas.local',
       );
-      expect(created.statut).toBe('ouvert');
+      expect(result.version.statut).toBe('ouvert');
     });
 
     it('rejects duplicate codeVersion (409)', async () => {
@@ -259,6 +269,150 @@ describe('VersionService', () => {
 
     it('returns false when id unknown', async () => {
       expect(await service.softDelete('999')).toBe(false);
+    });
+  });
+
+  // ─── Lot 3.2 : hook Q9 (auto-création scénario MEDIAN)
+
+  describe('hook Q9 — auto-création MEDIAN', () => {
+    it('aucun scénario pour 2027 → MEDIAN_2027 créé en cascade', async () => {
+      const result = await service.create(
+        {
+          codeVersion: 'BUDGET_INITIAL_2027',
+          libelle: 'Budget initial 2027',
+          typeVersion: 'budget_initial',
+          exerciceFiscal: 2027,
+        },
+        'admin@miznas.local',
+      );
+      expect(result.version.codeVersion).toBe('BUDGET_INITIAL_2027');
+      expect(result.scenarioAutoCreeCode).toBe('MEDIAN_2027');
+
+      const scenario = await dataSource.query(
+        `SELECT code_scenario, type_scenario, statut, exercice_fiscal
+           FROM dim_scenario WHERE code_scenario='MEDIAN_2027'`,
+      );
+      expect(scenario).toHaveLength(1);
+      expect(scenario[0].type_scenario).toBe('central');
+      expect(scenario[0].statut).toBe('actif');
+      expect(scenario[0].exercice_fiscal).toBe(2027);
+    });
+
+    it('idempotence : si scénario existe pour exercice → pas de création', async () => {
+      // Pré-condition : un scénario CENTRAL_2028 déjà rattaché à 2028.
+      await dataSource.query(
+        `INSERT INTO dim_scenario
+           ("code_scenario","libelle","type_scenario","statut",
+            "exercice_fiscal","utilisateur_creation")
+         VALUES ('CENTRAL_2028','Central 2028','central','actif',2028,'system')`,
+      );
+
+      const result = await service.create(
+        {
+          codeVersion: 'BUDGET_INITIAL_2028',
+          libelle: 'Budget initial 2028',
+          typeVersion: 'budget_initial',
+          exerciceFiscal: 2028,
+        },
+        'admin@miznas.local',
+      );
+      expect(result.scenarioAutoCreeCode).toBeNull();
+
+      const count = (await dataSource.query(
+        `SELECT COUNT(*)::int AS c FROM dim_scenario WHERE exercice_fiscal=2028`,
+      )) as Array<{ c: number }>;
+      expect(count[0]!.c).toBe(1);
+    });
+
+    it("idempotence par code : si MEDIAN_<exercice> existe déjà sans exerciceFiscal renseigné, pas de doublon", async () => {
+      // Cas hérité Lot 2.4 : un scénario MEDIAN_2029 existait avec
+      // exerciceFiscal=NULL. Le hook ne doit pas créer un doublon.
+      await dataSource.query(
+        `INSERT INTO dim_scenario
+           ("code_scenario","libelle","type_scenario","statut",
+            "exercice_fiscal","utilisateur_creation")
+         VALUES ('MEDIAN_2029','Médian 2029 (legacy)','central','actif',NULL,'system')`,
+      );
+
+      const result = await service.create(
+        {
+          codeVersion: 'BUDGET_INITIAL_2029',
+          libelle: 'Budget 2029',
+          typeVersion: 'budget_initial',
+          exerciceFiscal: 2029,
+        },
+        'admin',
+      );
+      expect(result.scenarioAutoCreeCode).toBeNull();
+
+      const count = (await dataSource.query(
+        `SELECT COUNT(*)::int AS c FROM dim_scenario WHERE code_scenario='MEDIAN_2029'`,
+      )) as Array<{ c: number }>;
+      expect(count[0]!.c).toBe(1);
+    });
+
+    it('audit_log porte AUTO_CREATE_SCENARIO avec le déclencheur', async () => {
+      await service.create(
+        {
+          codeVersion: 'BUDGET_INITIAL_2030',
+          libelle: 'Budget 2030',
+          typeVersion: 'budget_initial',
+          exerciceFiscal: 2030,
+        },
+        'admin@miznas.local',
+      );
+
+      const audits = (await dataSource.query(
+        `SELECT type_action, statut, id_cible, payload_apres, commentaire
+           FROM audit_log
+          WHERE type_action = 'AUTO_CREATE_SCENARIO'`,
+      )) as Array<{
+        type_action: string;
+        statut: string;
+        id_cible: string | null;
+        payload_apres: { codeScenario?: string; declencheur?: { codeVersion?: string } };
+        commentaire: string;
+      }>;
+      expect(audits).toHaveLength(1);
+      expect(audits[0]!.statut).toBe('success');
+      expect(audits[0]!.id_cible).toBe('MEDIAN_2030');
+      expect(audits[0]!.payload_apres.codeScenario).toBe('MEDIAN_2030');
+      expect(audits[0]!.payload_apres.declencheur?.codeVersion).toBe(
+        'BUDGET_INITIAL_2030',
+      );
+      expect(audits[0]!.commentaire).toMatch(/Hook Q9/);
+    });
+
+    it('rollback transactionnel : si conflit codeVersion, aucun scénario auto créé', async () => {
+      // Pré-condition : version existante pour 2031.
+      await rawInsert(dataSource, {
+        codeVersion: 'BUDGET_INITIAL_2031',
+        exerciceFiscal: 2031,
+      });
+
+      await expect(
+        service.create(
+          {
+            codeVersion: 'BUDGET_INITIAL_2031',
+            libelle: 'Doublon',
+            typeVersion: 'budget_initial',
+            exerciceFiscal: 2031,
+          },
+          'admin',
+        ),
+      ).rejects.toThrow(ConflictException);
+
+      // Le scénario MEDIAN_2031 NE doit PAS exister (rollback).
+      const count = (await dataSource.query(
+        `SELECT COUNT(*)::int AS c FROM dim_scenario WHERE code_scenario='MEDIAN_2031'`,
+      )) as Array<{ c: number }>;
+      expect(count[0]!.c).toBe(0);
+      // Et aucun audit AUTO_CREATE_SCENARIO non plus.
+      const auditCount = (await dataSource.query(
+        `SELECT COUNT(*)::int AS c FROM audit_log
+          WHERE type_action='AUTO_CREATE_SCENARIO' AND id_cible='MEDIAN_2031'`,
+      )) as Array<{ c: number }>;
+      expect(auditCount[0]!.c).toBe(0);
     });
   });
 });
