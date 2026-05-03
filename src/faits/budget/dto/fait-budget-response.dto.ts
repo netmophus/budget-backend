@@ -1,5 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
+import type { ModeSaisieFaitBudget } from '../entities/fait-budget.entity';
+
 /**
  * Vue compacte d'une dimension référencée — embarquée dans la
  * réponse fait pour épargner aux clients un appel par dimension.
@@ -71,6 +73,23 @@ export class FaitBudgetResponseDto {
 
   @ApiProperty({ example: 1.0 })
   tauxChangeApplique!: number;
+
+  // ─── Mode de saisie (Lot 3.1)
+
+  @ApiProperty({ enum: ['MONTANT', 'ENCOURS_TIE'], example: 'MONTANT' })
+  modeSaisie!: ModeSaisieFaitBudget;
+
+  @ApiPropertyOptional({ example: 896000000, nullable: true })
+  encoursMoyen!: number | null;
+
+  @ApiPropertyOptional({ example: 0.085, nullable: true })
+  tie!: number | null;
+
+  @ApiPropertyOptional({
+    example: 'Hypothèse encours retail PCT — comité ALCO mars 2026',
+    nullable: true,
+  })
+  commentaire!: string | null;
 
   @ApiProperty({ type: String, format: 'date-time' })
   dateCreation!: Date;

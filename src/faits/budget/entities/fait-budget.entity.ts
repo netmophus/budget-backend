@@ -1,4 +1,5 @@
 import {
+  Check,
   Column,
   Entity,
   Index,
@@ -19,6 +20,8 @@ import { DimStructure } from '../../../referentiels/structure/entities/dim-struc
 import { DimTemps } from '../../../referentiels/temps/entities/dim-temps.entity';
 import { DimVersion } from '../../../referentiels/version/entities/dim-version.entity';
 
+export type ModeSaisieFaitBudget = 'MONTANT' | 'ENCOURS_TIE';
+
 /**
  * `fait_budget` — table de faits centrale du module élaboration
  * budgétaire (cf. `docs/modele-donnees.md` §4.1).
@@ -35,8 +38,44 @@ import { DimVersion } from '../../../referentiels/version/entities/dim-version.e
  * ligne_metier, produit, segment) doivent pointer vers la version
  * VALIDE À LA DATE MÉTIER (`fk_temps`), pas vers la version courante
  * au moment de l'INSERT. Validation applicative au Lot 3.2B.
+ *
+ * **Mode de saisie (Lot 3.1, migration `ExtendFaitBudget…`)** :
+ *  - `MONTANT` : le préparateur saisit `montantDevise` directement
+ *    (mode par défaut, encoursMoyen et tie restent NULL).
+ *  - `ENCOURS_TIE` : le préparateur saisit `encoursMoyen` (encours
+ *    moyen mensuel) et `tie` (taux annuel décimal, ex. 0.0850 pour
+ *    8,50 %) ; le service `FaitBudgetService` recalcule
+ *    `montantDevise = encoursMoyen × tie / 12`. Réservé aux comptes
+ *    avec `est_porteur_interets = true` (validation applicative).
+ *  Le CHECK `ck_fait_budget_coherence_mode` est la 2ᵉ ligne de défense
+ *  côté DB (cf. `docs/modele-donnees.md` §4.1).
  */
 @Entity({ name: 'fait_budget' })
+@Check(
+  'ck_fait_budget_coherence_mode',
+  `(
+    (
+      "mode_saisie" = 'ENCOURS_TIE'
+      AND "encours_moyen" IS NOT NULL
+      AND "tie" IS NOT NULL
+    )
+    OR
+    (
+      "mode_saisie" = 'MONTANT'
+      AND "encours_moyen" IS NULL
+      AND "tie" IS NULL
+    )
+  )`,
+)
+@Check(
+  'ck_fait_budget_tie_range',
+  `"tie" IS NULL OR ("tie" >= 0 AND "tie" <= 1)`,
+)
+@Check(
+  'ck_fait_budget_encours_positif',
+  `"encours_moyen" IS NULL OR "encours_moyen" >= 0`,
+)
+@Check('ck_fait_budget_mode', `"mode_saisie" IN ('MONTANT','ENCOURS_TIE')`)
 @Index('ix_fait_budget_temps', ['fkTemps'])
 @Index('ix_fait_budget_compte', ['fkCompte'])
 @Index('ix_fait_budget_structure', ['fkStructure'])
@@ -129,6 +168,39 @@ export class FaitBudget {
     transformer: ColumnNumericTransformer,
   })
   tauxChangeApplique!: number;
+
+  // ─── Mode de saisie (Lot 3.1, migration 1779200000000)
+
+  @Column({
+    name: 'mode_saisie',
+    type: 'varchar',
+    length: 20,
+    default: 'MONTANT',
+  })
+  modeSaisie!: ModeSaisieFaitBudget;
+
+  @Column({
+    name: 'encours_moyen',
+    type: 'numeric',
+    precision: 20,
+    scale: 4,
+    nullable: true,
+    transformer: ColumnNumericTransformer,
+  })
+  encoursMoyen!: number | null;
+
+  @Column({
+    name: 'tie',
+    type: 'numeric',
+    precision: 7,
+    scale: 4,
+    nullable: true,
+    transformer: ColumnNumericTransformer,
+  })
+  tie!: number | null;
+
+  @Column({ name: 'commentaire', type: 'text', nullable: true })
+  commentaire!: string | null;
 
   @Column({
     name: 'date_creation',

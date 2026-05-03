@@ -6,11 +6,13 @@ import {
   IsOptional,
   IsString,
   Matches,
+  Max,
   MaxLength,
   Min,
 } from 'class-validator';
 
 import type { TypeTaux } from '../../../referentiels/taux-change/entities/ref-taux-change.entity';
+import type { ModeSaisieFaitBudget } from '../entities/fait-budget.entity';
 
 /**
  * DTO de création d'un `fait_budget` depuis les codes business.
@@ -127,4 +129,47 @@ export class CreateFaitBudgetFromBusinessKeysDto {
   @IsOptional()
   @IsIn(['cloture', 'moyen_mensuel', 'fixe_budgetaire'])
   typeTaux?: TypeTaux;
+
+  // ─── Mode de saisie (Lot 3.1)
+
+  @ApiPropertyOptional({
+    enum: ['MONTANT', 'ENCOURS_TIE'],
+    default: 'MONTANT',
+    description:
+      "MONTANT (défaut) : `montantDevise` est saisi directement. " +
+      "ENCOURS_TIE : le service recalcule `montantDevise = encoursMoyen × tie / 12` " +
+      "(réservé aux comptes porteurs d'intérêts).",
+  })
+  @IsOptional()
+  @IsIn(['MONTANT', 'ENCOURS_TIE'])
+  modeSaisie?: ModeSaisieFaitBudget;
+
+  @ApiPropertyOptional({
+    example: 896000000,
+    description: "Encours moyen mensuel. Requis si modeSaisie='ENCOURS_TIE'.",
+  })
+  @IsOptional()
+  @IsNumber({ maxDecimalPlaces: 4 })
+  @Min(0)
+  encoursMoyen?: number;
+
+  @ApiPropertyOptional({
+    example: 0.085,
+    description:
+      "TIE annuel décimal. Requis si modeSaisie='ENCOURS_TIE'. Range [0,1].",
+  })
+  @IsOptional()
+  @IsNumber({ maxDecimalPlaces: 4 })
+  @Min(0)
+  @Max(1)
+  tie?: number;
+
+  @ApiPropertyOptional({
+    example: 'Hypothèse encours retail PCT — comité ALCO mars 2026',
+    maxLength: 2000,
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(2000)
+  commentaire?: string;
 }

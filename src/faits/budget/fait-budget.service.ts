@@ -15,6 +15,7 @@
  *    calcul automatique du taux et de `montant_fcfa`.
  */
 import {
+  BadRequestException,
   ConflictException,
   Injectable,
   NotFoundException,
@@ -40,6 +41,7 @@ import { DimVersion } from '../../referentiels/version/entities/dim-version.enti
 import { VersionService } from '../../referentiels/version/version.service';
 import { CreateFaitBudgetFromBusinessKeysDto } from './dto/create-fait-budget-from-business-keys.dto';
 import { CreateFaitBudgetDto } from './dto/create-fait-budget.dto';
+import type { ModeSaisieFaitBudget } from './entities/fait-budget.entity';
 import {
   DimensionResolueDto,
   FaitBudgetFromBusinessKeysResponseDto,
@@ -104,6 +106,10 @@ function toResponse(f: FaitBudget): FaitBudgetResponseDto {
     montantDevise: f.montantDevise,
     montantFcfa: f.montantFcfa,
     tauxChangeApplique: f.tauxChangeApplique,
+    modeSaisie: f.modeSaisie,
+    encoursMoyen: f.encoursMoyen,
+    tie: f.tie,
+    commentaire: f.commentaire,
     dateCreation: f.dateCreation,
     utilisateurCreation: f.utilisateurCreation,
     dateModification: f.dateModification,
@@ -319,7 +325,17 @@ export class FaitBudgetService {
     //    être créé que dans une version ouverte).
     await this.assertVersionOuverte(dto.fkVersion);
 
-    // 2. Vérifier le grain unique côté service (message clair). L'index
+    // 2. Résoudre le mode de saisie + recalculer le montantDevise
+    //    si mode=ENCOURS_TIE (cf. §4.1 modele-donnees).
+    const resolvedMode = await this.resolveModeSaisie({
+      modeSaisie: dto.modeSaisie ?? 'MONTANT',
+      encoursMoyen: dto.encoursMoyen,
+      tie: dto.tie,
+      montantDeviseFourni: dto.montantDevise,
+      fkCompte: dto.fkCompte,
+    });
+
+    // 3. Vérifier le grain unique côté service (message clair). L'index
     //    UNIQUE composite reste 2ᵉ ligne de défense.
     const existing = await this.repo.findOne({
       where: {
@@ -355,9 +371,13 @@ export class FaitBudgetService {
           fkDevise: dto.fkDevise,
           fkVersion: dto.fkVersion,
           fkScenario: dto.fkScenario,
-          montantDevise: dto.montantDevise,
+          montantDevise: resolvedMode.montantDevise,
           montantFcfa: dto.montantFcfa,
           tauxChangeApplique: dto.tauxChangeApplique,
+          modeSaisie: resolvedMode.modeSaisie,
+          encoursMoyen: resolvedMode.encoursMoyen,
+          tie: resolvedMode.tie,
+          commentaire: dto.commentaire ?? null,
           utilisateurCreation: utilisateur,
         }),
       );
@@ -402,15 +422,66 @@ export class FaitBudgetService {
     // 2. Refus si la version est figée (statut != 'ouvert').
     await this.assertVersionOuverte(current.fkVersion);
 
-    // 3. Modifier les mesures.
-    if (dto.montantDevise !== undefined) {
+    // 3. Mode de saisie : si l'un des 3 champs (modeSaisie, encoursMoyen,
+    //    tie) est touché OU si on fournit un nouveau montantDevise sur
+    //    un fait actuellement en ENCOURS_TIE, on rebascule via le
+    //    helper. Sinon on reste sur l'ancien mode.
+    const modeKeysTouched =
+      dto.modeSaisie !== undefined ||
+      'encoursMoyen' in dto ||
+      'tie' in dto;
+    if (modeKeysTouched) {
+      const targetMode: ModeSaisieFaitBudget =
+        dto.modeSaisie ?? current.modeSaisie;
+      // Quand on bascule vers MONTANT, on n'hérite PAS des anciennes
+      // valeurs encoursMoyen/tie : un bascule explicite vers MONTANT
+      // doit nettoyer les 2 champs (sauf si l'utilisateur les a
+      // explicitement fournis, ce qui sera rejeté par
+      // resolveModeSaisie comme incohérent).
+      const inheritFromCurrent = targetMode === 'ENCOURS_TIE';
+      const resolvedMode = await this.resolveModeSaisie({
+        modeSaisie: targetMode,
+        encoursMoyen:
+          'encoursMoyen' in dto
+            ? dto.encoursMoyen
+            : inheritFromCurrent
+              ? (current.encoursMoyen ?? undefined)
+              : undefined,
+        tie:
+          'tie' in dto
+            ? dto.tie
+            : inheritFromCurrent
+              ? (current.tie ?? undefined)
+              : undefined,
+        montantDeviseFourni: dto.montantDevise ?? current.montantDevise,
+        fkCompte: current.fkCompte,
+      });
+      current.modeSaisie = resolvedMode.modeSaisie;
+      current.encoursMoyen = resolvedMode.encoursMoyen;
+      current.tie = resolvedMode.tie;
+      current.montantDevise = resolvedMode.montantDevise;
+    } else if (dto.montantDevise !== undefined) {
+      // Pas de bascule de mode : si l'utilisateur passe un nouveau
+      // montantDevise sur un fait en ENCOURS_TIE, on refuse pour
+      // forcer la cohérence (sinon le couple encours×tie/12 ne
+      // correspondrait plus).
+      if (current.modeSaisie === 'ENCOURS_TIE') {
+        throw new BadRequestException(
+          "Impossible de changer montantDevise sur un fait en mode ENCOURS_TIE " +
+            "sans repasser par modeSaisie / encoursMoyen / tie. Utiliser une bascule explicite.",
+        );
+      }
       current.montantDevise = dto.montantDevise;
     }
+
     if (dto.montantFcfa !== undefined) {
       current.montantFcfa = dto.montantFcfa;
     }
     if (dto.tauxChangeApplique !== undefined) {
       current.tauxChangeApplique = dto.tauxChangeApplique;
+    }
+    if (dto.commentaire !== undefined) {
+      current.commentaire = dto.commentaire;
     }
     current.dateModification = new Date();
     current.utilisateurModification = utilisateur;
@@ -626,7 +697,15 @@ export class FaitBudgetService {
     // g) Insertion via la méthode `create` (3.2A) qui couvre :
     //    - validation grain unique (uq_fait_budget_grain)
     //    - assertVersionOuverte (déjà fait au d), 2ᵉ ligne de défense)
+    //    - mode_saisie + recalcul mensualisation si ENCOURS_TIE
     //    - mapping FK + retour FaitBudgetResponseDto
+    //
+    // NB : si mode='ENCOURS_TIE', `montantDevise` sera recalculé par
+    // `resolveModeSaisie` à partir de encoursMoyen × tie / 12, et
+    // `montantFcfa` ne sera donc plus aligné sur le `dto.montantDevise`
+    // initial. On laisse le caller (UI Lot 3.5) responsable de cohérer
+    // les 2 (typiquement : il appelle d'abord en mode ENCOURS_TIE pour
+    // obtenir la valeur calculée puis recalcule montantFcfa).
     const created = await this.create(
       {
         fkTemps,
@@ -642,6 +721,10 @@ export class FaitBudgetService {
         montantDevise: dto.montantDevise,
         montantFcfa,
         tauxChangeApplique,
+        modeSaisie: dto.modeSaisie ?? 'MONTANT',
+        encoursMoyen: dto.encoursMoyen,
+        tie: dto.tie,
+        commentaire: dto.commentaire,
       },
       utilisateur,
     );
@@ -704,5 +787,105 @@ export class FaitBudgetService {
           `Seul 'ouvert' autorise les mutations sur fait_budget. Le workflow de réouverture arrive en Lot 3.3.`,
       );
     }
+  }
+
+  /**
+   * Mensualisation `montantDevise = encoursMoyen × tie / 12` arrondie
+   * à 4 décimales (cohérent avec `numeric(20,4)`).
+   *
+   * Cf. `docs/modele-donnees.md` §4.1.
+   */
+  private mensualiserMontant(encours: number, tie: number): number {
+    return Math.round((encours * tie * 10000) / 12) / 10000;
+  }
+
+  /**
+   * Valide la cohérence du mode de saisie vs les champs fournis et
+   * recalcule `montantDevise` si mode='ENCOURS_TIE'.
+   *
+   *  - mode='MONTANT' : `encoursMoyen`/`tie` doivent être absents
+   *    (rejet sinon avec BadRequest). Le `montantDevise` fourni est
+   *    conservé tel quel.
+   *  - mode='ENCOURS_TIE' : `encoursMoyen` et `tie` doivent être
+   *    présents (rejet sinon). Le compte cible doit avoir
+   *    `est_porteur_interets=true` (rejet sinon avec message clair).
+   *    `montantDevise` est recalculé via `mensualiserMontant` ;
+   *    l'éventuel `montantDeviseFourni` est ignoré (on ne lève pas
+   *    d'erreur, on aligne sur la valeur calculée).
+   */
+  private async resolveModeSaisie(args: {
+    modeSaisie: ModeSaisieFaitBudget;
+    encoursMoyen: number | undefined;
+    tie: number | undefined;
+    montantDeviseFourni: number;
+    fkCompte: string;
+  }): Promise<{
+    modeSaisie: ModeSaisieFaitBudget;
+    encoursMoyen: number | null;
+    tie: number | null;
+    montantDevise: number;
+  }> {
+    if (args.modeSaisie === 'MONTANT') {
+      if (args.encoursMoyen !== undefined && args.encoursMoyen !== null) {
+        throw new BadRequestException(
+          "Mode 'MONTANT' incompatible avec encoursMoyen : retirer encoursMoyen " +
+            "ou passer modeSaisie='ENCOURS_TIE'.",
+        );
+      }
+      if (args.tie !== undefined && args.tie !== null) {
+        throw new BadRequestException(
+          "Mode 'MONTANT' incompatible avec tie : retirer tie " +
+            "ou passer modeSaisie='ENCOURS_TIE'.",
+        );
+      }
+      return {
+        modeSaisie: 'MONTANT',
+        encoursMoyen: null,
+        tie: null,
+        montantDevise: args.montantDeviseFourni,
+      };
+    }
+
+    // mode='ENCOURS_TIE' : les 2 champs sont obligatoires.
+    if (args.encoursMoyen === undefined || args.encoursMoyen === null) {
+      throw new BadRequestException(
+        "Mode 'ENCOURS_TIE' requiert encoursMoyen (encours moyen mensuel).",
+      );
+    }
+    if (args.tie === undefined || args.tie === null) {
+      throw new BadRequestException(
+        "Mode 'ENCOURS_TIE' requiert tie (taux d'intérêt effectif annuel décimal, ex. 0.085).",
+      );
+    }
+
+    // Le compte cible doit être porteur d'intérêts.
+    let compte;
+    try {
+      compte = await this.compteService.findOneResponse(args.fkCompte);
+    } catch (err) {
+      if (err instanceof NotFoundException) {
+        throw new NotFoundException(
+          `Compte ${args.fkCompte} introuvable (FK invalide).`,
+        );
+      }
+      throw err;
+    }
+    if (!compte.estPorteurInterets) {
+      throw new BadRequestException(
+        `Mode 'ENCOURS_TIE' incompatible avec le compte ${compte.codeCompte} ` +
+          `qui n'est pas porteur d'intérêts. Choisir un autre compte ou repasser en mode 'MONTANT'.`,
+      );
+    }
+
+    const montantDevise = this.mensualiserMontant(
+      args.encoursMoyen,
+      args.tie,
+    );
+    return {
+      modeSaisie: 'ENCOURS_TIE',
+      encoursMoyen: args.encoursMoyen,
+      tie: args.tie,
+      montantDevise,
+    };
   }
 }
