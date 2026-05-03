@@ -27,10 +27,13 @@ export class UserRole {
   @Column({ name: 'fk_role', type: 'bigint' })
   fkRole!: string;
 
+  // Lot 3.3 : étendu varchar(20) → varchar(50) car la valeur
+  // 'centre_responsabilite' (21 chars) acceptée par le CHECK ne tenait
+  // pas dans la colonne (cf. migration 1779200000020).
   @Column({
     name: 'perimetre_type',
     type: 'varchar',
-    length: 20,
+    length: 50,
     nullable: true,
   })
   perimetreType!: string | null;

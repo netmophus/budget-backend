@@ -12,6 +12,7 @@ import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
 import { PermissionsGuard } from './auth/guards/permissions.guard';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 import { FaitBudgetModule } from './faits/budget/fait-budget.module';
+import { BudgetModule } from './budget/budget.module';
 import { HealthModule } from './health/health.module';
 import { CentreResponsabiliteModule } from './referentiels/centre-responsabilite/centre-responsabilite.module';
 import { CompteModule } from './referentiels/compte/compte.module';
@@ -105,6 +106,7 @@ import { UsersModule } from './users/users.module';
     TauxChangeModule,
     VersionModule,
     FaitBudgetModule,
+    BudgetModule,
     // Référentiels secondaires (énumérations) — Lot 2.5-bis-A.
     RefTypeStructureModule,
     RefPaysModule,
