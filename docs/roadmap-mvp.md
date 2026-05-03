@@ -425,6 +425,18 @@ gérables via UI sans intervention DBA.
 bout en bout — saisie collaborative, workflow de validation, gestion
 des versions et scénarios — pour produire un budget initial validé.
 
+**Avancement Lot 3** :
+
+| Sous-étape | Périmètre | Statut |
+|---|---|---|
+| 3.1 | Modèle de données budgétaire — extension `fait_budget` (mode `ENCOURS_TIE`) + permissions `BUDGET.SOUMETTRE/VALIDER/PUBLIER` + mapping vocabulaire (Brouillon/Médian/Publié) | ✅ Livré — 03/05/2026 |
+| 3.2 | CRUD UI Scénario + Version + hook auto-création MEDIAN (Q9). Vocabulaire UI métier UEMOA. | ✅ Livré — 03/05/2026 |
+| 3.3 | Saisie budgétaire (grille multi-axes, périmètre user) | À venir |
+| 3.4 | UI grille de saisie | À venir |
+| 3.5 | Workflow validation (Soumettre/Valider/Publier) | À venir |
+| 3.6 | Indicateurs avancés + calculs hybrides (Q6) | À venir |
+| 3.7 | Import / export Excel-CSV | À venir |
+
 ### Périmètre
 
 - **Campagne budgétaire** : ouverture, paramétrage (périmètre,

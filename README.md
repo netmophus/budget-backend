@@ -284,7 +284,7 @@ pour le **Lot 3 (Module B — Élaboration budgétaire)**.
 | Lot 2 — Référentiels SCD2           | ✅ **Livré** (2.1, 2.2, 2.3, 2.4, 2.5A-F livrés) |
 | Lot 2.5 — CRUD UI dimensions        | ✅ **Livré — 02/05/2026** (6 sous-étapes A-F : 6/6 CRUDs UI) |
 | Lot 2.5-bis — Référentiels secondaires paramétrables | ✅ **Livré — 01/05/2026** (5 sous-étapes A-E) |
-| Lot 3 — Élaboration budgétaire      | 🟡 À démarrer |
+| Lot 3 — Élaboration budgétaire      | 🟡 En cours (3.1 + 3.2 livrés ; 3.3 saisie + 3.4 UI grille + 3.5 workflow + 3.6 indicateurs + 3.7 import à venir) |
 | Lot 4 — PNB / Charges               | ⏳ À venir |
 | Lot 5 — Reporting / ALM             | ⏳ À venir |
 | Lot 6 — Stabilisation               | ⏳ À venir |
