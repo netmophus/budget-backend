@@ -205,6 +205,44 @@ côté `CentreResponsabiliteService.constructor` (oubli) avait laissé
 remonter `crsRelinked=0` au e2e — c'est ce test qui a permis
 d'identifier le bug.
 
+### 2.8 Filtrage par périmètre RBAC (Lot 3.3, Q5)
+
+Toute requête qui lit ou modifie des données métier rattachées à un
+**centre de responsabilité** doit appeler
+`PerimetreService.getCrAutorisesPourUser(userId)` et **injecter le
+filtre `WHERE fk_centre IN (...crAutorises)`** correspondant dans la
+requête principale.
+
+**Règles** :
+
+1. **Filtrage actif par défaut**. `crAutorises === null` → admin
+   global (pas de filtre). `crAutorises === [...]` → restreindre.
+   `crAutorises === []` → aucun résultat (l'utilisateur a des rôles
+   mais sur périmètres invalides).
+
+2. **Aucune requête ne doit court-circuiter ce filtre**, même pour
+   des opérations admin. Laisser le service décider via `null`. Pas
+   de requête « bypass » dans les controllers.
+
+3. **Endpoints d'écriture** (POST / PATCH / DELETE) : appeler
+   `assertCrAutorise(fkCentre, userId)` AVANT toute mutation. Lever
+   `ForbiddenException` si la cible est hors périmètre.
+
+4. **Endpoints de lecture** (GET listing) : passer `crAutorises` au
+   service `findAll(query, crAutorises)` qui injecte le `WHERE`
+   approprié.
+
+5. **Endpoints de lecture par id** (GET `/:id`) : 403 si la ligne
+   pointe vers un CR hors périmètre.
+
+**Pattern de référence** : cf. `FaitBudgetController`
+(`src/faits/budget/fait-budget.controller.ts`) — chaque méthode CRUD
+appelle `assertCrAutorise` ; `findAll` consomme `crAutorises` en
+paramètre du service.
+
+**Audit** : un appel `PerimetreService` sans périmètre actif valide
+est tracé via Pino (warning) et non en `audit_log` (volume).
+
 ---
 
 ## 3. DTO et validation

@@ -487,6 +487,71 @@ envisagé si l'écart sémantique gêne les exploitants. Au MVP,
 l'UI traduit avec ce mapping et le code applicatif consomme les
 valeurs DB.
 
+#### 4.4 Filtrage périmètre par structure (Q5, Lot 3.3)
+
+Toute requête sur `fait_budget` par un utilisateur non-admin global est
+filtrée selon les rôles RBAC actifs de l'utilisateur. L'algorithme est
+porté par `PerimetreService.getCrAutorisesPourUser(userId)`
+(`src/budget/services/perimetre.service.ts`).
+
+**Étapes** :
+
+1. Charger les rôles actifs du user via `bridge_user_role` (filtre
+   `est_actif=true` ET date du jour comprise dans
+   `[date_debut_validite, date_fin_validite]` quand bornées).
+
+2. Pour chaque rôle :
+   - `perimetre_type IS NULL` ou `'global'` → retourner **null**
+     immédiatement (un seul rôle global suffit à tout débloquer ;
+     pas de filtre).
+   - `perimetre_type = 'structure'` → calculer les **descendants
+     récursifs** de la structure cible (BFS itératif côté JS,
+     équivalent à un `WITH RECURSIVE` PostgreSQL — voir note ci-bas)
+     puis lister les CR rattachés.
+   - `perimetre_type = 'centre_responsabilite'` → ajouter le CR cible
+     directement (CR plat, pas de descendance).
+
+3. Retourner l'union des CR autorisés.
+
+**Convention de retour** :
+- `null` = pas de filtre (admin global, voit tout).
+- `[]` = aucun CR autorisé (cas rôles invalides) → 0 résultat.
+- `string[]` = liste explicite des `id` de CR autorisés.
+
+**Injection dans les requêtes** : tous les endpoints `fait_budget`
+appellent `PerimetreService` avant la requête principale et injectent
+`WHERE fk_centre IN (...crAutorises)` quand non-null.
+
+**Note d'implémentation — BFS itératif vs WITH RECURSIVE** : la
+récursion native PostgreSQL serait l'idéal, mais pg-mem (utilisé en
+tests unitaires) ne la supporte pas. L'implémentation actuelle fait
+une boucle JS qui charge les enfants par couches successives.
+Performance : ~10–50 ms par appel sur < 100 structures (cas MVP).
+L'index `ix_dim_structure_parent` (Lot 2.3A) couvre la jointure de
+chaque couche. Si la perf devient un enjeu (>10 000 structures), on
+pourra basculer conditionnellement sur `WITH RECURSIVE` en détectant
+le driver via `dataSource.options.type === 'postgres'`.
+
+**Exemple SQL équivalent** (à exécuter sur PostgreSQL réel) :
+
+```sql
+-- Tous les descendants de BR_CIV (= BR_CIV + DIR_CIV_RETAIL +
+-- DEPT_CIV_PARTICULIERS + AG_ABJ_PLATEAU + AG_ABJ_COCODY +
+-- DIR_CIV_CORPORATE + BR_CIV_FONCTIONS) :
+WITH RECURSIVE descendants AS (
+  SELECT id, code_structure FROM dim_structure
+  WHERE code_structure = 'BR_CIV' AND version_courante = true
+  UNION ALL
+  SELECT s.id, s.code_structure FROM dim_structure s
+  JOIN descendants d ON s.fk_structure_parent = d.id
+  WHERE s.version_courante = true
+)
+SELECT code_structure FROM descendants ORDER BY code_structure;
+```
+
+**Cache** : aucun au MVP. Si la charge l'exige (>100 requêtes/s par
+user), envisager un cache Redis TTL 60s.
+
 #### 4.1.3 Modèle 1:N version × scénario
 
 Une `dim_version` (ex. *« Budget 2027 initial »*) porte
