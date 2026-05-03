@@ -153,6 +153,30 @@ export const PERMISSIONS: PermissionSeed[] = [
     description: 'Supprimer une ligne de fait_budget (autorisé uniquement si la version est ouverte).',
   },
   {
+    code: 'BUDGET.SOUMETTRE',
+    libelle: 'Soumettre une version pour contrôle',
+    module: 'BUDGET',
+    description:
+      "Soumettre une version 'ouvert' à validation hiérarchique (transition ouvert → soumis). " +
+      'Permission consommée par le workflow Lot 3.5.',
+  },
+  {
+    code: 'BUDGET.VALIDER',
+    libelle: 'Valider ou rejeter une version soumise',
+    module: 'BUDGET',
+    description:
+      "Valider une version 'soumis' (transition soumis → valide) ou la rejeter " +
+      "(transition soumis → ouvert avec commentaire). Permission consommée par le workflow Lot 3.5.",
+  },
+  {
+    code: 'BUDGET.PUBLIER',
+    libelle: 'Geler/publier une version validée',
+    module: 'BUDGET',
+    description:
+      "Geler une version 'valide' (transition valide → gele, vocabulaire UI : « publier »). " +
+      'Action irréversible. Permission consommée par le workflow Lot 3.5.',
+  },
+  {
     code: 'CONFIGURATION.LIRE',
     libelle: 'Lire la configuration (référentiels secondaires)',
     module: 'CONFIGURATION',

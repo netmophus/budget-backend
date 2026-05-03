@@ -18,6 +18,39 @@ describe('PERMISSIONS seed list', () => {
     expect(gerer?.module).toBe('REFERENTIEL');
     expect(gerer?.description).toBeDefined();
   });
+
+  // ─── Lot 3.1 : permissions workflow budget
+
+  it('contient les 6 permissions BUDGET attendues (Lot 3.1)', () => {
+    const codesBudget = PERMISSIONS.filter((p) => p.module === 'BUDGET').map(
+      (p) => p.code,
+    );
+    expect(codesBudget).toEqual(
+      expect.arrayContaining([
+        'BUDGET.LIRE',
+        'BUDGET.SAISIR',
+        'BUDGET.SUPPRIMER',
+        'BUDGET.SOUMETTRE',
+        'BUDGET.VALIDER',
+        'BUDGET.PUBLIER',
+      ]),
+    );
+    expect(codesBudget).toHaveLength(6);
+  });
+
+  it('BUDGET.SOUMETTRE / VALIDER / PUBLIER ont chacun une description', () => {
+    for (const code of [
+      'BUDGET.SOUMETTRE',
+      'BUDGET.VALIDER',
+      'BUDGET.PUBLIER',
+    ]) {
+      const perm = PERMISSIONS.find((p) => p.code === code);
+      expect(perm).toBeDefined();
+      expect(perm?.module).toBe('BUDGET');
+      expect(perm?.description).toBeDefined();
+      expect(perm?.description?.length ?? 0).toBeGreaterThan(20);
+    }
+  });
 });
 
 
