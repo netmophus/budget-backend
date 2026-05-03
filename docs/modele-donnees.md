@@ -392,9 +392,13 @@ unique des axes et par mois.
 | fk_devise                | bigint          | NOT NULL, FK dim_devise              |                                              |
 | fk_version               | bigint          | NOT NULL, FK dim_version             |                                              |
 | fk_scenario              | bigint          | NOT NULL, FK dim_scenario            |                                              |
-| montant_devise           | numeric(20,4)   | NOT NULL                             | Montant en devise d'origine                  |
+| montant_devise           | numeric(20,4)   | NOT NULL                             | Montant en devise d'origine (recalculé par le service si `mode_saisie='ENCOURS_TIE'`) |
 | montant_fcfa             | numeric(20,4)   | NOT NULL                             | Montant converti au taux applicable          |
 | taux_change_applique     | numeric(18,8)   | NOT NULL                             | Taux utilisé pour la conversion              |
+| mode_saisie              | varchar(20)     | NOT NULL DEFAULT `'MONTANT'`         | `'MONTANT'` ou `'ENCOURS_TIE'` — cf. §4.1.1 ci-dessous |
+| encours_moyen            | numeric(20,4)   | NULL                                 | Encours moyen mensuel (requis si `mode_saisie='ENCOURS_TIE'`, sinon NULL) |
+| tie                      | numeric(7,4)    | NULL, ∈ [0,1]                        | Taux d'intérêt effectif annuel décimal (ex. 0.0850 = 8,50 %) |
+| commentaire              | text            | NULL                                 | Justification libre saisie utilisateur (max 2000 car.) |
 | date_creation            | timestamp       | NOT NULL                             |                                              |
 | utilisateur_creation     | varchar         | NOT NULL                             |                                              |
 | date_modification        | timestamp       | NULL                                 |                                              |
@@ -408,6 +412,95 @@ unique des axes et par mois.
 > chargée au seed. Cette stratégie permet de maintenir la contrainte
 > `UNIQUE` composite (PostgreSQL traite chaque NULL comme distinct
 > dans les index `UNIQUE`).
+
+> Contraintes CHECK (Lot 3.1, migration `1779200000000`) :
+> - `ck_fait_budget_mode` : `mode_saisie IN ('MONTANT','ENCOURS_TIE')`.
+> - `ck_fait_budget_tie_range` : `tie IS NULL OR (tie BETWEEN 0 AND 1)`.
+> - `ck_fait_budget_encours_positif` : `encours_moyen IS NULL OR encours_moyen >= 0`.
+> - `ck_fait_budget_coherence_mode` : *(mode='ENCOURS_TIE' ⇒ encours+tie NOT NULL)* OU
+>   *(mode='MONTANT' ⇒ encours+tie NULL)*. Garde-fou DB de la sémantique métier.
+
+#### 4.1.1 Mode de saisie ENCOURS × TIE (mensualisation)
+
+Pour les comptes avec `est_porteur_interets = true` (typiquement
+classes 6xxxxx « charges d'intérêts » et 7xxxxx « produits
+d'intérêts »), le préparateur peut basculer en mode `ENCOURS_TIE`
+pour saisir une **hypothèse macro** plutôt qu'un montant mensuel.
+
+| Mode          | Champs saisis                                  | Champ calculé                                              |
+|---------------|------------------------------------------------|-------------------------------------------------------------|
+| `MONTANT`     | `montant_devise` (default)                     | aucun — le montant est utilisé tel quel                     |
+| `ENCOURS_TIE` | `encours_moyen` + `tie` (annuel décimal)        | `montant_devise = encours_moyen × tie / 12` (arrondi 4 décimales, calcul applicatif côté service) |
+
+**Cas d'usage typique** : projection des intérêts perçus sur le
+portefeuille de prêts CT particuliers. Le contrôleur connaît son
+encours cible (ex. 896 M FCFA) et le TIE moyen (ex. 8,50 %) plutôt
+que le montant mensuel. Le système calcule **6 346 666,67 FCFA / mois**.
+
+**Garde-fous applicatifs** (`FaitBudgetService.resolveModeSaisie`) :
+- `mode_saisie='ENCOURS_TIE'` exige que le compte cible vérifie
+  `est_porteur_interets=true`. Sinon **400 BadRequest** avec message
+  explicite (« Mode 'ENCOURS_TIE' incompatible avec le compte X qui
+  n'est pas porteur d'intérêts »).
+- `mode_saisie='ENCOURS_TIE'` exige `encours_moyen` ET `tie` non
+  null. Sinon 400.
+- `mode_saisie='MONTANT'` rejette `encours_moyen`/`tie` fournis
+  dans le DTO (cohérence stricte).
+- Sur `PATCH`, modifier `montant_devise` directement sur un fait en
+  mode `ENCOURS_TIE` est refusé : il faut repasser explicitement
+  par `mode_saisie` + `encours_moyen` + `tie` pour préserver la
+  cohérence du couple encours×tie/12.
+
+**Audit complet** : les 3 valeurs (`mode_saisie`, `encours_moyen`,
+`tie`) sont tracées dans `audit_log.payload_apres` pour permettre
+la justification ultérieure d'une hypothèse macro.
+
+#### 4.1.2 Mapping vocabulaire métier ↔ DB
+
+Le vocabulaire métier UEMOA utilisé en interface utilisateur (et
+dans les décisions d'architecture du Lot 3) ne correspond pas
+exactement aux libellés stockés en base, hérités du Lot 2. Le
+mapping suivant est la convention canonique :
+
+| Vocabulaire métier (UI / décisions Q1-Q10) | Stockage DB (`dim_version.statut`) |
+|---|---|
+| `BROUILLON` (saisie en cours)               | `ouvert`                          |
+| `SOUMIS` (envoyé à validation)              | `soumis`                          |
+| `VALIDÉ` (validé hiérarchie)                | `valide`                          |
+| `PUBLIÉ` (gel irréversible BCEAO)           | `gele`                            |
+
+| Vocabulaire métier (UI) | Stockage DB (`dim_scenario.type_scenario`) |
+|---|---|
+| `MEDIAN`                | `central`                                  |
+| `OPTIMISTE`             | `optimiste`                                |
+| `PESSIMISTE`            | `pessimiste`                               |
+| `ALTERNATIF`            | `alternatif`                               |
+
+| Vocabulaire métier (UI) | Stockage DB (`dim_version.type_version`) |
+|---|---|
+| `BUDGET_INITIAL`        | `budget_initial`                          |
+| `FORECAST_Q1` / `FORECAST_Q2` | `reforecast_1` / `reforecast_2`     |
+| `ATTERRISSAGE_Q4`       | `atterrissage`                            |
+
+À terme (Lot 6 — industrialisation), un rename DB pourrait être
+envisagé si l'écart sémantique gêne les exploitants. Au MVP,
+l'UI traduit avec ce mapping et le code applicatif consomme les
+valeurs DB.
+
+#### 4.1.3 Modèle 1:N version × scénario
+
+Une `dim_version` (ex. *« Budget 2027 initial »*) porte
+**simultanément** N scénarios via `fait_budget` : chaque ligne
+factuelle porte sa propre `fk_version` ET `fk_scenario`. Une même
+version peut donc contenir, en parallèle, les 3 projections
+`MEDIAN` / `OPTIMISTE` / `PESSIMISTE` remplies par le contrôle
+de gestion.
+
+Le **workflow de validation** (Lot 3.5) opérera sur la VERSION
+(donc sur tous ses scénarios en bloc), pas sur chaque scénario
+individuellement. C'est la photo cohérente requise pour un cycle
+budgétaire BCEAO : on ne peut pas valider le scénario MEDIAN sans
+les scénarios sensibilité associés.
 
 ### 4.2 fait_realise
 

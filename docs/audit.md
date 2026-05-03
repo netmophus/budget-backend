@@ -24,6 +24,10 @@ debug — volatiles).
 | `CREATE` / `UPDATE` / `DELETE` | Endpoints décorés `@Auditable({ typeAction: ... })` — sur opérations métier. | success ou failure | body sanitisé, idCible si extracteur fourni |
 | `VALIDATE` | Validation métier (ex. version budget). | success ou failure | (à venir aux Lots 3+) |
 | `FREEZE` | Gel d'une version (irréversible). | success ou failure | (à venir au Lot 3) |
+| `SOUMETTRE_BUDGET` | Préparateur soumet une version `dim_version` à validation (`statut: ouvert → soumis`). Permission `BUDGET.SOUMETTRE`. | success ou failure | `idCible = version.id`, commentaire de soumission (Lot 3.5) |
+| `VALIDER_BUDGET` | Contrôleur valide une version soumise (`statut: soumis → valide`). Permission `BUDGET.VALIDER`. | success ou failure | `idCible = version.id`, commentaire (Lot 3.5) |
+| `REJETER_BUDGET` | Contrôleur rejette une version soumise (`statut: soumis → ouvert`). Permission `BUDGET.VALIDER`. | success ou failure | `idCible = version.id`, motif obligatoire (Lot 3.5) |
+| `PUBLIER_BUDGET` | Directeur publie/gèle une version validée (`statut: valide → gele`, alias DB : *geler*). Permission `BUDGET.PUBLIER`. **Action irréversible**. | success ou failure | `idCible = version.id`, conservation 10 ans BCEAO (Lot 3.5) |
 | `EXPORT` / `IMPORT` | Transferts en masse (Excel, CSV). | success ou failure | `IMPORT` : première utilisation Lot 2.4A.2 sur `POST /referentiels/comptes/import` — `payloadApres` contient le rapport `ImportRapportDto` complet (totalLines, imported, updated, skipped, errors[]). Conservation 10 ans comme les autres types. `EXPORT` à venir Lots 5+. |
 | `LIRE_AUDIT` | Méta-audit : un utilisateur (≠ `system`) consulte `/audit-logs`. | success | commentaire = filtres JSON appliqués |
 
