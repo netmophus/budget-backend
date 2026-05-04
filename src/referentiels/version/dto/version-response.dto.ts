@@ -46,6 +46,38 @@ export class VersionResponseDto {
 
   @ApiPropertyOptional({ example: 'admin@miznas.local', nullable: true })
   utilisateurModification!: string | null;
+
+  // ─── Workflow de validation (Lot 3.5) ───────────────────────────
+
+  @ApiPropertyOptional({ nullable: true })
+  commentaireSoumission!: string | null;
+
+  @ApiPropertyOptional({ nullable: true })
+  commentaireValidation!: string | null;
+
+  @ApiPropertyOptional({ nullable: true })
+  commentaireRejet!: string | null;
+
+  @ApiPropertyOptional({ nullable: true })
+  commentairePublication!: string | null;
+
+  @ApiPropertyOptional({ type: String, format: 'date-time', nullable: true })
+  dateSoumission!: Date | null;
+
+  @ApiPropertyOptional({ example: 'preparateur@miznas.local', nullable: true })
+  utilisateurSoumission!: string | null;
+
+  @ApiPropertyOptional({ type: String, format: 'date-time', nullable: true })
+  dateValidation!: Date | null;
+
+  @ApiPropertyOptional({ example: 'controleur@miznas.local', nullable: true })
+  utilisateurValidation!: string | null;
+
+  @ApiPropertyOptional({ type: String, format: 'date-time', nullable: true })
+  dateRejet!: Date | null;
+
+  @ApiPropertyOptional({ example: 'controleur@miznas.local', nullable: true })
+  utilisateurRejet!: string | null;
 }
 
 /**
