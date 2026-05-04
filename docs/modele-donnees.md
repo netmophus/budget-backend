@@ -552,6 +552,40 @@ SELECT code_structure FROM descendants ORDER BY code_structure;
 **Cache** : aucun au MVP. Si la charge l'exige (>100 requêtes/s par
 user), envisager un cache Redis TTL 60s.
 
+#### 4.5 Saisie from-scratch (Lot 3.4-bis)
+
+`GET /api/v1/budget/grille` exige désormais le query param
+`ligneMetierId` (obligatoire) en plus de `versionId / scenarioId /
+crId / exerciceFiscal`. La grille est construite sur la combinaison
+**(CR × ligne_metier × classe)** :
+
+- L'endpoint retourne **tous les comptes feuilles éligibles** de la
+  classe choisie, qu'il existe ou non une ligne `fait_budget` pour
+  cette combinaison. Les cellules vides sont retournées avec
+  `montant=0`, `ligneId=null`, `modeSaisie=null`.
+- `POST /api/v1/budget/grille` crée désormais les cellules
+  `from-scratch` (sans `ligneId` existant et `montant > 0`) via
+  INSERT en transaction. Validation métier inchangée (compte
+  feuille, mode `ENCOURS_TIE` compatible, période 1ᵉʳ du mois,
+  périmètre RBAC, statut version).
+- Sentinels par défaut résolues côté service au 1ᵉʳ INSERT du
+  payload :
+  - `fk_devise = XOF` (devise pivot, taux=1)
+  - `fk_structure = cr.fk_structure` (structure rattachée au CR)
+  - `fk_produit = PRODUIT_TRANSVERSE` (sentinel Lot 2.5C ; fallback :
+    1ᵉʳ produit racine courant)
+  - `fk_segment = 1ᵉʳ segment courant` (convention MVP)
+- Si l'utilisateur saisit `montant=0` sur une cellule sans `ligneId` :
+  SKIP côté backend (`ignorees++`), aucun INSERT.
+- Si l'utilisateur efface une cellule existante (`montant=0` +
+  `ligneId` présent) : DELETE côté backend (`supprimees++`).
+
+Ce modèle permet à un préparateur de saisir son budget pour un CR
+totalement vierge, sans dépendance à un seed initial — il choisit
+sa ligne_metier dans le SelecteurContexte, la grille affiche tous
+les comptes feuilles éligibles, et la saisie crée les lignes au
+fur et à mesure.
+
 #### 4.1.3 Modèle 1:N version × scénario
 
 Une `dim_version` (ex. *« Budget 2027 initial »*) porte
