@@ -216,3 +216,334 @@ describe('BudgetSaisieService — wiring', () => {
     expect(BudgetSaisieService).toBeDefined();
   });
 });
+
+// ─── Lot 3.4-bis : grille from-scratch ─────────────────────────────
+
+describe('BudgetSaisieService — grille from-scratch (Lot 3.4-bis)', () => {
+  let ds: DataSource;
+  let service: BudgetSaisieService;
+  let ids: {
+    versionId: string;
+    scenarioId: string;
+    crId: string;
+    ligneMetierId: string;
+    structureId: string;
+  };
+
+  beforeAll(async () => {
+    ds = await createDataSource();
+    const perim = new PerimetreService(ds.getRepository(UserRole));
+    const audit = new AuditService(ds.getRepository(AuditLog));
+    service = new BudgetSaisieService(
+      ds.getRepository(FaitBudget),
+      ds.getRepository(DimCompte),
+      ds.getRepository(DimTemps),
+      ds.getRepository(DimCentreResponsabilite),
+      ds.getRepository(DimVersion),
+      ds.getRepository(DimScenario),
+      perim,
+      audit,
+      ds,
+    );
+
+    // 1 user admin global (rôle 'global' → null filter)
+    await ds.query(
+      `INSERT INTO ref_role ("code_role","libelle","est_actif","utilisateur_creation")
+       VALUES ('ADMIN','Admin',true,'system')`,
+    );
+    await ds.query(
+      `INSERT INTO "user" ("email","mot_de_passe_hash","nom","prenom","est_actif","utilisateur_creation")
+       VALUES ('admin@miznas.local','hash','A','D',true,'system')`,
+    );
+    await ds.query(
+      `INSERT INTO bridge_user_role ("fk_user","fk_role","perimetre_type","perimetre_id","est_actif","utilisateur_creation")
+        SELECT u.id, r.id, 'global', NULL, true, 'system'
+        FROM "user" u, ref_role r
+        WHERE u.email='admin@miznas.local' AND r.code_role='ADMIN'`,
+    );
+
+    // Structure + CR
+    await ds.query(
+      `INSERT INTO dim_structure
+        ("code_structure","libelle","libelle_court","type_structure","niveau_hierarchique",
+         "fk_structure_parent","code_pays","date_debut_validite","date_fin_validite",
+         "version_courante","est_actif","utilisateur_creation")
+       VALUES ('AG_TEST','Agence Test',NULL,'agence',1,NULL,NULL,'2026-01-01',NULL,true,true,'system')`,
+    );
+    const struct = (await ds.query(
+      `SELECT id FROM dim_structure WHERE code_structure='AG_TEST'`,
+    )) as Array<{ id: string }>;
+    await ds.query(
+      `INSERT INTO dim_centre_responsabilite
+        ("code_cr","libelle","libelle_court","type_cr","fk_structure",
+         "date_debut_validite","date_fin_validite","version_courante","est_actif","utilisateur_creation")
+       VALUES ('CR_TEST','CR Test',NULL,'cdc',$1,'2026-01-01',NULL,true,true,'system')`,
+      [String(struct[0]!.id)],
+    );
+
+    // Ligne_metier + 3 comptes feuilles classe 6 + 1 agrégé
+    await ds.query(
+      `INSERT INTO dim_ligne_metier
+        ("code_ligne_metier","libelle","fk_ligne_metier_parent","niveau",
+         "date_debut_validite","date_fin_validite","version_courante","est_actif","utilisateur_creation")
+       VALUES ('RETAIL','Retail',NULL,1,'2026-01-01',NULL,true,true,'system')`,
+    );
+    for (const code of ['611100', '612100', '613100']) {
+      await ds.query(
+        `INSERT INTO dim_compte
+          ("code_compte","libelle","classe","fk_compte_parent","niveau",
+           "est_compte_collectif","est_porteur_interets",
+           "date_debut_validite","date_fin_validite","version_courante","est_actif","utilisateur_creation")
+         VALUES ($1,$1,'6',NULL,4,false,false,'2026-01-01',NULL,true,true,'system')`,
+        [code],
+      );
+    }
+    // 12 mois de dim_temps pour 2027
+    for (let m = 1; m <= 12; m++) {
+      const mm = String(m).padStart(2, '0');
+      await ds.query(
+        `INSERT INTO dim_temps
+          ("date","annee","trimestre","mois","jour","jour_ouvre","est_fin_de_mois",
+           "est_fin_de_trimestre","est_fin_d_annee","exercice_fiscal","libelle_mois")
+         VALUES ($1,2027,$2,$3,1,true,false,false,false,2027,$4)`,
+        [
+          `2027-${mm}-01`,
+          Math.ceil(m / 3),
+          m,
+          [
+            'Janvier',
+            'Février',
+            'Mars',
+            'Avril',
+            'Mai',
+            'Juin',
+            'Juillet',
+            'Août',
+            'Septembre',
+            'Octobre',
+            'Novembre',
+            'Décembre',
+          ][m - 1]!,
+        ],
+      );
+    }
+    // Devise XOF + 1 produit + 1 segment (sentinels MVP)
+    await ds.query(
+      `INSERT INTO dim_devise
+        ("code_iso","libelle","symbole","nb_decimales","est_devise_pivot","est_active","utilisateur_creation")
+       VALUES ('XOF','Franc CFA','F CFA',0,true,true,'system')`,
+    );
+    await ds.query(
+      `INSERT INTO dim_produit
+        ("code_produit","libelle","type_produit","fk_produit_parent","niveau",
+         "est_porteur_interets","date_debut_validite","date_fin_validite",
+         "version_courante","est_actif","utilisateur_creation")
+       VALUES ('PRODUIT_TRANSVERSE','Produit transverse','autre',NULL,1,
+               false,'2026-01-01',NULL,true,true,'system')`,
+    );
+    await ds.query(
+      `INSERT INTO dim_segment
+        ("code_segment","libelle","categorie",
+         "date_debut_validite","date_fin_validite","version_courante","est_actif","utilisateur_creation")
+       VALUES ('PARTICULIER','Particuliers','particulier','2026-01-01',NULL,true,true,'system')`,
+    );
+
+    // 1 version ouvert + 1 scenario
+    await ds.query(
+      `INSERT INTO dim_version
+        ("code_version","libelle","type_version","exercice_fiscal","statut","utilisateur_creation")
+       VALUES ('BUDGET_INITIAL_2027','Budget 2027','budget_initial',2027,'ouvert','system')`,
+    );
+    await ds.query(
+      `INSERT INTO dim_scenario
+        ("code_scenario","libelle","type_scenario","statut","exercice_fiscal","utilisateur_creation")
+       VALUES ('MEDIAN_2027','Médian 2027','central','actif',2027,'system')`,
+    );
+
+    async function id(table: string, col: string, code: string): Promise<string> {
+      const r = (await ds.query(
+        `SELECT id FROM ${table} WHERE ${col} = $1`,
+        [code],
+      )) as Array<{ id: string | number }>;
+      return String(r[0]!.id);
+    }
+    ids = {
+      structureId: String(struct[0]!.id),
+      versionId: await id('dim_version', 'code_version', 'BUDGET_INITIAL_2027'),
+      scenarioId: await id('dim_scenario', 'code_scenario', 'MEDIAN_2027'),
+      crId: await id('dim_centre_responsabilite', 'code_cr', 'CR_TEST'),
+      ligneMetierId: await id('dim_ligne_metier', 'code_ligne_metier', 'RETAIL'),
+    };
+  });
+
+  afterAll(async () => {
+    await ds.destroy();
+  });
+
+  async function adminUserId(): Promise<string> {
+    const r = (await ds.query(
+      `SELECT id FROM "user" WHERE email='admin@miznas.local'`,
+    )) as Array<{ id: string }>;
+    return String(r[0]!.id);
+  }
+
+  it("GET grille from-scratch : 3 comptes feuilles classe 6 retournés (CR vierge)", async () => {
+    const userId = await adminUserId();
+    const result = await service.getGrilleSaisie(
+      {
+        versionId: ids.versionId,
+        scenarioId: ids.scenarioId,
+        crId: ids.crId,
+        ligneMetierId: ids.ligneMetierId,
+        exerciceFiscal: 2027,
+        classeCompte: '6',
+      },
+      userId,
+    );
+    expect(result.lignes).toHaveLength(3);
+    // Toutes les cellules vides : montant=0, ligneId=null
+    for (const ligne of result.lignes) {
+      expect(ligne.cellules).toHaveLength(12);
+      for (const c of ligne.cellules) {
+        expect(c.montant).toBe(0);
+        expect(c.ligneId).toBeNull();
+        expect(c.modeSaisie).toBeNull();
+      }
+    }
+    expect(result.totalAnneeCr).toBe(0);
+  });
+
+  it('GET grille sans ligneMetierId → BadRequestException explicite', async () => {
+    const userId = await adminUserId();
+    await expect(
+      service.getGrilleSaisie(
+        {
+          versionId: ids.versionId,
+          scenarioId: ids.scenarioId,
+          crId: ids.crId,
+          ligneMetierId: '',
+          exerciceFiscal: 2027,
+          classeCompte: '6',
+        },
+        userId,
+      ),
+    ).rejects.toThrow(/ligneMetierId/);
+  });
+
+  it("POST grille from-scratch : INSERT 1 cellule sur compte 611100 (sans ligneId)", async () => {
+    const userId = await adminUserId();
+    const compteId = (
+      (await ds.query(
+        `SELECT id FROM dim_compte WHERE code_compte='611100'`,
+      )) as Array<{ id: string }>
+    )[0]!.id;
+    const r = await service.saveGrilleSaisie(
+      {
+        versionId: ids.versionId,
+        scenarioId: ids.scenarioId,
+        crId: ids.crId,
+        lignes: [
+          {
+            compteId: String(compteId),
+            ligneMetierId: ids.ligneMetierId,
+            cellules: [
+              { mois: '2027-01-01', montant: 10_200_000, modeSaisie: 'MONTANT' },
+            ],
+          },
+        ],
+      },
+      userId,
+      'admin@miznas.local',
+    );
+    expect(r.inserees).toBe(1);
+    expect(r.modifiees).toBe(0);
+    expect(r.erreurs).toEqual([]);
+    // Vérifier en base
+    const rows = (await ds.query(
+      `SELECT montant_devise, mode_saisie, fk_devise FROM fait_budget
+        WHERE fk_compte = $1 AND fk_version = $2`,
+      [compteId, ids.versionId],
+    )) as Array<{
+      montant_devise: string;
+      mode_saisie: string;
+      fk_devise: string;
+    }>;
+    expect(rows).toHaveLength(1);
+    expect(Number(rows[0]!.montant_devise)).toBe(10_200_000);
+    expect(rows[0]!.mode_saisie).toBe('MONTANT');
+  });
+
+  it('POST grille from-scratch : montant=0 sans ligneId → ignorée (pas d\'INSERT)', async () => {
+    const userId = await adminUserId();
+    const compteId = (
+      (await ds.query(
+        `SELECT id FROM dim_compte WHERE code_compte='612100'`,
+      )) as Array<{ id: string }>
+    )[0]!.id;
+    const r = await service.saveGrilleSaisie(
+      {
+        versionId: ids.versionId,
+        scenarioId: ids.scenarioId,
+        crId: ids.crId,
+        lignes: [
+          {
+            compteId: String(compteId),
+            ligneMetierId: ids.ligneMetierId,
+            cellules: [
+              { mois: '2027-02-01', montant: 0, modeSaisie: 'MONTANT' },
+            ],
+          },
+        ],
+      },
+      userId,
+      'admin@miznas.local',
+    );
+    expect(r.inserees).toBe(0);
+    expect(r.ignorees).toBe(1);
+    expect(r.erreurs).toEqual([]);
+  });
+
+  it('POST grille mix : 1 nouveau compte 613100 + 1 update sur 611100 → inserees=1, modifiees=1', async () => {
+    const userId = await adminUserId();
+    const c611 = (
+      (await ds.query(
+        `SELECT id FROM dim_compte WHERE code_compte='611100'`,
+      )) as Array<{ id: string }>
+    )[0]!.id;
+    const c613 = (
+      (await ds.query(
+        `SELECT id FROM dim_compte WHERE code_compte='613100'`,
+      )) as Array<{ id: string }>
+    )[0]!.id;
+    const r = await service.saveGrilleSaisie(
+      {
+        versionId: ids.versionId,
+        scenarioId: ids.scenarioId,
+        crId: ids.crId,
+        lignes: [
+          {
+            compteId: String(c611),
+            ligneMetierId: ids.ligneMetierId,
+            // 611100 a déjà une ligne (test précédent) — on la modifie
+            cellules: [
+              { mois: '2027-01-01', montant: 12_000_000, modeSaisie: 'MONTANT' },
+            ],
+          },
+          {
+            compteId: String(c613),
+            ligneMetierId: ids.ligneMetierId,
+            // 613100 nouveau
+            cellules: [
+              { mois: '2027-03-01', montant: 5_000_000, modeSaisie: 'MONTANT' },
+            ],
+          },
+        ],
+      },
+      userId,
+      'admin@miznas.local',
+    );
+    expect(r.inserees).toBe(1);
+    expect(r.modifiees).toBe(1);
+    expect(r.erreurs).toEqual([]);
+  });
+});
