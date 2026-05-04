@@ -37,7 +37,7 @@ export interface CreateVersionResult {
   scenarioAutoCreeCode: string | null;
 }
 
-function toResponse(v: DimVersion): VersionResponseDto {
+export function toVersionResponse(v: DimVersion): VersionResponseDto {
   return {
     id: v.id,
     codeVersion: v.codeVersion,
@@ -52,8 +52,21 @@ function toResponse(v: DimVersion): VersionResponseDto {
     utilisateurCreation: v.utilisateurCreation,
     dateModification: v.dateModification,
     utilisateurModification: v.utilisateurModification,
+    // Workflow Lot 3.5
+    commentaireSoumission: v.commentaireSoumission ?? null,
+    commentaireValidation: v.commentaireValidation ?? null,
+    commentaireRejet: v.commentaireRejet ?? null,
+    commentairePublication: v.commentairePublication ?? null,
+    dateSoumission: v.dateSoumission ?? null,
+    utilisateurSoumission: v.utilisateurSoumission ?? null,
+    dateValidation: v.dateValidation ?? null,
+    utilisateurValidation: v.utilisateurValidation ?? null,
+    dateRejet: v.dateRejet ?? null,
+    utilisateurRejet: v.utilisateurRejet ?? null,
   };
 }
+
+const toResponse = toVersionResponse;
 
 @Injectable()
 export class VersionService {

@@ -1,0 +1,267 @@
+/**
+ * VersionWorkflowService (Lot 3.5) — transitions de statut du
+ * workflow de validation budgétaire (Q4).
+ *
+ * Cycle linéaire avec rejet possible :
+ *   ouvert (Brouillon)
+ *     ↓ soumettre (BUDGET.SOUMETTRE)
+ *   soumis
+ *     ├─→ valider (BUDGET.VALIDER) → valide
+ *     │                                ↓ publier (BUDGET.PUBLIER)
+ *     │                              gele (Publié, IMMUABLE)
+ *     └─→ rejeter (BUDGET.VALIDER) → ouvert (avec commentaire de
+ *                                              rejet conservé)
+ *
+ * Les permissions sont vérifiées par le `PermissionsGuard` global
+ * via le décorateur `@RequirePermissions` du controller — le service
+ * suppose que la permission est déjà satisfaite et se concentre sur
+ * la cohérence métier (statut + audit).
+ *
+ * Toutes les transitions sont **transactionnelles** et écrivent une
+ * entrée `audit_log` (4 nouveaux `type_action` :
+ * SOUMETTRE_BUDGET / VALIDER_BUDGET / REJETER_BUDGET / PUBLIER_BUDGET).
+ */
+import {
+  ConflictException,
+  Injectable,
+  NotFoundException,
+  UnprocessableEntityException,
+} from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { DataSource, Repository } from 'typeorm';
+
+import { AuditService } from '../../audit/audit.service';
+import { DimVersion } from './entities/dim-version.entity';
+import { VersionResponseDto } from './dto/version-response.dto';
+import {
+  PublierVersionDto,
+  RejeterVersionDto,
+  SoumettreVersionDto,
+  ValiderVersionDto,
+} from './dto/workflow.dto';
+import { toVersionResponse } from './version.service';
+
+@Injectable()
+export class VersionWorkflowService {
+  constructor(
+    @InjectRepository(DimVersion)
+    private readonly versionRepo: Repository<DimVersion>,
+    private readonly dataSource: DataSource,
+    private readonly auditService: AuditService,
+  ) {}
+
+  // ─── Soumettre : ouvert → soumis ────────────────────────────────
+
+  async soumettre(
+    versionId: string,
+    dto: SoumettreVersionDto,
+    user: { email: string },
+  ): Promise<VersionResponseDto> {
+    return this.dataSource.transaction(async (manager) => {
+      const repo = manager.getRepository(DimVersion);
+      const v = await repo.findOne({ where: { id: versionId } });
+      if (!v) {
+        throw new NotFoundException(`Version ${versionId} introuvable.`);
+      }
+      if (v.statut !== 'ouvert') {
+        throw new ConflictException(
+          `Seule une version en Brouillon peut être soumise. ` +
+            `Statut actuel : '${v.statut}'.`,
+        );
+      }
+
+      // Une version vide (aucune ligne fait_budget) ne peut pas être
+      // soumise — sinon on transmet pour validation un travail nul.
+      // Raw query SQL pour éviter d'importer FaitBudget (couplage
+      // entité indésirable côté VersionModule, cf. version.module.ts).
+      const rows = (await manager.query(
+        `SELECT COUNT(*)::int AS n FROM fait_budget WHERE fk_version = $1`,
+        [versionId],
+      )) as Array<{ n: number }>;
+      const nbLignes = rows[0]?.n ?? 0;
+      if (nbLignes === 0) {
+        throw new UnprocessableEntityException(
+          `Cette version est vide. Saisissez au moins une ligne ` +
+            `budgétaire avant de la soumettre à validation.`,
+        );
+      }
+
+      v.statut = 'soumis';
+      v.commentaireSoumission = dto.commentaire ?? null;
+      v.dateSoumission = new Date();
+      v.utilisateurSoumission = user.email;
+      // Réinitialiser les champs des transitions ultérieures (cas
+      // d'un précédent rejet → re-soumission).
+      v.commentaireValidation = null;
+      v.dateValidation = null;
+      v.utilisateurValidation = null;
+      v.commentaireRejet = null;
+      v.dateRejet = null;
+      v.utilisateurRejet = null;
+      const saved = await repo.save(v);
+
+      await this.auditService.log({
+        utilisateur: user.email,
+        typeAction: 'SOUMETTRE_BUDGET',
+        entiteCible: 'dim_version',
+        idCible: String(versionId),
+        statut: 'success',
+        payloadApres: {
+          codeVersion: v.codeVersion,
+          statutAvant: 'ouvert',
+          statutApres: 'soumis',
+          commentaire: dto.commentaire ?? null,
+        },
+        commentaire: `Soumission de ${v.codeVersion} (${nbLignes} ligne(s) à valider).`,
+      });
+
+      return toVersionResponse(saved);
+    });
+  }
+
+  // ─── Valider : soumis → valide ──────────────────────────────────
+
+  async valider(
+    versionId: string,
+    dto: ValiderVersionDto,
+    user: { email: string },
+  ): Promise<VersionResponseDto> {
+    return this.dataSource.transaction(async (manager) => {
+      const repo = manager.getRepository(DimVersion);
+      const v = await repo.findOne({ where: { id: versionId } });
+      if (!v) {
+        throw new NotFoundException(`Version ${versionId} introuvable.`);
+      }
+      if (v.statut !== 'soumis') {
+        throw new ConflictException(
+          `Seule une version Soumise peut être validée. ` +
+            `Statut actuel : '${v.statut}'.`,
+        );
+      }
+
+      v.statut = 'valide';
+      v.commentaireValidation = dto.commentaire ?? null;
+      v.dateValidation = new Date();
+      v.utilisateurValidation = user.email;
+      const saved = await repo.save(v);
+
+      await this.auditService.log({
+        utilisateur: user.email,
+        typeAction: 'VALIDER_BUDGET',
+        entiteCible: 'dim_version',
+        idCible: String(versionId),
+        statut: 'success',
+        payloadApres: {
+          codeVersion: v.codeVersion,
+          statutAvant: 'soumis',
+          statutApres: 'valide',
+          commentaire: dto.commentaire ?? null,
+        },
+        commentaire: `Validation de ${v.codeVersion}.`,
+      });
+
+      return toVersionResponse(saved);
+    });
+  }
+
+  // ─── Rejeter : soumis → ouvert (avec commentaire OBLIGATOIRE) ───
+
+  async rejeter(
+    versionId: string,
+    dto: RejeterVersionDto,
+    user: { email: string },
+  ): Promise<VersionResponseDto> {
+    return this.dataSource.transaction(async (manager) => {
+      const repo = manager.getRepository(DimVersion);
+      const v = await repo.findOne({ where: { id: versionId } });
+      if (!v) {
+        throw new NotFoundException(`Version ${versionId} introuvable.`);
+      }
+      if (v.statut !== 'soumis') {
+        throw new ConflictException(
+          `Seule une version Soumise peut être rejetée. ` +
+            `Statut actuel : '${v.statut}'.`,
+        );
+      }
+
+      // Retour en Brouillon, conservation du commentaire de rejet
+      // pour le préparateur. Effacer les champs de soumission
+      // (la prochaine soumission les ré-écrira).
+      v.statut = 'ouvert';
+      v.commentaireRejet = dto.commentaire;
+      v.dateRejet = new Date();
+      v.utilisateurRejet = user.email;
+      v.commentaireSoumission = null;
+      v.dateSoumission = null;
+      v.utilisateurSoumission = null;
+      const saved = await repo.save(v);
+
+      await this.auditService.log({
+        utilisateur: user.email,
+        typeAction: 'REJETER_BUDGET',
+        entiteCible: 'dim_version',
+        idCible: String(versionId),
+        statut: 'success',
+        payloadApres: {
+          codeVersion: v.codeVersion,
+          statutAvant: 'soumis',
+          statutApres: 'ouvert',
+          commentaireRejet: dto.commentaire,
+        },
+        commentaire: `Rejet de ${v.codeVersion} : ${dto.commentaire.slice(0, 200)}`,
+      });
+
+      return toVersionResponse(saved);
+    });
+  }
+
+  // ─── Publier : valide → gele (IMMUABLE) ─────────────────────────
+
+  async publier(
+    versionId: string,
+    dto: PublierVersionDto,
+    user: { email: string },
+  ): Promise<VersionResponseDto> {
+    return this.dataSource.transaction(async (manager) => {
+      const repo = manager.getRepository(DimVersion);
+      const v = await repo.findOne({ where: { id: versionId } });
+      if (!v) {
+        throw new NotFoundException(`Version ${versionId} introuvable.`);
+      }
+      if (v.statut !== 'valide') {
+        throw new ConflictException(
+          `Seule une version Validée peut être publiée. ` +
+            `Statut actuel : '${v.statut}'.`,
+        );
+      }
+
+      v.statut = 'gele';
+      v.commentairePublication = dto.commentaire ?? null;
+      // Conserver date_gel/utilisateur_gel comme alias de
+      // date_publication/utilisateur_publication (cf. mapping
+      // vocabulaire docs/modele-donnees.md §4.1.2).
+      v.dateGel = new Date();
+      v.utilisateurGel = user.email;
+      const saved = await repo.save(v);
+
+      await this.auditService.log({
+        utilisateur: user.email,
+        typeAction: 'PUBLIER_BUDGET',
+        entiteCible: 'dim_version',
+        idCible: String(versionId),
+        statut: 'success',
+        payloadApres: {
+          codeVersion: v.codeVersion,
+          statutAvant: 'valide',
+          statutApres: 'gele',
+          commentaire: dto.commentaire ?? null,
+        },
+        commentaire:
+          `Publication (gel) de ${v.codeVersion} — action irréversible. ` +
+          'Conservation BCEAO 10 ans.',
+      });
+
+      return toVersionResponse(saved);
+    });
+  }
+}
