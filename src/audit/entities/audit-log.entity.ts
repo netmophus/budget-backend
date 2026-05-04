@@ -24,7 +24,12 @@ export type TypeAction =
   // Lot 3.2 — hook Q9 : création automatique de scénario
   | 'AUTO_CREATE_SCENARIO'
   // Lot 3.3 — saisie budgétaire en lot via grille
-  | 'IMPORT_BUDGET';
+  | 'IMPORT_BUDGET'
+  // Lot 3.5 — workflow de validation budgétaire (4 transitions)
+  | 'SOUMETTRE_BUDGET'
+  | 'VALIDER_BUDGET'
+  | 'REJETER_BUDGET'
+  | 'PUBLIER_BUDGET';
 
 export type AuditStatut = 'success' | 'failure';
 
