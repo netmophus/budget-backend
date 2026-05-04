@@ -53,6 +53,7 @@ export class BudgetGrilleController {
         scenarioId: query.scenarioId,
         crId: query.crId,
         exerciceFiscal: query.exerciceFiscal,
+        ligneMetierId: query.ligneMetierId,
         ...(query.classeCompte ? { classeCompte: query.classeCompte } : {}),
       },
       user.userId,

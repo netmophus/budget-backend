@@ -131,10 +131,21 @@ export class BudgetSaisieService {
       scenarioId: string;
       crId: string;
       exerciceFiscal: number;
+      ligneMetierId: string;
       classeCompte?: string;
     },
     userId: string,
   ): Promise<GrilleSaisieReponseDto> {
+    // Lot 3.4-bis : ligneMetierId est obligatoire — la grille est
+    // désormais construite from-scratch sur (CR × ligne_metier ×
+    // classe), même sans aucune ligne fait_budget existante.
+    if (!query.ligneMetierId) {
+      throw new BadRequestException(
+        "Paramètre 'ligneMetierId' obligatoire (Lot 3.4-bis). " +
+          'Sélectionnez une ligne métier dans le contexte de saisie.',
+      );
+    }
+
     // 1. Vérifier le périmètre
     const crAutorises = await this.perimetreService.getCrAutorisesPourUser(userId);
     this.assertCrAutorise(query.crId, crAutorises);
@@ -151,6 +162,26 @@ export class BudgetSaisieService {
     if (!version) throw new NotFoundException('Version introuvable.');
     if (!scenario) throw new NotFoundException('Scénario introuvable.');
     if (!cr) throw new NotFoundException('Centre de responsabilité introuvable.');
+
+    // 2-bis. Charger la ligne_metier (pour la réponse + la matrice)
+    const ligneMetierEntity = await this.dataSource.query<
+      Array<{ id: string; code_ligne_metier: string; libelle: string }>
+    >(
+      `SELECT id, code_ligne_metier, libelle
+         FROM dim_ligne_metier
+        WHERE id = $1 AND version_courante = true`,
+      [query.ligneMetierId],
+    );
+    if (ligneMetierEntity.length === 0) {
+      throw new NotFoundException(
+        `Ligne métier ${query.ligneMetierId} introuvable ou non courante.`,
+      );
+    }
+    const ligneMetierRef = {
+      id: String(ligneMetierEntity[0]!.id),
+      codeLigneMetier: ligneMetierEntity[0]!.code_ligne_metier,
+      libelle: ligneMetierEntity[0]!.libelle,
+    };
 
     // 3. Charger les 12 mois de l'exercice
     const mois = await this.tempsRepo
@@ -178,52 +209,36 @@ export class BudgetSaisieService {
       .orderBy('c.codeCompte', 'ASC')
       .getMany();
 
-    // 5. Charger toutes les lignes fait_budget pour (version, scenario,
-    //    cr, mois de l'exercice).
+    // 5. Charger les lignes fait_budget existantes pour (version,
+    //    scenario, cr, ligne_metier, mois de l'exercice). Le filtre
+    //    par ligne_metier est nouveau au Lot 3.4-bis.
     const idsMois = mois.map((m) => m.id);
     const lignesQb = this.faitRepo
       .createQueryBuilder('f')
       .leftJoinAndSelect('f.compte', 'cpt')
-      .leftJoinAndSelect('f.ligneMetier', 'lm')
-      .leftJoinAndSelect('f.temps', 'tps')
       .where('f.fkVersion = :v', { v: query.versionId })
       .andWhere('f.fkScenario = :s', { s: query.scenarioId })
-      .andWhere('f.fkCentre = :c', { c: query.crId });
+      .andWhere('f.fkCentre = :c', { c: query.crId })
+      .andWhere('f.fkLigneMetier = :lm', { lm: query.ligneMetierId });
     if (idsMois.length > 0) {
       lignesQb.andWhere('f.fkTemps IN (:...mois)', { mois: idsMois });
     }
     const lignes = await lignesQb.getMany();
 
-    // 6. Indexer les lignes par (compteId, ligneMetierId, mois) pour
-    //    la matrice
+    // 6. Indexer par (compteId, mois) — ligne_metier fixée par contexte
     const cellulesIndex = new Map<string, FaitBudget>();
     for (const f of lignes) {
-      const key = `${f.fkCompte}_${f.fkLigneMetier}_${f.fkTemps}`;
+      const key = `${f.fkCompte}_${f.fkTemps}`;
       cellulesIndex.set(key, f);
     }
 
-    // 7. Construire la réponse matricielle. Pour chaque combinaison
-    //    (compte × ligneMetier) effectivement présente dans la
-    //    saisie, retourner les 12 mois. Si aucune saisie, retourner
-    //    juste la liste des comptes feuilles potentiels (UI vide).
-    type ComboKey = string;
-    const combosVus = new Set<ComboKey>();
-    for (const f of lignes) {
-      combosVus.add(`${f.fkCompte}_${f.fkLigneMetier}`);
-    }
-
+    // 7. From-scratch (Lot 3.4-bis) : 1 ligne grille PAR compte feuille
+    //    éligible, qu'il y ait ou non une saisie existante. Cellules
+    //    vides : montant=0, ligneId=null, modeSaisie=null.
     const lignesGrille: LigneGrilleDto[] = [];
-    for (const combo of combosVus) {
-      const [compteId, ligneMetierId] = combo.split('_');
-      const compte = lignes.find((l) => String(l.fkCompte) === compteId)
-        ?.compte;
-      const ligneMetier = lignes.find(
-        (l) => String(l.fkLigneMetier) === ligneMetierId,
-      )?.ligneMetier;
-      if (!compte || !ligneMetier) continue;
-
+    for (const compte of comptes) {
       const cellules: CelluleGrilleDto[] = mois.map((m) => {
-        const key = `${compteId}_${ligneMetierId}_${m.id}`;
+        const key = `${compte.id}_${m.id}`;
         const fait = cellulesIndex.get(key);
         return {
           mois: m.date,
@@ -245,11 +260,7 @@ export class BudgetSaisieService {
           sens: compte.sens,
           estPorteurInterets: compte.estPorteurInterets,
         },
-        ligneMetier: {
-          id: String(ligneMetier.id),
-          codeLigneMetier: ligneMetier.codeLigneMetier,
-          libelle: ligneMetier.libelle,
-        },
+        ligneMetier: ligneMetierRef,
         cellules,
         totalAnnee,
       });
@@ -301,6 +312,89 @@ export class BudgetSaisieService {
       lignes: lignesGrille,
       totauxMensuels,
       totalAnneeCr,
+    };
+  }
+
+  /**
+   * Résout les FK par défaut nécessaires à l'INSERT from-scratch
+   * d'une ligne fait_budget depuis la grille (Lot 3.4-bis) :
+   *
+   *  - `fk_devise` : XOF (devise pivot)
+   *  - `fk_structure` : structure du CR (`cr.fk_structure`)
+   *  - `fk_produit` : `PRODUIT_TRANSVERSE` si présent (sentinel Lot
+   *    2.5C), sinon le 1ᵉʳ produit racine courant
+   *  - `fk_segment` : 1ᵉʳ segment courant (convention MVP)
+   *
+   * Retourne un objet discriminé : `{ ok: true, … }` ou
+   * `{ ok: false, message, code }` à reporter dans le rapport
+   * d'erreurs sans interrompre la transaction.
+   */
+  private async resoudreFkDefaultsPourInsert(
+    manager: import('typeorm').EntityManager,
+    fkStructureCr: string,
+  ): Promise<
+    | {
+        ok: true;
+        fkDevise: string;
+        fkStructure: string;
+        fkProduit: string;
+        fkSegment: string;
+      }
+    | { ok: false; message: string; code: string }
+  > {
+    const xof = await manager.query<Array<{ id: string }>>(
+      `SELECT id FROM dim_devise WHERE code_iso='XOF' LIMIT 1`,
+    );
+    if (xof.length === 0) {
+      return {
+        ok: false,
+        message: 'Devise pivot XOF introuvable dans dim_devise.',
+        code: 'DEVISE_PIVOT_ABSENTE',
+      };
+    }
+
+    const produitTransverse = await manager.query<Array<{ id: string }>>(
+      `SELECT id FROM dim_produit
+        WHERE code_produit = 'PRODUIT_TRANSVERSE' AND version_courante = true
+        LIMIT 1`,
+    );
+    const produitFallback = await manager.query<Array<{ id: string }>>(
+      `SELECT id FROM dim_produit
+        WHERE version_courante = true AND est_actif = true
+        ORDER BY niveau ASC, code_produit ASC LIMIT 1`,
+    );
+    const fkProduit =
+      produitTransverse[0]?.id ?? produitFallback[0]?.id ?? null;
+    if (!fkProduit) {
+      return {
+        ok: false,
+        message:
+          "Aucun produit par défaut disponible (ni PRODUIT_TRANSVERSE, " +
+          'ni produit courant). Seed dim_produit nécessaire.',
+        code: 'PRODUIT_DEFAUT_ABSENT',
+      };
+    }
+
+    const segmentDefaut = await manager.query<Array<{ id: string }>>(
+      `SELECT id FROM dim_segment
+        WHERE version_courante = true AND est_actif = true
+        ORDER BY code_segment ASC LIMIT 1`,
+    );
+    if (segmentDefaut.length === 0) {
+      return {
+        ok: false,
+        message:
+          'Aucun segment courant disponible. Seed dim_segment nécessaire.',
+        code: 'SEGMENT_DEFAUT_ABSENT',
+      };
+    }
+
+    return {
+      ok: true,
+      fkDevise: String(xof[0]!.id),
+      fkStructure: String(fkStructureCr),
+      fkProduit: String(fkProduit),
+      fkSegment: String(segmentDefaut[0]!.id),
     };
   }
 
@@ -520,34 +614,55 @@ export class BudgetSaisieService {
             await faitRepoTx.save(existant);
             modifiees++;
           } else {
-            // Trouver fkDevise XOF par défaut
-            const xof = await manager.query<Array<{ id: string }>>(
-              `SELECT id FROM dim_devise WHERE code_iso='XOF' LIMIT 1`,
+            // ─── INSERT from-scratch (Lot 3.4-bis) ─────────────────
+            // Résolution lazy des FK par défaut au 1er INSERT du
+            // payload pour éviter les requêtes inutiles si rien à
+            // créer. Cf. mandat 3.4-bis A.2 :
+            //  - fk_devise = XOF (pivot, taux=1)
+            //  - fk_structure = cr.fkStructure (depuis le CR)
+            //  - fk_produit = PRODUIT_TRANSVERSE (sentinel Lot 2.5C)
+            //                  fallback : 1ʳᵉ racine produite courante
+            //  - fk_segment = 1er segment courant (convention MVP)
+            const fkDefaults = await this.resoudreFkDefaultsPourInsert(
+              manager,
+              cr.fkStructure,
             );
-            if (xof.length === 0) {
+            if (!fkDefaults.ok) {
               erreurs.push({
                 ligneIndex: i,
                 mois: cell.mois,
-                message: 'Devise pivot XOF introuvable dans dim_devise.',
-                code: 'DEVISE_PIVOT_ABSENTE',
+                message: fkDefaults.message,
+                code: fkDefaults.code,
               });
               continue;
             }
-            // Trouver fkProduit + fkSegment + fkStructure « par défaut »
-            // depuis la 1re ligne existante du grain (compromis MVP).
-            // Si rien à reprendre, on considère que la grille ne peut
-            // créer une cellule que pour des grains déjà esquissés —
-            // pour MVP, exiger ces FK dans le DTO si nouvelle ligne.
-            erreurs.push({
-              ligneIndex: i,
-              mois: cell.mois,
-              message:
-                "Création d'une nouvelle cellule (compte × ligne_metier) " +
-                'inexistante non supportée par /grille au MVP. Utiliser ' +
-                'POST /fait-budget pour la première ligne, /grille ensuite.',
-              code: 'CELLULE_NEUVE_NON_SUPPORTEE',
-            });
-            continue;
+
+            await faitRepoTx.save(
+              faitRepoTx.create({
+                fkVersion: dto.versionId,
+                fkScenario: dto.scenarioId,
+                fkCentre: dto.crId,
+                fkCompte: ligne.compteId,
+                fkLigneMetier: ligne.ligneMetierId,
+                fkTemps: String(tps.id),
+                fkDevise: fkDefaults.fkDevise,
+                fkStructure: fkDefaults.fkStructure,
+                fkProduit: fkDefaults.fkProduit,
+                fkSegment: fkDefaults.fkSegment,
+                montantDevise,
+                montantFcfa: montantDevise, // XOF pivot
+                tauxChangeApplique: 1,
+                modeSaisie: mode,
+                encoursMoyen:
+                  mode === 'ENCOURS_TIE'
+                    ? (cell.encoursMoyen ?? null)
+                    : null,
+                tie: mode === 'ENCOURS_TIE' ? (cell.tie ?? null) : null,
+                commentaire: cell.commentaire ?? null,
+                utilisateurCreation: userEmail,
+              }),
+            );
+            inserees++;
           }
         }
       }

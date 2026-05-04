@@ -199,6 +199,18 @@ export class GetGrilleSaisieQueryDto {
   @Max(2050)
   exerciceFiscal!: number;
 
+  /**
+   * Lot 3.4-bis : obligatoire. La grille est désormais construite
+   * sur (CR × ligne_metier × classe), permettant la saisie
+   * from-scratch sans ligne fait_budget pré-existante.
+   */
+  @ApiProperty({ example: '5' })
+  @IsString()
+  @Matches(/^\d+$/, {
+    message: 'ligneMetierId obligatoire (Lot 3.4-bis)',
+  })
+  ligneMetierId!: string;
+
   @ApiPropertyOptional({ example: '6' })
   @IsOptional()
   @IsString()
