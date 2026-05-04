@@ -676,6 +676,91 @@ Encours actif / passif par bande de maturité — support du module ALM.
 
 ---
 
+## 4.6 Workflow de validation budgétaire (Lot 3.5)
+
+Le workflow de validation porte sur la **version entière** (toutes les
+lignes `fait_budget` rattachées à un même `fk_version` sont gérées en
+bloc). Il n'y a pas de validation ligne à ligne — au plus le rejet
+peut s'accompagner d'un commentaire pointant les lignes douteuses.
+
+### 4.6.1 Cycle des statuts
+
+```
+ouvert (Brouillon)
+   │ POST /referentiels/versions/:id/soumettre   (BUDGET.SOUMETTRE)
+   ▼
+soumis (Soumis)
+   ├──► POST /:id/valider   (BUDGET.VALIDER) ──► valide (Validé)
+   │                                              │ POST /:id/publier (BUDGET.PUBLIER)
+   │                                              ▼
+   │                                            gele (Publié, IMMUABLE)
+   └──► POST /:id/rejeter   (BUDGET.VALIDER) ──► ouvert (avec commentaire de rejet conservé)
+```
+
+`gele` est terminal : aucune transition n'en sort, aucune modification
+n'est autorisée — conservation BCEAO 10 ans.
+
+### 4.6.2 Vocabulaire UI ↔ DB
+
+| Statut DB | Libellé UI |
+|-----------|------------|
+| ouvert    | Brouillon  |
+| soumis    | Soumis     |
+| valide    | Validé     |
+| gele      | Publié     |
+
+`date_gel` / `utilisateur_gel` (Lot 2.4B) jouent le rôle de
+`date_publication` / `utilisateur_publication` (alias historique).
+
+### 4.6.3 Colonnes ajoutées sur `dim_version` (migration 1779200000040)
+
+| Colonne                    | Type            | NOT NULL | Description                                   |
+|----------------------------|-----------------|----------|-----------------------------------------------|
+| commentaire_soumission     | text            | NULL     | Note du préparateur au contrôleur             |
+| commentaire_validation     | text            | NULL     | Note du contrôleur lors de la validation      |
+| commentaire_rejet          | text            | NULL     | Motif du rejet (OBLIGATOIRE côté DTO)         |
+| commentaire_publication    | text            | NULL     | Note du directeur lors du gel                 |
+| date_soumission            | timestamp       | NULL     | Trace temporelle                              |
+| utilisateur_soumission     | varchar(255)    | NULL     | Email du préparateur                          |
+| date_validation            | timestamp       | NULL     | Trace temporelle                              |
+| utilisateur_validation     | varchar(255)    | NULL     | Email du contrôleur                           |
+| date_rejet                 | timestamp       | NULL     | Trace temporelle                              |
+| utilisateur_rejet          | varchar(255)    | NULL     | Email du contrôleur                           |
+
+Les colonnes existantes `date_gel` + `utilisateur_gel` sont
+réutilisées pour la publication (pas de duplication).
+
+### 4.6.4 Règles transactionnelles
+
+Toutes les transitions sont implémentées dans `VersionWorkflowService`
+sous `dataSource.transaction(...)`, avec écriture obligatoire d'une
+entrée `audit_log` (4 nouveaux `type_action` :
+`SOUMETTRE_BUDGET` / `VALIDER_BUDGET` / `REJETER_BUDGET` / `PUBLIER_BUDGET`).
+
+- **Soumettre** : refuse 409 si statut ≠ `ouvert`. Refuse 422 si la
+  version est vide (aucune ligne `fait_budget`). Réinitialise les
+  champs validation/rejet (cas re-soumission après rejet).
+- **Valider** : refuse 409 si statut ≠ `soumis`.
+- **Rejeter** : refuse 409 si statut ≠ `soumis`. Le commentaire est
+  obligatoire (DTO @IsNotEmpty → 400 sinon). Ramène statut à `ouvert`,
+  conserve commentaire_rejet/date_rejet/utilisateur_rejet, et
+  réinitialise les champs de soumission.
+- **Publier** : refuse 409 si statut ≠ `valide`. Action irréversible
+  (gel BCEAO 10 ans).
+
+### 4.6.5 Permissions
+
+| Permission        | Acteur typique | Routes                              |
+|-------------------|----------------|-------------------------------------|
+| BUDGET.SOUMETTRE  | Préparateur    | POST /:id/soumettre                 |
+| BUDGET.VALIDER    | Contrôleur     | POST /:id/valider, POST /:id/rejeter|
+| BUDGET.PUBLIER    | Directeur      | POST /:id/publier                   |
+
+Les permissions sont vérifiées par le `PermissionsGuard` global via
+`@RequirePermissions`.
+
+---
+
 ## 5. Tables de référentiel et de support
 
 ### 5.1 ref_taux_change
