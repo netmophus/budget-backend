@@ -761,6 +761,78 @@ Les permissions sont vérifiées par le `PermissionsGuard` global via
 
 ---
 
+## 4.7 Indicateurs avancés consolidés (Lot 3.6)
+
+Le module budgétaire expose **3 indicateurs métier UEMOA** calculés
+via la vue matérialisée `mv_indicateurs_budget` (rafraîchie à la
+demande, cf. §4.7.3).
+
+### 4.7.1 Définition des indicateurs
+
+- **PNB** (Produit Net Bancaire) =
+  Σ classe 7 − Σ comptes 67xxxx
+  Représente la marge brute d'exploitation bancaire.
+
+- **MNI** (Marge Nette d'Intérêt) =
+  Σ comptes 76xxxx − Σ comptes 67xxxx
+  Mesure la rentabilité de l'activité d'intermédiation.
+
+- **Coefficient d'exploitation** =
+  charges_hors_intérêts (classe 6 hors 67xxxx) / PNB × 100
+  Indicateur clé de productivité bancaire. Cible BCEAO < 60 %.
+  Convention service : si PNB ≤ 0 → coef = `null` (calcul impossible).
+
+### 4.7.2 Vue matérialisée `mv_indicateurs_budget`
+
+Pré-agrège par (`fk_version` × `fk_scenario` × `fk_centre` × `exercice`)
+les sommes utiles. 14 colonnes dont 3 indicateurs dérivés (`pnb`,
+`mni`, `charges_hors_interets`) calculés en SQL et 4 totaux bruts
+(`total_classe_6`, `total_classe_7`, `total_67_charges_interets`,
+`total_76_produits_interets`).
+
+Index :
+- `idx_mv_indicateurs_unique` UNIQUE sur
+  (`fk_version`, `fk_scenario`, `fk_centre`, `exercice`) — **prérequis
+  obligatoire** pour `REFRESH MATERIALIZED VIEW CONCURRENTLY`.
+- `idx_mv_indicateurs_version` sur `fk_version` (filtre principal).
+
+### 4.7.3 Stratégie de rafraîchissement (Q15)
+
+`REFRESH MATERIALIZED VIEW CONCURRENTLY mv_indicateurs_budget`
+déclenchable par tout user `BUDGET.LIRE` via
+`POST /budget/indicateurs/refresh`. Le mode CONCURRENTLY ne bloque
+pas les SELECT pendant le refresh (coût supplémentaire mais
+acceptable au MVP). Premier refresh post-création : la vue est
+vide, CONCURRENTLY refuse → fallback bloquant transparent.
+
+L'action est consignée dans `audit_log` (`type_action` =
+`RECALCUL_INDICATEURS`) avec `dureeMs` + `nbLignes`.
+
+### 4.7.4 Drill-down et comparaison (Q16, Q17)
+
+| Endpoint | Réponse | Usage |
+|----------|---------|-------|
+| `GET /globaux` | `IndicateursGlobauxDto` | Vue d'ensemble (3 KPI) |
+| `GET /par-cr` | `IndicateursParCrDto[]` | Drill-down par CR (Q16) |
+| `GET /comparaison` | `IndicateursComparaisonDto` | Pivot par scénario (Q17) |
+| `POST /refresh` | `RefreshIndicateursResponseDto` | Rafraîchir la vue |
+
+Pas de drill-down par classe ni par mois au MVP. Pas de comparaison
+vs version précédente (réservé Lot 5 avec réalisé).
+
+### 4.7.5 Filtrage périmètre Q5
+
+Tous les endpoints appliquent `PerimetreService.getCrAutorisesPourUser` :
+- `null` retourné → admin global, pas de filtre.
+- `string[]` retourné → restriction `mv.fk_centre IN (…)`.
+- `[]` retourné → aucun CR accessible, réponse à zéro.
+
+Conséquence : un préparateur restreint à `BR_CIV` voit ses
+indicateurs avec uniquement les `fait_budget` rattachés à ce CR
+(même au niveau des KPI globaux).
+
+---
+
 ## 5. Tables de référentiel et de support
 
 ### 5.1 ref_taux_change

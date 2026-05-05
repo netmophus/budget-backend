@@ -434,7 +434,7 @@ des versions et scénarios — pour produire un budget initial validé.
 | 3.3 | Saisie budgétaire backend — PerimetreService Q5 + endpoints `/budget/grille` + filtrage transversal sur tous les endpoints `fait_budget` | ✅ Livré — 03/05/2026 |
 | 3.4 | UI grille de saisie — custom HTML, mode dual MONTANT/ENCOURS_TIE par ligne, totaux à la volée Q6, indicateurs partiels (PNB/MNI/Coef sur classe affichée), Zustand store pour contexte persistant | ✅ Livré — 04/05/2026 |
 | 3.5 | Workflow validation (Soumettre / Valider / Rejeter / Publier) — 4 statuts, 4 routes, audit dédié, UI WorkflowActions + Timeline + page « À valider » | ✅ Livré — 02/05/2026 |
-| 3.6 | Indicateurs avancés + calculs hybrides (Q6) | À venir |
+| 3.6 | Indicateurs avancés consolidés (PNB / MNI / Coef expl.) — vue matérialisée `mv_indicateurs_budget` (Q15), drill-down par CR (Q16), comparaison scénarios côte à côte (Q17), refresh manuel auditté | ✅ Livré — 05/05/2026 |
 | 3.7 | Import / export Excel-CSV | À venir |
 
 ### Périmètre
