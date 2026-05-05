@@ -147,6 +147,7 @@ async function createDataSource(): Promise<DataSource> {
       fk_scenario bigint NOT NULL,
       montant_devise numeric(20,2) NOT NULL,
       montant_fcfa numeric(20,2) NOT NULL,
+      taux_change_applique numeric(8,5) NOT NULL,
       mode_saisie varchar(20) NOT NULL DEFAULT 'MONTANT',
       encours_moyen numeric(20,2) NULL,
       tie numeric(8,5) NULL,
@@ -324,7 +325,7 @@ describe('BudgetImportService', () => {
     perimetre.setReturnValue(null); // admin par défaut
   });
 
-  it('import 5 lignes valides → 5 inserees, 0 rejetees, audit OK', async () => {
+  it('import 5 lignes valides → 5 inserees, 0 rejetees, audit OK, tauxChangeApplique=1', async () => {
     const file = csv([
       HEADER,
       'BR_CIV,611100,RETAIL_PARTICULIERS,2027-01,MONTANT,1000,,,Loyer Q1',
@@ -350,6 +351,17 @@ describe('BudgetImportService', () => {
     )) as Array<{ type_action: string; statut: string }>;
     expect(audit).toHaveLength(1);
     expect(audit[0]!.statut).toBe('success');
+
+    // Mini-fix Lot 3.7 : taux_change_applique=1 (devise pivot XOF).
+    // Sans cette valeur, l'INSERT en prod plantait sur la contrainte
+    // NOT NULL — bug remonté au smoke test BSIC Niger.
+    const taux = (await dataSource.query(
+      `SELECT taux_change_applique FROM fait_budget`,
+    )) as Array<{ taux_change_applique: string }>;
+    expect(taux).toHaveLength(5);
+    for (const t of taux) {
+      expect(Number(t.taux_change_applique)).toBe(1);
+    }
   });
 
   it('import 8 lignes mélangées (5 OK + 3 KO) → rapport détaillé', async () => {

@@ -705,17 +705,20 @@ export class BudgetImportService {
       );
 
       if (existing.length === 0) {
-        // INSERT — on cale montant_fcfa = montant_devise (devise = XOF
-        // pivot, taux change implicite = 1.0 pour le MVP).
+        // INSERT — on cale montant_fcfa = montant_devise et
+        // taux_change_applique = 1 (devise pivot XOF — saisie en
+        // FCFA, pas de conversion). Cohérent avec
+        // BudgetSaisieService.saveGrilleSaisie (Lot 3.4).
         await manager.query(
           `INSERT INTO fait_budget (
              fk_temps, fk_compte, fk_structure, fk_centre, fk_ligne_metier,
              fk_produit, fk_segment, fk_devise, fk_version, fk_scenario,
-             montant_devise, montant_fcfa, mode_saisie, encours_moyen, tie,
+             montant_devise, montant_fcfa, taux_change_applique,
+             mode_saisie, encours_moyen, tie,
              commentaire, utilisateur_creation
            ) VALUES (
              $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,
-             $11,$11,$12,$13,$14,$15,$16
+             $11,$11,1,$12,$13,$14,$15,$16
            )`,
           [
             op.fkTemps,
