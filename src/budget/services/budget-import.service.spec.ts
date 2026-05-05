@@ -622,4 +622,100 @@ describe('BudgetImportService', () => {
     )) as Array<{ n: number }>;
     expect(cnt[0]!.n).toBe(0);
   });
+
+  // Mini-fix critique Lot 3.7 — non-régression : imports successifs sur
+  // 3 scénarios DIFFÉRENTS de la MÊME version doivent produire 3 jeux
+  // de lignes indépendants (pas d'écrasement silencieux). Le grain
+  // métier inclut fk_scenario (cf. uq_fait_budget_grain).
+  it('imports multi-scénarios : chaque scénario garde ses propres lignes', async () => {
+    // 2 scénarios supplémentaires (OPTIMISTE et PESSIMISTE) pour la
+    // version BI_2027.
+    await dataSource.query(
+      `INSERT INTO dim_scenario (code_scenario)
+       VALUES ('OPTIMISTE_2027'), ('PESSIMISTE_2027')`,
+    );
+    const scOpt = String(
+      ((await dataSource.query(
+        `SELECT id FROM dim_scenario WHERE code_scenario='OPTIMISTE_2027'`,
+      )) as Array<{ id: string }>)[0]!.id,
+    );
+    const scPess = String(
+      ((await dataSource.query(
+        `SELECT id FROM dim_scenario WHERE code_scenario='PESSIMISTE_2027'`,
+      )) as Array<{ id: string }>)[0]!.id,
+    );
+
+    // Mêmes (CR × compte × ligne_metier × mois) — seul le scénario
+    // change → on doit obtenir 3 lignes distinctes après les 3 imports.
+    const lignes = [
+      'BR_CIV,611100,RETAIL_PARTICULIERS,2027-01,MONTANT,1000,,,',
+      'BR_CIV,611100,RETAIL_PARTICULIERS,2027-02,MONTANT,1100,,,',
+      'BR_CIV,760000,RETAIL_PARTICULIERS,2027-01,MONTANT,5000,,,',
+    ];
+    const fileMedian = csv([HEADER, ...lignes]);
+    // Montants différents pour bien distinguer les scénarios.
+    const fileOpt = csv([
+      HEADER,
+      'BR_CIV,611100,RETAIL_PARTICULIERS,2027-01,MONTANT,2000,,,',
+      'BR_CIV,611100,RETAIL_PARTICULIERS,2027-02,MONTANT,2200,,,',
+      'BR_CIV,760000,RETAIL_PARTICULIERS,2027-01,MONTANT,8000,,,',
+    ]);
+    const filePess = csv([
+      HEADER,
+      'BR_CIV,611100,RETAIL_PARTICULIERS,2027-01,MONTANT,500,,,',
+      'BR_CIV,611100,RETAIL_PARTICULIERS,2027-02,MONTANT,550,,,',
+      'BR_CIV,760000,RETAIL_PARTICULIERS,2027-01,MONTANT,3000,,,',
+    ]);
+
+    const r1 = await service.importFichier(
+      fileMedian,
+      ids.versionId,
+      ids.scenarioId, // MEDIAN
+      adminUser,
+    );
+    const r2 = await service.importFichier(
+      fileOpt,
+      ids.versionId,
+      scOpt,
+      adminUser,
+    );
+    const r3 = await service.importFichier(
+      filePess,
+      ids.versionId,
+      scPess,
+      adminUser,
+    );
+
+    // Chaque import insère ses 3 lignes — pas d'écrasement.
+    expect(r1.lignesInserees).toBe(3);
+    expect(r1.lignesModifiees).toBe(0);
+    expect(r2.lignesInserees).toBe(3);
+    expect(r2.lignesModifiees).toBe(0);
+    expect(r3.lignesInserees).toBe(3);
+    expect(r3.lignesModifiees).toBe(0);
+
+    // Total = 9 lignes, 3 par scénario.
+    const total = (await dataSource.query(
+      `SELECT COUNT(*)::int AS n FROM fait_budget`,
+    )) as Array<{ n: number }>;
+    expect(total[0]!.n).toBe(9);
+
+    const parScenario = (await dataSource.query(
+      `SELECT fk_scenario, COUNT(*)::int AS n,
+              SUM(montant_devise)::int AS total
+         FROM fait_budget
+        WHERE fk_version = $1
+        GROUP BY fk_scenario`,
+      [ids.versionId],
+    )) as Array<{ fk_scenario: string; n: number; total: number }>;
+    expect(parScenario).toHaveLength(3);
+
+    const byId = new Map(parScenario.map((r) => [String(r.fk_scenario), r]));
+    expect(byId.get(ids.scenarioId)!.n).toBe(3);
+    expect(byId.get(ids.scenarioId)!.total).toBe(7100); // 1000+1100+5000
+    expect(byId.get(scOpt)!.n).toBe(3);
+    expect(byId.get(scOpt)!.total).toBe(12200); // 2000+2200+8000
+    expect(byId.get(scPess)!.n).toBe(3);
+    expect(byId.get(scPess)!.total).toBe(4050); // 500+550+3000
+  });
 });
