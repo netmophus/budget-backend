@@ -29,7 +29,9 @@ export type TypeAction =
   | 'SOUMETTRE_BUDGET'
   | 'VALIDER_BUDGET'
   | 'REJETER_BUDGET'
-  | 'PUBLIER_BUDGET';
+  | 'PUBLIER_BUDGET'
+  // Lot 3.6 — refresh manuel de mv_indicateurs_budget
+  | 'RECALCUL_INDICATEURS';
 
 export type AuditStatut = 'success' | 'failure';
 
