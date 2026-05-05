@@ -35,6 +35,31 @@ export class ListComptesQueryDto {
   @IsIn(CLASSES_PCB)
   classe?: string;
 
+  /**
+   * Liste de classes (CSV ou répétition `?classes=6&classes=7`).
+   * Mutuellement exclusif avec `classe` (qui prime si fourni).
+   * Utilisé par le sélecteur compte de la saisie budgétaire pour
+   * ne ramener que classes 6 et 7.
+   */
+  @ApiPropertyOptional({
+    example: '6,7',
+    description: 'Liste de classes (CSV `6,7` ou répété `classes=6&classes=7`).',
+  })
+  @IsOptional()
+  @Transform(({ value }) => {
+    if (Array.isArray(value)) return value.map((v) => String(v).trim()).filter((s) => s.length > 0);
+    if (typeof value === 'string') {
+      return value
+        .split(',')
+        .map((s) => s.trim())
+        .filter((s) => s.length > 0);
+    }
+    return value;
+  })
+  @IsString({ each: true })
+  @IsIn(CLASSES_PCB, { each: true })
+  classes?: string[];
+
   @ApiPropertyOptional({ description: 'Filtre LIKE %libelle% case-insensitive.' })
   @IsOptional()
   @IsString()

@@ -100,6 +100,10 @@ export class CompteService extends Scd2Service<DimCompte> {
     }
     if (query.classe !== undefined) {
       qb.andWhere('c.classe = :classe', { classe: query.classe });
+    } else if (query.classes && query.classes.length > 0) {
+      // `classes` (pluriel) : liste de classes — utilisé par le
+      // sélecteur compte de la saisie budgétaire (charges + produits).
+      qb.andWhere('c.classe IN (:...classes)', { classes: query.classes });
     }
     if (query.codePosteBudgetaire) {
       qb.andWhere('c.codePosteBudgetaire = :cpb', {

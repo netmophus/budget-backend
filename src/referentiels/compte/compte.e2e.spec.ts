@@ -151,6 +151,11 @@ async function seedAll(ds: DataSource): Promise<SeedIds> {
   await ins('611', 'Rémunérations', 6, 3, '61', 'D');
   await ins('611100', 'Salaires bruts', 6, 4, '611', 'D');
   await ins('611200', 'Primes et bonus', 6, 4, '611', 'D');
+  // Comptes classe 7 pour valider le filtre `classes=6,7` (Lot 3 UX A.1).
+  await ins('7', 'PRODUITS', 7, 1, null, 'C');
+  await ins('70', 'Produits d\'exploitation', 7, 2, '7', 'C');
+  await ins('701', 'Intérêts perçus', 7, 3, '70', 'C');
+  await ins('701100', 'Intérêts sur prêts', 7, 4, '701', 'C');
 
   return {
     adminId: userIdByEmail.get('admin@miznas.local')!,
@@ -305,6 +310,11 @@ describe('Compte (e2e) — 3ᵉ dimension SCD2 + relink auto-référence straté
     await ins('611', 'Rémunérations', 6, 3, '61', 'D');
     await ins('611100', 'Salaires bruts', 6, 4, '611', 'D');
     await ins('611200', 'Primes et bonus', 6, 4, '611', 'D');
+    // Classe 7 — pour valider le filtre `classes=6,7` (UX A.1).
+    await ins('7', 'PRODUITS', 7, 1, null, 'C');
+    await ins('70', 'Produits d\'exploitation', 7, 2, '7', 'C');
+    await ins('701', 'Intérêts perçus', 7, 3, '70', 'C');
+    await ins('701100', 'Intérêts sur prêts', 7, 4, '701', 'C');
 
     ids.id6 = localIds.get('6')!;
     ids.id60 = localIds.get('60')!;
@@ -328,6 +338,37 @@ describe('Compte (e2e) — 3ᵉ dimension SCD2 + relink auto-référence straté
       .set('Authorization', `Bearer ${lecteurToken}`)
       .expect(200);
     expect(res.body.total).toBeGreaterThanOrEqual(6);
+  });
+
+  // UX A.1 — filtre `classes=6,7` pour le sélecteur de saisie budget.
+  it('GET /comptes?classes=6&classes=7 → uniquement classes 6 et 7 (charges + produits)', async () => {
+    const res = await request(app.getHttpServer())
+      .get('/api/v1/referentiels/comptes')
+      // `?classes=6&classes=7` (forme répétée — express en fait un array).
+      .query({ classes: ['6', '7'], limit: 200 })
+      .set('Authorization', `Bearer ${lecteurToken}`)
+      .expect(200);
+    type Item = { codeCompte: string; classe: string };
+    const items = res.body.items as Item[];
+    expect(items.length).toBeGreaterThan(0);
+    for (const c of items) {
+      expect(['6', '7']).toContain(c.classe);
+    }
+    const codes = items.map((c) => c.codeCompte);
+    // On retrouve bien les feuilles classe 6 et 7 du seed.
+    expect(codes).toContain('611100');
+    expect(codes).toContain('701100');
+  });
+
+  it('GET /comptes?classes=6 (singleton liste) → uniquement classe 6', async () => {
+    const res = await request(app.getHttpServer())
+      .get('/api/v1/referentiels/comptes')
+      .query({ classes: '6', limit: 200 })
+      .set('Authorization', `Bearer ${lecteurToken}`)
+      .expect(200);
+    const items = res.body.items as Array<{ classe: string }>;
+    expect(items.length).toBeGreaterThan(0);
+    for (const c of items) expect(c.classe).toBe('6');
   });
 
   it('POST /comptes with LECTEUR → 403', async () => {
