@@ -31,7 +31,9 @@ export type TypeAction =
   | 'REJETER_BUDGET'
   | 'PUBLIER_BUDGET'
   // Lot 3.6 — refresh manuel de mv_indicateurs_budget
-  | 'RECALCUL_INDICATEURS';
+  | 'RECALCUL_INDICATEURS'
+  // Lot 3.7 — import en masse depuis fichier CSV/XLSX
+  | 'IMPORT_BUDGET_BULK';
 
 export type AuditStatut = 'success' | 'failure';
 
