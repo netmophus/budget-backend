@@ -833,6 +833,68 @@ indicateurs avec uniquement les `fait_budget` rattachés à ce CR
 
 ---
 
+## 4.8 Import Excel/CSV de saisie budgétaire (Lot 3.7)
+
+Permet l'import en masse de saisie budgétaire depuis un fichier
+**CSV (UTF-8)** ou **XLSX**. Cible : les contrôleurs de gestion qui
+travaillent avec des templates Excel et veulent éviter la double
+saisie ligne par ligne.
+
+### 4.8.1 Format du fichier (9 colonnes obligatoires, ordre figé)
+
+| Colonne | Type | Description |
+|---------|------|-------------|
+| `code_cr` | string | Code business du CR (ex. `BR_CIV`) |
+| `code_compte` | string | Code compte feuille (ex. `611100`) |
+| `code_ligne_metier` | string | Code ligne métier (ex. `RETAIL_PARTICULIERS`) |
+| `mois` | date | `YYYY-MM` ou `YYYY-MM-DD` (ramené au 1er du mois) |
+| `mode_saisie` | enum | `MONTANT` ou `ENCOURS_TIE` |
+| `montant` | decimal | Saisie directe (mode MONTANT) |
+| `encours_moyen` | decimal | Encours mensuel moyen (mode ENCOURS_TIE) |
+| `tie` | decimal 0–1 | Taux d'intérêt effectif (mode ENCOURS_TIE) |
+| `commentaire` | string | Optionnel, max 2000 chars (tronqué sinon) |
+
+CSV : séparateur auto-détecté (`,` `;` `\t`), BOM consommé.
+XLSX : 1ʳᵉ feuille uniquement, dates Excel converties en ISO.
+
+### 4.8.2 Algorithme d'import
+
+1. Validation contexte : version statut=`ouvert`, permission
+   `BUDGET.SAISIR`, taille fichier ≤ 10 Mo.
+2. Parsing → liste de rows brutes.
+3. Pour chaque ligne : validation Zod, résolution FK par codes
+   business, vérification périmètre Q5, vérification compte feuille,
+   cohérence mode_saisie + recalcul `montant = encours × tie / 12`
+   (warning `MONTANT_RECALCULE` si différent du fourni).
+4. Si `lignesRejetees / lignesTotal > 10 %` → **ROLLBACK global**
+   (`transactionRollback=true`), AUCUNE écriture DB.
+5. Sinon, transaction unique : `INSERT` ou `UPDATE` selon présence
+   au grain `uq_fait_budget_grain` (10 FK). Lignes identiques à
+   l'existant comptées en `lignesIgnorees` (pas de bruit historique).
+6. Audit `IMPORT_BUDGET_BULK` (succès **ou** rollback) avec
+   `payloadApres = { lignesTotal, lignesInserees, lignesModifiees,
+   lignesIgnorees, lignesRejetees, transactionRollback }` +
+   `dureeMs`.
+
+### 4.8.3 Codes d'erreur retournés
+
+`VALIDATION_FORMAT`, `CR_INTROUVABLE`, `CR_PERIMETRE_REFUSE`,
+`COMPTE_INTROUVABLE`, `COMPTE_AGREGE`, `LIGNE_METIER_INTROUVABLE`,
+`TEMPS_INTROUVABLE`, `TEMPS_PAS_PREMIER_DU_MOIS`,
+`MODE_SAISIE_INVALIDE`, `ENCOURS_TIE_CHAMPS_MANQUANTS`,
+`TIE_HORS_BORNES`, `AUTRE`.
+
+Chaque erreur est rapportée avec son `ligneNumero` (1=header) pour
+permettre la correction côté UI.
+
+### 4.8.4 Endpoint
+
+`POST /api/v1/budget/import` — multipart/form-data avec champs
+`file`, `versionId`, `scenarioId`. Permission `BUDGET.SAISIR`.
+Retourne `ImportBudgetRapportDto` détaillé.
+
+---
+
 ## 5. Tables de référentiel et de support
 
 ### 5.1 ref_taux_change

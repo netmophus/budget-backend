@@ -435,7 +435,12 @@ des versions et scénarios — pour produire un budget initial validé.
 | 3.4 | UI grille de saisie — custom HTML, mode dual MONTANT/ENCOURS_TIE par ligne, totaux à la volée Q6, indicateurs partiels (PNB/MNI/Coef sur classe affichée), Zustand store pour contexte persistant | ✅ Livré — 04/05/2026 |
 | 3.5 | Workflow validation (Soumettre / Valider / Rejeter / Publier) — 4 statuts, 4 routes, audit dédié, UI WorkflowActions + Timeline + page « À valider » | ✅ Livré — 02/05/2026 |
 | 3.6 | Indicateurs avancés consolidés (PNB / MNI / Coef expl.) — vue matérialisée `mv_indicateurs_budget` (Q15), drill-down par CR (Q16), comparaison scénarios côte à côte (Q17), refresh manuel auditté | ✅ Livré — 05/05/2026 |
-| 3.7 | Import / export Excel-CSV | À venir |
+| 3.7 | Import Excel/CSV de saisie en masse — endpoint `POST /budget/import` multipart avec parser CSV+XLSX (exceljs), validation ligne par ligne, filtrage périmètre Q5, rollback global > 10 % d'erreurs, audit `IMPORT_BUDGET_BULK`, UI `ImportBudgetDialog` drag&drop + rapport détaillé + bouton « Télécharger template » | ✅ Livré — 05/05/2026 |
+
+> **Lot 3 INTÉGRALEMENT LIVRÉ** (3.1 → 3.7) : élaboration budgétaire
+> complète — modèle de données, CRUD versions/scénarios, saisie
+> grille UI, workflow validation 4 statuts, indicateurs consolidés,
+> import en masse. Prêt pour test global de A à Z.
 
 ### Périmètre
 
