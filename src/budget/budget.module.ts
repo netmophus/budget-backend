@@ -11,7 +11,9 @@ import { DimVersion } from '../referentiels/version/entities/dim-version.entity'
 import { FaitBudget } from '../faits/budget/entities/fait-budget.entity';
 import { UserRole } from '../users/entities/user-role.entity';
 import { BudgetGrilleController } from './controllers/budget-grille.controller';
+import { BudgetImportController } from './controllers/budget-import.controller';
 import { IndicateursController } from './controllers/indicateurs.controller';
+import { BudgetImportService } from './services/budget-import.service';
 import { BudgetSaisieService } from './services/budget-saisie.service';
 import { IndicateursService } from './services/indicateurs.service';
 import { PerimetreService } from './services/perimetre.service';
@@ -42,8 +44,22 @@ import { PerimetreService } from './services/perimetre.service';
     AuditModule,
     AuthModule,
   ],
-  controllers: [BudgetGrilleController, IndicateursController],
-  providers: [PerimetreService, BudgetSaisieService, IndicateursService],
-  exports: [PerimetreService, BudgetSaisieService, IndicateursService],
+  controllers: [
+    BudgetGrilleController,
+    IndicateursController,
+    BudgetImportController,
+  ],
+  providers: [
+    PerimetreService,
+    BudgetSaisieService,
+    IndicateursService,
+    BudgetImportService,
+  ],
+  exports: [
+    PerimetreService,
+    BudgetSaisieService,
+    IndicateursService,
+    BudgetImportService,
+  ],
 })
 export class BudgetModule {}
