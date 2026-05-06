@@ -16,10 +16,7 @@
  *   └── BR_SEN
  *       └── AG_DKR_PLATEAU          (CR_AG_DKR_PLATEAU)
  */
-import {
-  NotImplementedException,
-  UnauthorizedException,
-} from '@nestjs/common';
+import { UnauthorizedException } from '@nestjs/common';
 import { DataType, IMemoryDb, newDb } from 'pg-mem';
 import { DataSource } from 'typeorm';
 
@@ -29,6 +26,7 @@ import { Role } from '../../roles/entities/role.entity';
 import { DimCentreResponsabilite } from '../../referentiels/centre-responsabilite/entities/dim-centre-responsabilite.entity';
 import { DimStructure } from '../../referentiels/structure/entities/dim-structure.entity';
 import { User } from '../../users/entities/user.entity';
+import { UserPerimetre } from '../../users/entities/user-perimetre.entity';
 import { UserRole } from '../../users/entities/user-role.entity';
 import { PerimetreService } from './perimetre.service';
 
@@ -57,6 +55,7 @@ async function createDataSource(): Promise<DataSource> {
       User,
       Role,
       UserRole,
+      UserPerimetre,
       Permission,
       RolePermission,
       DimStructure,
@@ -223,7 +222,10 @@ describe('PerimetreService', () => {
 
   beforeAll(async () => {
     ds = await createDataSource();
-    service = new PerimetreService(ds.getRepository(UserRole));
+    service = new PerimetreService(
+      ds.getRepository(UserRole),
+      ds.getRepository(UserPerimetre),
+    );
     seed = await seedSocBank(ds);
   });
 
@@ -402,36 +404,11 @@ describe('PerimetreService', () => {
     ).rejects.toThrow(UnauthorizedException);
   });
 
-  it("perimetre_type non implémenté → NotImplementedException", async () => {
-    // Le CHECK constraint sur bridge_user_role.perimetre_type empêche
-    // l'INSERT direct d'une valeur hors enum. On simule donc le cas
-    // d'un perimetre_type inconnu (qui pourrait apparaître si l'enum DB
-    // est élargi sans mise à jour du service) via un mock du repository.
-    const fakeRole = {
-      id: '999',
-      fkUser: '1',
-      fkRole: '1',
-      perimetreType: 'agent_direct',
-      perimetreId: '1',
-      estActif: true,
-    } as UserRole;
-    const mockedRepo = {
-      manager: ds.manager,
-      createQueryBuilder: () => ({
-        where: () => ({
-          andWhere: () => ({
-            andWhere: () => ({
-              andWhere: () => ({ getMany: async () => [fakeRole] }),
-            }),
-          }),
-        }),
-      }),
-    } as unknown as import('typeorm').Repository<UserRole>;
-    const isolatedService = new PerimetreService(mockedRepo);
-    await expect(
-      isolatedService.getCrAutorisesPourUser('1'),
-    ).rejects.toThrow(NotImplementedException);
-  });
+  // Lot 4.1 — la branche `NotImplementedException` historique (cas
+  // d'un perimetre_type inconnu côté bridge_user_role) a disparu : le
+  // service délègue désormais à user_perimetres pour les rôles non
+  // globaux. La validation des cible_type est garantie par le CHECK
+  // SQL `ck_user_perimetres_cible_type` côté table.
 
   // ─── getStructuresAutoriseesPourUser
 
@@ -450,5 +427,176 @@ describe('PerimetreService', () => {
     // BR_CIV + DIR_CIV_RETAIL + DEPT_CIV_PARTICULIERS + AG_ABJ_PLATEAU
     // + AG_ABJ_COCODY + DIR_CIV_CORPORATE + BR_CIV_FONCTIONS = 7
     expect(result).toHaveLength(7);
+  });
+});
+
+// ─── Lot 4.1 : getPerimetreEffectif (multi-périmètres user_perimetres) ─
+
+describe('PerimetreService.getPerimetreEffectif (Lot 4.1)', () => {
+  let ds: DataSource;
+  let service: PerimetreService;
+  let seed: SeedIds;
+
+  beforeAll(async () => {
+    ds = await createDataSource();
+    service = new PerimetreService(
+      ds.getRepository(UserRole),
+      ds.getRepository(UserPerimetre),
+    );
+    seed = await seedSocBank(ds);
+  });
+
+  afterAll(async () => {
+    await ds.destroy();
+  });
+
+  beforeEach(async () => {
+    await ds.query('DELETE FROM bridge_user_role');
+    await ds.query('DELETE FROM user_perimetres');
+  });
+
+  async function ajouterPerimetre(
+    userId: string,
+    cibleType: 'STRUCTURE' | 'CR' | 'CR_SET',
+    options: {
+      cibleId?: string | null;
+      cibleCrIds?: string[] | null;
+      origine?: 'PRINCIPAL' | 'AFFECTATION' | 'DELEGATION';
+      dateDebut?: string;
+      dateFin?: string | null;
+      actif?: boolean;
+    },
+  ): Promise<void> {
+    await ds.query(
+      `INSERT INTO user_perimetres
+         ("fk_user","cible_type","cible_id","cible_cr_ids","origine",
+          "date_debut","date_fin","actif","utilisateur_creation")
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'system')`,
+      [
+        userId,
+        cibleType,
+        options.cibleId ?? null,
+        options.cibleCrIds ?? null,
+        options.origine ?? 'AFFECTATION',
+        options.dateDebut ?? '2026-01-01',
+        options.dateFin ?? null,
+        options.actif ?? true,
+      ],
+    );
+  }
+
+  it('STRUCTURE : descend l\'arbre', async () => {
+    const userId = seed.userIds['preparateur_civ@miznas.local']!;
+    await ajouterPerimetre(userId, 'STRUCTURE', {
+      cibleId: seed.structureIds['BR_CIV']!,
+    });
+    const result = await service.getPerimetreEffectif(userId);
+    // 6 CR sous BR_CIV
+    expect(result).toHaveLength(6);
+  });
+
+  it("CR : ajoute uniquement le CR ciblé (pas de descente)", async () => {
+    const userId = seed.userIds['preparateur_civ@miznas.local']!;
+    await ajouterPerimetre(userId, 'CR', {
+      cibleId: seed.crIds['CR_AG_ABJ_PLATEAU']!,
+    });
+    const result = await service.getPerimetreEffectif(userId);
+    expect(result).toEqual([seed.crIds['CR_AG_ABJ_PLATEAU']!]);
+  });
+
+  it('CR_SET : retourne les CR de la liste, pas de descente', async () => {
+    const userId = seed.userIds['preparateur_civ@miznas.local']!;
+    await ajouterPerimetre(userId, 'CR_SET', {
+      cibleCrIds: [
+        seed.crIds['CR_AG_ABJ_PLATEAU']!,
+        seed.crIds['CR_AG_ABJ_COCODY']!,
+      ],
+    });
+    const result = await service.getPerimetreEffectif(userId);
+    expect(result.sort()).toEqual(
+      [
+        seed.crIds['CR_AG_ABJ_PLATEAU']!,
+        seed.crIds['CR_AG_ABJ_COCODY']!,
+      ].sort(),
+    );
+  });
+
+  it('union : multi-affectations → CR dédupliqués', async () => {
+    const userId = seed.userIds['preparateur_civ@miznas.local']!;
+    // Affectation 1 : un CR
+    await ajouterPerimetre(userId, 'CR', {
+      cibleId: seed.crIds['CR_AG_ABJ_PLATEAU']!,
+    });
+    // Affectation 2 : un CR_SET incluant le même CR + 1 autre
+    await ajouterPerimetre(userId, 'CR_SET', {
+      cibleCrIds: [
+        seed.crIds['CR_AG_ABJ_PLATEAU']!,
+        seed.crIds['CR_AG_ABJ_COCODY']!,
+      ],
+    });
+    const result = await service.getPerimetreEffectif(userId);
+    expect(result).toHaveLength(2);
+  });
+
+  it('exclut les périmètres avec date_fin dépassée', async () => {
+    const userId = seed.userIds['preparateur_civ@miznas.local']!;
+    await ajouterPerimetre(userId, 'CR', {
+      cibleId: seed.crIds['CR_AG_ABJ_PLATEAU']!,
+      dateDebut: '2026-01-01',
+      dateFin: '2026-12-31',
+    });
+    // dateRef en 2027 → exclu
+    const result = await service.getPerimetreEffectif(userId, '2027-06-01');
+    expect(result).toEqual([]);
+  });
+
+  it('exclut les périmètres avec actif=false', async () => {
+    const userId = seed.userIds['preparateur_civ@miznas.local']!;
+    await ajouterPerimetre(userId, 'CR', {
+      cibleId: seed.crIds['CR_AG_ABJ_PLATEAU']!,
+      actif: false,
+    });
+    const result = await service.getPerimetreEffectif(userId);
+    expect(result).toEqual([]);
+  });
+
+  it('exclut les périmètres avec date_debut > dateRef', async () => {
+    const userId = seed.userIds['preparateur_civ@miznas.local']!;
+    await ajouterPerimetre(userId, 'CR', {
+      cibleId: seed.crIds['CR_AG_ABJ_PLATEAU']!,
+      dateDebut: '2027-06-01',
+    });
+    const result = await service.getPerimetreEffectif(userId, '2027-01-01');
+    expect(result).toEqual([]);
+  });
+
+  it("getCrAutorisesPourUser : null pour un user 'global' (court-circuit admin)", async () => {
+    const userId = seed.userIds['admin@miznas.local']!;
+    await ds.query(
+      `INSERT INTO bridge_user_role ("fk_user","fk_role","perimetre_type","est_actif","utilisateur_creation")
+       VALUES ($1, $2, 'global', true, 'system')`,
+      [userId, seed.roleIds['ADMIN']!],
+    );
+    const result = await service.getCrAutorisesPourUser(userId);
+    expect(result).toBeNull();
+  });
+
+  it("getCrAutorisesPourUser : union user_perimetres + bridge_user_role (rétrocompat)", async () => {
+    const userId = seed.userIds['preparateur_civ@miznas.local']!;
+    // Ancien périmètre (bridge)
+    await ds.query(
+      `INSERT INTO bridge_user_role ("fk_user","fk_role","perimetre_type","perimetre_id","est_actif","utilisateur_creation")
+       VALUES ($1, $2, 'centre_responsabilite', $3, true, 'system')`,
+      [userId, seed.roleIds['PREPARATEUR']!, seed.crIds['CR_AG_ABJ_PLATEAU']!],
+    );
+    // Nouveau périmètre (user_perimetres)
+    await ajouterPerimetre(userId, 'CR', {
+      cibleId: seed.crIds['CR_AG_ABJ_COCODY']!,
+    });
+    const result = await service.getCrAutorisesPourUser(userId);
+    expect(result).not.toBeNull();
+    expect((result as string[]).sort()).toEqual(
+      [seed.crIds['CR_AG_ABJ_PLATEAU']!, seed.crIds['CR_AG_ABJ_COCODY']!].sort(),
+    );
   });
 });

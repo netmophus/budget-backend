@@ -33,6 +33,7 @@ import { Permission } from '../../roles/entities/permission.entity';
 import { Role } from '../../roles/entities/role.entity';
 import { RolePermission } from '../../roles/entities/role-permission.entity';
 import { User } from '../../users/entities/user.entity';
+import { UserPerimetre } from '../../users/entities/user-perimetre.entity';
 import { UserRole } from '../../users/entities/user-role.entity';
 import { BudgetSaisieService } from './budget-saisie.service';
 import { PerimetreService } from './perimetre.service';
@@ -62,6 +63,7 @@ async function createDataSource(): Promise<DataSource> {
       User,
       Role,
       UserRole,
+      UserPerimetre,
       Permission,
       RolePermission,
       DimStructure,
@@ -90,7 +92,10 @@ describe('BudgetSaisieService — helpers de validation', () => {
 
   beforeAll(async () => {
     ds = await createDataSource();
-    perimetreService = new PerimetreService(ds.getRepository(UserRole));
+    perimetreService = new PerimetreService(
+      ds.getRepository(UserRole),
+      ds.getRepository(UserPerimetre),
+    );
     const auditService = new AuditService(ds.getRepository(AuditLog));
     service = new BudgetSaisieService(
       ds.getRepository(FaitBudget),
@@ -232,7 +237,10 @@ describe('BudgetSaisieService — grille from-scratch (Lot 3.4-bis)', () => {
 
   beforeAll(async () => {
     ds = await createDataSource();
-    const perim = new PerimetreService(ds.getRepository(UserRole));
+    const perim = new PerimetreService(
+      ds.getRepository(UserRole),
+      ds.getRepository(UserPerimetre),
+    );
     const audit = new AuditService(ds.getRepository(AuditLog));
     service = new BudgetSaisieService(
       ds.getRepository(FaitBudget),

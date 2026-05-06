@@ -29,15 +29,11 @@
  * `UnauthorizedException` (situation impossible pour un user
  * authentifié sauf bug ou révocation de tous les rôles).
  */
-import {
-  Injectable,
-  Logger,
-  NotImplementedException,
-  UnauthorizedException,
-} from '@nestjs/common';
+import { Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 
+import { UserPerimetre } from '../../users/entities/user-perimetre.entity';
 import { UserRole } from '../../users/entities/user-role.entity';
 
 @Injectable()
@@ -47,51 +43,62 @@ export class PerimetreService {
   constructor(
     @InjectRepository(UserRole)
     private readonly userRoleRepo: Repository<UserRole>,
+    @InjectRepository(UserPerimetre)
+    private readonly userPerimetreRepo: Repository<UserPerimetre>,
   ) {}
 
   /**
    * Liste des `id` de CR accessibles à l'utilisateur. `null` = pas de
    * filtre (admin global). `[]` = aucun CR (situation rare mais
    * possible). Stringifié bigint.
+   *
+   * Lot 4.1 — la source de vérité bascule de `bridge_user_role` vers
+   * `user_perimetres`. Pour ne pas casser les déploiements en cours
+   * (où le backfill peut ne pas être encore exécuté), on lit les
+   * deux sources et on en fait l'union (dette tracée — Lot 6 :
+   * retirer la lecture `bridge_user_role.perimetre_type` une fois la
+   * coexistence stabilisée).
+   *
+   * Le rôle global ('global' dans `bridge_user_role.perimetre_type`)
+   * reste détecté via le bridge (court-circuit admin).
    */
   async getCrAutorisesPourUser(userId: string): Promise<string[] | null> {
+    // 1. Détection admin global via bridge_user_role (inchangé).
     const roles = await this.loadRolesActifs(userId);
     if (roles.length === 0) {
       throw new UnauthorizedException(
         `Aucun rôle actif pour l'utilisateur ${userId}. Accès budget refusé.`,
       );
     }
+    if (
+      roles.some((r) => (r.perimetreType ?? 'global').toLowerCase() === 'global')
+    ) {
+      return null;
+    }
 
+    // 2. Union de user_perimetres (Lot 4.1) et des anciennes
+    //    affectations bridge_user_role (rétrocompat).
+    const setIds = new Set<string>(await this.getPerimetreEffectif(userId));
+    for (const id of await this.crsViaBridgeUserRole(roles)) {
+      setIds.add(id);
+    }
+    return Array.from(setIds);
+  }
+
+  /**
+   * Lecture historique (rétrocompat Lot 1-3) : extrait les CR
+   * autorisés depuis `bridge_user_role.perimetre_type` (structure ou
+   * centre_responsabilite). Sera supprimée au Lot 6 une fois la
+   * bascule complète vers user_perimetres terminée.
+   */
+  private async crsViaBridgeUserRole(roles: UserRole[]): Promise<string[]> {
     const setIds = new Set<string>();
-
     for (const ur of roles) {
       const ptype = (ur.perimetreType ?? 'global').toLowerCase();
-      if (ptype === 'global') {
-        // Un seul rôle global suffit : court-circuit immédiat.
-        return null;
-      }
-
-      if (ptype === 'structure') {
-        if (!ur.perimetreId) {
-          this.logger.warn(
-            `Rôle ${ur.fkRole} sur user ${userId} : perimetre_type='structure' sans perimetre_id. Ignoré.`,
-          );
-          continue;
-        }
+      if (ptype === 'structure' && ur.perimetreId) {
         const idsCr = await this.crsSousStructure(ur.perimetreId);
         idsCr.forEach((id) => setIds.add(id));
-        continue;
-      }
-
-      if (ptype === 'centre_responsabilite') {
-        if (!ur.perimetreId) {
-          this.logger.warn(
-            `Rôle ${ur.fkRole} sur user ${userId} : perimetre_type='centre_responsabilite' sans perimetre_id. Ignoré.`,
-          );
-          continue;
-        }
-        // Vérifier l'existence en version courante uniquement (un CR
-        // archivé ne donne plus accès).
+      } else if (ptype === 'centre_responsabilite' && ur.perimetreId) {
         const exists = await this.userRoleRepo.manager.query<
           Array<{ id: string }>
         >(
@@ -99,23 +106,96 @@ export class PerimetreService {
            WHERE id = $1 AND version_courante = true`,
           [ur.perimetreId],
         );
-        if (exists.length === 0) {
+        if (exists.length > 0) setIds.add(String(exists[0]!.id));
+      }
+    }
+    return Array.from(setIds);
+  }
+
+  /**
+   * Calcule l'union des CR autorisés à l'utilisateur via l'ensemble
+   * de ses affectations `user_perimetres` actives à la date `dateRef`
+   * (par défaut aujourd'hui).
+   *
+   * Logique selon `cible_type` :
+   *  - STRUCTURE → BFS itératif sur `dim_structure.fk_structure_parent`
+   *    pour collecter tous les CR rattachés à la sous-arborescence.
+   *  - CR        → ajouter directement (vérification version_courante).
+   *  - CR_SET    → ajouter directement chaque id de `cible_cr_ids`.
+   *
+   * Filtres appliqués :
+   *  - actif = true
+   *  - date_debut <= dateRef
+   *  - date_fin IS NULL OR date_fin >= dateRef
+   *
+   * Retour : tableau d'`id` de CR dédupliqués (jamais `null`, contrairement
+   * à `getCrAutorisesPourUser` qui retourne `null` pour les admins).
+   */
+  async getPerimetreEffectif(
+    userId: string,
+    dateRef?: string,
+  ): Promise<string[]> {
+    const today = dateRef ?? new Date().toISOString().slice(0, 10);
+    const perimetres = await this.userPerimetreRepo
+      .createQueryBuilder('up')
+      .where('up.fkUser = :userId', { userId })
+      .andWhere('up.actif = true')
+      .andWhere('up.dateDebut <= :today', { today })
+      .andWhere('(up.dateFin IS NULL OR up.dateFin >= :today)', { today })
+      .getMany();
+
+    const setIds = new Set<string>();
+    for (const p of perimetres) {
+      if (p.cibleType === 'STRUCTURE') {
+        if (!p.cibleId) {
           this.logger.warn(
-            `Rôle ${ur.fkRole} sur user ${userId} : CR ${ur.perimetreId} introuvable ou non courant. Ignoré.`,
+            `Affectation ${p.id} (user ${userId}) : STRUCTURE sans cible_id. Ignorée.`,
           );
           continue;
         }
-        setIds.add(String(exists[0]!.id));
-        continue;
+        const idsCr = await this.crsSousStructure(p.cibleId);
+        idsCr.forEach((id) => setIds.add(id));
+      } else if (p.cibleType === 'CR') {
+        if (!p.cibleId) {
+          this.logger.warn(
+            `Affectation ${p.id} (user ${userId}) : CR sans cible_id. Ignorée.`,
+          );
+          continue;
+        }
+        const exists = await this.userRoleRepo.manager.query<
+          Array<{ id: string }>
+        >(
+          `SELECT id FROM dim_centre_responsabilite
+           WHERE id = $1 AND version_courante = true`,
+          [p.cibleId],
+        );
+        if (exists.length > 0) setIds.add(String(exists[0]!.id));
+      } else if (p.cibleType === 'CR_SET') {
+        if (!p.cibleCrIds || p.cibleCrIds.length === 0) {
+          this.logger.warn(
+            `Affectation ${p.id} (user ${userId}) : CR_SET sans cible_cr_ids. Ignorée.`,
+          );
+          continue;
+        }
+        // Vérification version_courante en lot.
+        const placeholders = p.cibleCrIds
+          .map((_, i) => `$${i + 1}`)
+          .join(',');
+        const valides = await this.userRoleRepo.manager.query<
+          Array<{ id: string }>
+        >(
+          `SELECT id FROM dim_centre_responsabilite
+           WHERE id IN (${placeholders}) AND version_courante = true`,
+          p.cibleCrIds,
+        );
+        valides.forEach((r) => setIds.add(String(r.id)));
       }
-
-      throw new NotImplementedException(
-        `perimetre_type '${ptype}' non supporté (rôle ${ur.fkRole}, user ${userId}).`,
-      );
     }
-
     return Array.from(setIds);
   }
+
+/* getPerimetresActifsPourUser déplacé dans UserPerimetreService.lister
+   (Lot 4.1) — évite un import croisé UsersModule ↔ BudgetModule. */
 
   /**
    * Liste des `id` de structures couvertes par les rôles actifs du

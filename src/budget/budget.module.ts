@@ -9,6 +9,7 @@ import { DimScenario } from '../referentiels/scenario/entities/dim-scenario.enti
 import { DimTemps } from '../referentiels/temps/entities/dim-temps.entity';
 import { DimVersion } from '../referentiels/version/entities/dim-version.entity';
 import { FaitBudget } from '../faits/budget/entities/fait-budget.entity';
+import { UserPerimetre } from '../users/entities/user-perimetre.entity';
 import { UserRole } from '../users/entities/user-role.entity';
 import { BudgetGrilleController } from './controllers/budget-grille.controller';
 import { BudgetImportController } from './controllers/budget-import.controller';
@@ -34,6 +35,7 @@ import { PerimetreService } from './services/perimetre.service';
   imports: [
     TypeOrmModule.forFeature([
       UserRole,
+      UserPerimetre,
       FaitBudget,
       DimCompte,
       DimTemps,
