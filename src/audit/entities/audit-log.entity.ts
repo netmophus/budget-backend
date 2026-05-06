@@ -33,7 +33,10 @@ export type TypeAction =
   // Lot 3.6 — refresh manuel de mv_indicateurs_budget
   | 'RECALCUL_INDICATEURS'
   // Lot 3.7 — import en masse depuis fichier CSV/XLSX
-  | 'IMPORT_BUDGET_BULK';
+  | 'IMPORT_BUDGET_BULK'
+  // Lot 4.1 — gestion des affectations multi-périmètres
+  | 'AFFECTATION_CREEE'
+  | 'AFFECTATION_RETIREE';
 
 export type AuditStatut = 'success' | 'failure';
 
