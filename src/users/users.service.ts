@@ -50,8 +50,38 @@ export class UsersService {
       take: query.limit,
     });
 
+    let responses = items.map(toUserResponse);
+
+    // Lot 4.1-fix.A — enrichissement optionnel avec le compteur de
+    // périmètres actifs (utilisé par /admin/affectations pour afficher
+    // tous les users dont ceux à 0 périmètre, et éviter le N+1).
+    if (query.withPerimetresCount && items.length > 0) {
+      const today = new Date().toISOString().slice(0, 10);
+      const ids = items.map((u) => u.id);
+      const placeholders = ids.map((_, i) => `$${i + 1}`).join(',');
+      const counts = (await this.userRepo.manager.query<
+        Array<{ fk_user: string; n: string }>
+      >(
+        `SELECT fk_user, COUNT(*)::text AS n
+           FROM user_perimetres
+          WHERE fk_user IN (${placeholders})
+            AND actif = true
+            AND date_debut <= $${ids.length + 1}
+            AND (date_fin IS NULL OR date_fin >= $${ids.length + 1})
+          GROUP BY fk_user`,
+        [...ids, today],
+      )) ?? [];
+      const byUser = new Map(
+        counts.map((c) => [String(c.fk_user), Number(c.n)]),
+      );
+      responses = responses.map((r) => ({
+        ...r,
+        nombrePerimetresActifs: byUser.get(r.id) ?? 0,
+      }));
+    }
+
     return {
-      items: items.map(toUserResponse),
+      items: responses,
       total,
       page: query.page,
       limit: query.limit,

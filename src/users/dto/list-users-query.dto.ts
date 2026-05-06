@@ -43,4 +43,21 @@ export class ListUsersQueryDto {
   })
   @IsBoolean()
   estActif?: boolean;
+
+  /**
+   * Lot 4.1-fix.A — quand `true`, chaque UserResponse retourné est
+   * enrichi de `nombrePerimetresActifs` (count des lignes
+   * `user_perimetres.actif=true` couvrant aujourd'hui).
+   * Évite N+1 appels côté frontend pour la page /admin/affectations.
+   */
+  @ApiPropertyOptional({ example: true })
+  @IsOptional()
+  @Transform(({ value }) => {
+    if (typeof value === 'boolean') return value;
+    if (value === 'true') return true;
+    if (value === 'false') return false;
+    return value;
+  })
+  @IsBoolean()
+  withPerimetresCount?: boolean;
 }

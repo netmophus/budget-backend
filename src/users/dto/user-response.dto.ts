@@ -21,4 +21,12 @@ export class UserResponseDto {
 
   @ApiProperty({ type: String, format: 'date-time' })
   dateCreation!: Date;
+
+  /**
+   * Lot 4.1-fix.A — rempli uniquement si la liste est demandée avec
+   * `?withPerimetresCount=true`. Compte les lignes user_perimetres
+   * actives à aujourd'hui pour ce user.
+   */
+  @ApiPropertyOptional({ example: 2 })
+  nombrePerimetresActifs?: number;
 }
