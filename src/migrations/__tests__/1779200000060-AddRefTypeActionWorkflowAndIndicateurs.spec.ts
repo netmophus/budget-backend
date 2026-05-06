@@ -6,7 +6,7 @@
 import { DataType, IMemoryDb, newDb } from 'pg-mem';
 import { DataSource, type QueryRunner } from 'typeorm';
 
-import { AddRefTypeActionWorkflowAndIndicateurs1779200000060 } from './1779200000060-AddRefTypeActionWorkflowAndIndicateurs';
+import { AddRefTypeActionWorkflowAndIndicateurs1779200000060 } from '../1779200000060-AddRefTypeActionWorkflowAndIndicateurs';
 
 function buildMemDb(): IMemoryDb {
   const db = newDb({ autoCreateForeignKeyIndices: true });
