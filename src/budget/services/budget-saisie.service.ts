@@ -148,9 +148,15 @@ export class BudgetSaisieService {
       );
     }
 
-    // 1. Vérifier le périmètre
-    const crAutorises = await this.perimetreService.getCrAutorisesPourUser(userId);
-    this.assertCrAutorise(query.crId, crAutorises);
+    // 1. Périmètre : Lot Administration ADMIN.D fix réel —
+    //    la CONSULTATION de la grille (GET) n'exige PAS que le CR
+    //    cible soit dans le périmètre user_perimetres du user. Un
+    //    VALIDATEUR doit pouvoir consulter la grille de n'importe
+    //    quel CR pour évaluer la version avant validation, même
+    //    si son périmètre user_perimetres ne le couvre pas. L'écriture
+    //    (saveGrilleSaisie) reste protégée par assertCrAutorise +
+    //    @RequirePermissions('BUDGET.SAISIR') côté controller. La
+    //    permission BUDGET.LIRE déclarée sur l'endpoint suffit ici.
 
     // 2. Charger version + scenario + CR (avec rattachement structure)
     const [version, scenario, cr] = await Promise.all([

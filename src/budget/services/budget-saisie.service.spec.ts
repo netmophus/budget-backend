@@ -431,6 +431,109 @@ describe('BudgetSaisieService — grille from-scratch (Lot 3.4-bis)', () => {
     expect(result.totalAnneeCr).toBe(0);
   });
 
+  // ─── Fix réel ADMIN.D — RBAC consultation grille ────────────────
+
+  describe('Fix réel ADMIN.D — VALIDATEUR consultation hors périmètre', () => {
+    async function creerValidateurHorsPerimetre(): Promise<string> {
+      // Crée un user "VALIDATEUR" avec un bridge_user_role NON-global
+      // ciblant un autre CR que ids.crId. La grille de ids.crId
+      // devrait néanmoins être consultable (BUDGET.LIRE seul suffit).
+      await ds.query(
+        `INSERT INTO ref_role ("code_role","libelle","est_actif","utilisateur_creation")
+         VALUES ('VALIDATEUR_FIX','Validateur fix',true,'system')
+         ON CONFLICT DO NOTHING`,
+      );
+      // Un autre CR
+      await ds.query(
+        `INSERT INTO dim_centre_responsabilite
+          ("code_cr","libelle","libelle_court","type_cr","fk_structure",
+           "est_actif","date_debut_validite","date_fin_validite",
+           "version_courante","utilisateur_creation")
+         VALUES ('CR_AUTRE','Autre CR',NULL,'profit_center',$1::bigint,
+                 true,'2026-01-01',NULL,true,'system')
+         ON CONFLICT DO NOTHING`,
+        [ids.structureId],
+      );
+      const autreCrId = (
+        (await ds.query(
+          `SELECT id FROM dim_centre_responsabilite WHERE code_cr='CR_AUTRE'`,
+        )) as Array<{ id: string }>
+      )[0]!.id;
+      // Idempotent — peut être appelée plusieurs fois dans la même
+      // suite (1 fois par test).
+      const existing = (await ds.query(
+        `SELECT id FROM "user" WHERE email='validateur.fix@miznas.local'`,
+      )) as Array<{ id: string }>;
+      if (existing.length > 0) return String(existing[0]!.id);
+
+      await ds.query(
+        `INSERT INTO "user" ("email","mot_de_passe_hash","nom","prenom","est_actif","utilisateur_creation")
+         VALUES ('validateur.fix@miznas.local','h','V','Fix',true,'system')`,
+      );
+      const userId = (
+        (await ds.query(
+          `SELECT id FROM "user" WHERE email='validateur.fix@miznas.local'`,
+        )) as Array<{ id: string }>
+      )[0]!.id;
+      await ds.query(
+        `INSERT INTO bridge_user_role ("fk_user","fk_role","perimetre_type","perimetre_id","est_actif","utilisateur_creation")
+          SELECT $1::bigint, r.id, 'centre_responsabilite', $2::bigint, true, 'system'
+            FROM ref_role r WHERE r.code_role='VALIDATEUR_FIX'`,
+        [userId, autreCrId],
+      );
+      return String(userId);
+    }
+
+    it("VALIDATEUR sur un CR hors périmètre peut GET la grille (consultation read-only)", async () => {
+      const userId = await creerValidateurHorsPerimetre();
+      // Avant le fix, ce GET levait ForbiddenException via
+      // assertCrAutorise. Désormais la consultation est autorisée
+      // par BUDGET.LIRE seul (cf. décorateur côté controller).
+      const result = await service.getGrilleSaisie(
+        {
+          versionId: ids.versionId,
+          scenarioId: ids.scenarioId,
+          crId: ids.crId, // CR différent du périmètre du user
+          ligneMetierId: ids.ligneMetierId,
+          exerciceFiscal: 2027,
+          classeCompte: '6',
+        },
+        userId,
+      );
+      expect(result.cr.id).toBe(String(ids.crId));
+    });
+
+    it("VALIDATEUR ne peut PAS POST grille hors périmètre (assertCrAutorise reste actif sur l'écriture)", async () => {
+      const userId = await creerValidateurHorsPerimetre();
+      const c611Id = (
+        (await ds.query(
+          `SELECT id FROM dim_compte WHERE code_compte='611100'`,
+        )) as Array<{ id: string }>
+      )[0]!.id;
+      // L'écriture doit toujours rejeter en 403 sur un CR hors périmètre.
+      await expect(
+        service.saveGrilleSaisie(
+          {
+            versionId: ids.versionId,
+            scenarioId: ids.scenarioId,
+            crId: ids.crId, // hors périmètre du user
+            lignes: [
+              {
+                compteId: String(c611Id),
+                ligneMetierId: ids.ligneMetierId,
+                cellules: [
+                  { mois: '2027-01-01', montant: 1_000_000, modeSaisie: 'MONTANT' },
+                ],
+              },
+            ],
+          },
+          userId,
+          'validateur.fix@miznas.local',
+        ),
+      ).rejects.toThrow(ForbiddenException);
+    });
+  });
+
   it('GET grille sans ligneMetierId → BadRequestException explicite', async () => {
     const userId = await adminUserId();
     await expect(
