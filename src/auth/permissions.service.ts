@@ -14,6 +14,27 @@ export interface EffectivePermission {
   perimetre_id: string | null;
 }
 
+/**
+ * Lot 4.2 — Permission effective enrichie du contexte d'origine.
+ * `via='NATIF'` = vient d'un rôle (bridge_user_role).
+ * `via='DELEGATION'` = vient d'une délégation active à `dateRef` ;
+ * `delegation_id` est alors renseigné. Permet à l'audit et l'UI
+ * de signaler clairement quand une action est effectuée via une
+ * délégation reçue.
+ */
+export interface EffectivePermissionWithContext extends EffectivePermission {
+  via: 'NATIF' | 'DELEGATION';
+  delegation_id?: string;
+}
+
+/** Mapping verbe délégué → code permission RBAC sous-jacente. */
+const DELEGATION_PERM_MAPPING: Record<string, string> = {
+  SAISIE: 'BUDGET.SAISIR',
+  SOUMISSION: 'BUDGET.SOUMETTRE',
+  VALIDATION: 'BUDGET.VALIDER',
+  PUBLICATION: 'BUDGET.PUBLIER',
+};
+
 @Injectable()
 export class PermissionsService {
   constructor(
@@ -80,5 +101,64 @@ export class PermissionsService {
       return codes.every((c) => possessed.has(c));
     }
     return codes.some((c) => possessed.has(c));
+  }
+
+  /**
+   * Lot 4.2 — Permissions effectives enrichies du contexte d'origine.
+   * Combine permissions natives (rôles RBAC) ET permissions reçues
+   * par délégation active à `dateRef`. Chaque entrée a un champ
+   * `via` ('NATIF' / 'DELEGATION'), avec `delegation_id` renseigné
+   * pour les délégations.
+   *
+   * Utilisée par :
+   *  - L'API frontend pour afficher les badges « via délégation »
+   *  - L'audit applicatif pour propager `via_delegation_id` lors
+   *    des actions métier (SAISIR / SOUMETTRE / VALIDER / PUBLIER).
+   *
+   * Le service requête `delegations` directement (pas de dépendance
+   * vers DelegationsService pour éviter un cycle).
+   */
+  async getPermissionsEffectivesAvecContexte(
+    userId: string,
+    dateRef?: string,
+  ): Promise<EffectivePermissionWithContext[]> {
+    const today = dateRef ?? new Date().toISOString().slice(0, 10);
+
+    const natives = await this.getEffectivePermissions(userId);
+    const result: EffectivePermissionWithContext[] = natives.map((p) => ({
+      ...p,
+      via: 'NATIF' as const,
+    }));
+
+    // Permissions issues de délégations actives à dateRef
+    const delegations = (await this.userRoleRepo.manager.query<
+      Array<{
+        id: string;
+        permissions: string[];
+      }>
+    >(
+      `SELECT id, permissions FROM delegations
+        WHERE fk_delegataire = $1
+          AND actif = true
+          AND date_debut <= $2
+          AND date_fin >= $2`,
+      [userId, today],
+    )) ?? [];
+
+    for (const d of delegations) {
+      for (const verb of d.permissions) {
+        const code = DELEGATION_PERM_MAPPING[verb];
+        if (!code) continue;
+        result.push({
+          code_permission: code,
+          module: 'BUDGET',
+          perimetre_type: 'centre_responsabilite',
+          perimetre_id: null,
+          via: 'DELEGATION',
+          delegation_id: String(d.id),
+        });
+      }
+    }
+    return result;
   }
 }
