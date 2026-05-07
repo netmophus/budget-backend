@@ -15,6 +15,12 @@
 
 Version des spécifications : **V1.0 — avril 2026**
 
+> **État au 2026-05** : module budgétaire complet livré (Lots 1 → 4).
+> Les capacités multi-périmètres, délégations temporaires et
+> notifications email sont opérationnelles — voir
+> [`docs/lot-4/README.md`](docs/lot-4/README.md) pour la synthèse et
+> [`CHANGELOG.md`](CHANGELOG.md) pour l'historique consolidé.
+
 ---
 
 ## 1. Objectif fonctionnel
