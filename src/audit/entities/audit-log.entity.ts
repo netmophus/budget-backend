@@ -55,7 +55,13 @@ export type TypeAction =
   | 'RESET_PASSWORD_USER'
   | 'FORCER_DECONNEXION_USER'
   | 'ATTRIBUER_ROLE'
-  | 'RETIRER_ROLE';
+  | 'RETIRER_ROLE'
+  // Lot 5.1 — Réalisé. Codes ajoutés en base via migration 054
+  // (1779200000150-CreerFaitRealiseEtPermissions.ts).
+  | 'IMPORTER_REALISE'
+  | 'SAISIR_REALISE'
+  | 'VALIDER_REALISE'
+  | 'SUPPRIMER_REALISE';
 
 export type AuditStatut = 'success' | 'failure';
 
