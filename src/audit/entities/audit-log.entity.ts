@@ -44,7 +44,18 @@ export type TypeAction =
   // une nouvelle migration au démarrage du 4.2)
   | 'CREER_DELEGATION'
   | 'REVOQUER_DELEGATION'
-  | 'EXPIRER_DELEGATION';
+  | 'EXPIRER_DELEGATION'
+  // Lot Administration — CRUD users + gestion des rôles depuis
+  // l'UI admin. Codes ajoutés en base via migration 053
+  // (1779200000140-AddRefTypeActionAdminUsers.ts).
+  | 'CREER_USER'
+  | 'MODIFIER_USER'
+  | 'DESACTIVER_USER'
+  | 'REACTIVER_USER'
+  | 'RESET_PASSWORD_USER'
+  | 'FORCER_DECONNEXION_USER'
+  | 'ATTRIBUER_ROLE'
+  | 'RETIRER_ROLE';
 
 export type AuditStatut = 'success' | 'failure';
 
