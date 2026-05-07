@@ -242,6 +242,29 @@ Nx, Lerna). Chaque projet se gère et se déploie indépendamment.
 | [`docs/scd2-pattern.md`](docs/scd2-pattern.md)       | Pattern SCD2 (entité, helpers de migration, service générique)                 |
 | [`docs/referentiels-secondaires.md`](docs/referentiels-secondaires.md) | Architecture des 13 référentiels secondaires paramétrables (Lot 2.5-bis)  |
 | [`docs/qa-smoke-2.5-bis.md`](docs/qa-smoke-2.5-bis.md) | Checklist manuelle de validation bout-en-bout du Lot 2.5-bis post-déploiement   |
+| [`docs/lot-4/4.1-multi-perimetres.md`](docs/lot-4/4.1-multi-perimetres.md) | Lot 4.1 — multi-périmètres, anti-chaînage `delegation_id`                |
+| [`docs/lot-4/4.2-delegations.md`](docs/lot-4/4.2-delegations.md) | Lot 4.2 — délégations temporaires (D2 strict, cron expiration, anti-chaînage)         |
+| [`docs/lot-4/4.3-notifications-email.md`](docs/lot-4/4.3-notifications-email.md) | Lot 4.3 — notifications email (8 événements, dry-run, préférences, retry)  |
+
+### 7.1 Configuration SMTP (Lot 4.3)
+
+Pour le développement local, utiliser **Mailhog** comme serveur
+SMTP de capture (aucun email réel envoyé) :
+
+```bash
+docker run -d --name mailhog -p 1025:1025 -p 8025:8025 mailhog/mailhog
+# Puis dans .env :
+SMTP_HOST=localhost
+SMTP_PORT=1025
+EMAIL_DRY_RUN=false
+# UI Mailhog : http://localhost:8025
+```
+
+Mode `EMAIL_DRY_RUN=true` (défaut) : aucun appel SMTP, les emails
+sont quand même tracés dans `email_log` avec `statut='SUPPRIME'`.
+Pratique pour démos et CI sans dépendance externe.
+
+Cf. `.env.example` pour la liste complète des variables SMTP_*.
 
 Sources de référence interne :
 - `Specs_Module_Budgetaire_Bancaire_UEMOA.docx` — spécifications V1.0
