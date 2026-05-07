@@ -161,4 +161,37 @@ export class PermissionsService {
     }
     return result;
   }
+
+  /**
+   * Lot 4.2-fix.A — Détermine si l'usage d'un code permission par
+   * un user passe par une délégation. Retourne `delegation_id` si
+   * oui, `null` sinon.
+   *
+   * **Priorité NATIF** : si l'utilisateur possède la permission à
+   * la fois en natif (rôle RBAC) ET via délégation, on retourne
+   * `null` — il agit avec son droit propre, pas via la délégation
+   * reçue. Ne pas mentir dans l'audit.
+   *
+   * Utilisé par les services métier (workflow + saisie) pour
+   * enrichir le payload audit avec `via_delegation_id` au moment
+   * d'écrire l'audit_log.
+   */
+  async getDelegationContextPour(
+    userId: string,
+    codePermission: string,
+    dateRef?: string,
+  ): Promise<string | null> {
+    const ctx = await this.getPermissionsEffectivesAvecContexte(
+      userId,
+      dateRef,
+    );
+    const aLeNatif = ctx.some(
+      (p) => p.code_permission === codePermission && p.via === 'NATIF',
+    );
+    if (aLeNatif) return null;
+    const parDelegation = ctx.find(
+      (p) => p.code_permission === codePermission && p.via === 'DELEGATION',
+    );
+    return parDelegation?.delegation_id ?? null;
+  }
 }

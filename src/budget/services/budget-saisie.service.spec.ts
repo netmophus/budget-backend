@@ -18,6 +18,7 @@ import { DataSource } from 'typeorm';
 
 import { AuditLog } from '../../audit/entities/audit-log.entity';
 import { AuditService } from '../../audit/audit.service';
+import type { PermissionsService } from '../../auth/permissions.service';
 import { DimCentreResponsabilite } from '../../referentiels/centre-responsabilite/entities/dim-centre-responsabilite.entity';
 import { DimCompte } from '../../referentiels/compte/entities/dim-compte.entity';
 import { DimDevise } from '../../referentiels/devise/entities/dim-devise.entity';
@@ -97,6 +98,10 @@ describe('BudgetSaisieService — helpers de validation', () => {
       ds.getRepository(UserPerimetre),
     );
     const auditService = new AuditService(ds.getRepository(AuditLog));
+    // Lot 4.2-fix.A : mock PermissionsService — par défaut NATIF.
+    const permissionsServiceMock = {
+      getDelegationContextPour: jest.fn().mockResolvedValue(null),
+    } as unknown as PermissionsService;
     service = new BudgetSaisieService(
       ds.getRepository(FaitBudget),
       ds.getRepository(DimCompte),
@@ -107,6 +112,7 @@ describe('BudgetSaisieService — helpers de validation', () => {
       perimetreService,
       auditService,
       ds,
+      permissionsServiceMock,
     );
 
     // Seed minimal : 1 compte feuille, 1 compte agrégé, 1 temps 1er, 1 temps mid
@@ -242,6 +248,9 @@ describe('BudgetSaisieService — grille from-scratch (Lot 3.4-bis)', () => {
       ds.getRepository(UserPerimetre),
     );
     const audit = new AuditService(ds.getRepository(AuditLog));
+    const permissionsServiceMock = {
+      getDelegationContextPour: jest.fn().mockResolvedValue(null),
+    } as unknown as PermissionsService;
     service = new BudgetSaisieService(
       ds.getRepository(FaitBudget),
       ds.getRepository(DimCompte),
@@ -252,6 +261,7 @@ describe('BudgetSaisieService — grille from-scratch (Lot 3.4-bis)', () => {
       perim,
       audit,
       ds,
+      permissionsServiceMock,
     );
 
     // 1 user admin global (rôle 'global' → null filter)

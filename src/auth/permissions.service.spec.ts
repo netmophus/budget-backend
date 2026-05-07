@@ -242,4 +242,61 @@ describe('PermissionsService', () => {
       expect(deleguees[0]!.code_permission).toBe('BUDGET.SAISIR');
     });
   });
+
+  // Lot 4.2-fix.A — helper pour audit applicatif via_delegation_id
+  describe('getDelegationContextPour', () => {
+    beforeEach(() => {
+      userRepo.findOne.mockResolvedValue({ id: '1', estActif: true } as User);
+    });
+
+    it('retourne delegation_id si la permission vient uniquement d\'une délégation', async () => {
+      // Pas de natifs ; 1 délégation portant SAISIE → BUDGET.SAISIR
+      userRoleRepo.createQueryBuilder.mockReturnValue(makeQb([]));
+      userRoleRepo.manager.query.mockResolvedValue([
+        { id: '42', permissions: ['SAISIE'] },
+      ]);
+      expect(
+        await service.getDelegationContextPour('1', 'BUDGET.SAISIR'),
+      ).toBe('42');
+    });
+
+    it('retourne null si la permission est native', async () => {
+      userRoleRepo.createQueryBuilder.mockReturnValue(
+        makeQb([
+          urRow({
+            permissions: [{ code: 'BUDGET.VALIDER', module: 'BUDGET' }],
+          }),
+        ]),
+      );
+      userRoleRepo.manager.query.mockResolvedValue([]);
+      expect(
+        await service.getDelegationContextPour('1', 'BUDGET.VALIDER'),
+      ).toBeNull();
+    });
+
+    it('priorité NATIF : retourne null si la permission est à la fois native ET déléguée', async () => {
+      // Natif BUDGET.VALIDER + délégation portant aussi VALIDATION
+      userRoleRepo.createQueryBuilder.mockReturnValue(
+        makeQb([
+          urRow({
+            permissions: [{ code: 'BUDGET.VALIDER', module: 'BUDGET' }],
+          }),
+        ]),
+      );
+      userRoleRepo.manager.query.mockResolvedValue([
+        { id: '99', permissions: ['VALIDATION'] },
+      ]);
+      expect(
+        await service.getDelegationContextPour('1', 'BUDGET.VALIDER'),
+      ).toBeNull();
+    });
+
+    it('retourne null si la permission n\'est ni native ni déléguée', async () => {
+      userRoleRepo.createQueryBuilder.mockReturnValue(makeQb([]));
+      userRoleRepo.manager.query.mockResolvedValue([]);
+      expect(
+        await service.getDelegationContextPour('1', 'BUDGET.PUBLIER'),
+      ).toBeNull();
+    });
+  });
 });

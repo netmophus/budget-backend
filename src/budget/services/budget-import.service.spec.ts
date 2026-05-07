@@ -307,10 +307,14 @@ describe('BudgetImportService', () => {
     dataSource = await createDataSource();
     auditService = new AuditService(dataSource.getRepository(AuditLog));
     perimetre = makePerimetreMock();
+    const permissionsServiceMock = {
+      getDelegationContextPour: jest.fn().mockResolvedValue(null),
+    };
     service = new BudgetImportService(
       dataSource,
       perimetre as unknown as PerimetreService,
       auditService,
+      permissionsServiceMock as unknown as import('../../auth/permissions.service').PermissionsService,
     );
     ids = await seedAll(dataSource);
   });
@@ -629,6 +633,9 @@ describe('BudgetImportService', () => {
   // de 800 lignes. On valide que le code actuel compte bien chaque ligne
   // (le bug — s'il existait — viendrait d'un slice/batch silencieux).
 
+  // Test perf intentionnel : timeout passé à 30 s pour absorber le coût
+  // additionnel des Promises (Lot 4.2-fix.A : 1 await getDelegationContextPour
+  // par audit) sur exécution parallèle CI.
   it('B.2 — import 1500 lignes valides : lignesInserees = 1500 exactement', async () => {
     // 1500 lignes valides via 5 CR × 6 mois × 50 cellules combinées :
     // pour un volume cible de 1500, on génère via combinaison de 1
@@ -715,7 +722,7 @@ describe('BudgetImportService', () => {
       `SELECT COUNT(*)::int AS n FROM fait_budget`,
     )) as Array<{ n: number }>;
     expect(cnt[0]!.n).toBe(100);
-  });
+  }, 30000);
 
   it('B.2 — re-import du même fichier : 100 lignes ignorées (no-op), pas écrasement', async () => {
     const lignes: string[] = [HEADER];

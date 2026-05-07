@@ -31,6 +31,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
 
 import { AuditService } from '../../audit/audit.service';
+import { PermissionsService } from '../../auth/permissions.service';
 import { DimVersion } from './entities/dim-version.entity';
 import { VersionResponseDto } from './dto/version-response.dto';
 import {
@@ -41,6 +42,11 @@ import {
 } from './dto/workflow.dto';
 import { toVersionResponse } from './version.service';
 
+interface AuthCaller {
+  userId: string;
+  email: string;
+}
+
 @Injectable()
 export class VersionWorkflowService {
   constructor(
@@ -48,6 +54,7 @@ export class VersionWorkflowService {
     private readonly versionRepo: Repository<DimVersion>,
     private readonly dataSource: DataSource,
     private readonly auditService: AuditService,
+    private readonly permissionsService: PermissionsService,
   ) {}
 
   // ─── Soumettre : ouvert → soumis ────────────────────────────────
@@ -55,8 +62,15 @@ export class VersionWorkflowService {
   async soumettre(
     versionId: string,
     dto: SoumettreVersionDto,
-    user: { email: string },
+    user: AuthCaller,
   ): Promise<VersionResponseDto> {
+    // Lot 4.2-fix.A : si l'action passe par une délégation, on
+    // l'enregistre dans le payload audit (priorité NATIF appliquée
+    // par PermissionsService.getDelegationContextPour).
+    const viaDelegationId = await this.permissionsService.getDelegationContextPour(
+      user.userId,
+      'BUDGET.SOUMETTRE',
+    );
     return this.dataSource.transaction(async (manager) => {
       const repo = manager.getRepository(DimVersion);
       const v = await repo.findOne({ where: { id: versionId } });
@@ -111,6 +125,9 @@ export class VersionWorkflowService {
           statutAvant: 'ouvert',
           statutApres: 'soumis',
           commentaire: dto.commentaire ?? null,
+          ...(viaDelegationId !== null
+            ? { via_delegation_id: viaDelegationId }
+            : {}),
         },
         commentaire: `Soumission de ${v.codeVersion} (${nbLignes} ligne(s) à valider).`,
       });
@@ -124,8 +141,12 @@ export class VersionWorkflowService {
   async valider(
     versionId: string,
     dto: ValiderVersionDto,
-    user: { email: string },
+    user: AuthCaller,
   ): Promise<VersionResponseDto> {
+    const viaDelegationId = await this.permissionsService.getDelegationContextPour(
+      user.userId,
+      'BUDGET.VALIDER',
+    );
     return this.dataSource.transaction(async (manager) => {
       const repo = manager.getRepository(DimVersion);
       const v = await repo.findOne({ where: { id: versionId } });
@@ -156,6 +177,9 @@ export class VersionWorkflowService {
           statutAvant: 'soumis',
           statutApres: 'valide',
           commentaire: dto.commentaire ?? null,
+          ...(viaDelegationId !== null
+            ? { via_delegation_id: viaDelegationId }
+            : {}),
         },
         commentaire: `Validation de ${v.codeVersion}.`,
       });
@@ -169,8 +193,13 @@ export class VersionWorkflowService {
   async rejeter(
     versionId: string,
     dto: RejeterVersionDto,
-    user: { email: string },
+    user: AuthCaller,
   ): Promise<VersionResponseDto> {
+    // Rejet utilise BUDGET.VALIDER (cf. controller).
+    const viaDelegationId = await this.permissionsService.getDelegationContextPour(
+      user.userId,
+      'BUDGET.VALIDER',
+    );
     return this.dataSource.transaction(async (manager) => {
       const repo = manager.getRepository(DimVersion);
       const v = await repo.findOne({ where: { id: versionId } });
@@ -207,6 +236,9 @@ export class VersionWorkflowService {
           statutAvant: 'soumis',
           statutApres: 'ouvert',
           commentaireRejet: dto.commentaire,
+          ...(viaDelegationId !== null
+            ? { via_delegation_id: viaDelegationId }
+            : {}),
         },
         commentaire: `Rejet de ${v.codeVersion} : ${dto.commentaire.slice(0, 200)}`,
       });
@@ -220,8 +252,12 @@ export class VersionWorkflowService {
   async publier(
     versionId: string,
     dto: PublierVersionDto,
-    user: { email: string },
+    user: AuthCaller,
   ): Promise<VersionResponseDto> {
+    const viaDelegationId = await this.permissionsService.getDelegationContextPour(
+      user.userId,
+      'BUDGET.PUBLIER',
+    );
     return this.dataSource.transaction(async (manager) => {
       const repo = manager.getRepository(DimVersion);
       const v = await repo.findOne({ where: { id: versionId } });
@@ -255,6 +291,9 @@ export class VersionWorkflowService {
           statutAvant: 'valide',
           statutApres: 'gele',
           commentaire: dto.commentaire ?? null,
+          ...(viaDelegationId !== null
+            ? { via_delegation_id: viaDelegationId }
+            : {}),
         },
         commentaire:
           `Publication (gel) de ${v.codeVersion} — action irréversible. ` +

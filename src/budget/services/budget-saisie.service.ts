@@ -30,6 +30,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
 
 import { AuditService } from '../../audit/audit.service';
+import { PermissionsService } from '../../auth/permissions.service';
 import { DimCompte } from '../../referentiels/compte/entities/dim-compte.entity';
 import { DimTemps } from '../../referentiels/temps/entities/dim-temps.entity';
 import { DimCentreResponsabilite } from '../../referentiels/centre-responsabilite/entities/dim-centre-responsabilite.entity';
@@ -64,6 +65,7 @@ export class BudgetSaisieService {
     private readonly perimetreService: PerimetreService,
     private readonly auditService: AuditService,
     private readonly dataSource: DataSource,
+    private readonly permissionsService: PermissionsService,
   ) {}
 
   // ─── Helpers de validation métier (Lot 3.3) ───────────────────────
@@ -670,7 +672,11 @@ export class BudgetSaisieService {
 
     const dureeMs = Date.now() - start;
 
-    // 6. Audit
+    // 6. Audit (Lot 4.2-fix.A : enrichissement via_delegation_id)
+    const viaDelegationId = await this.permissionsService.getDelegationContextPour(
+      userId,
+      'BUDGET.SAISIR',
+    );
     await this.auditService.log({
       utilisateur: userEmail,
       typeAction: 'IMPORT_BUDGET',
@@ -684,6 +690,9 @@ export class BudgetSaisieService {
         supprimees,
         ignorees,
         erreursCount: erreurs.length,
+        ...(viaDelegationId !== null
+          ? { via_delegation_id: viaDelegationId }
+          : {}),
       },
       commentaire: `Saisie en lot grille — ${dto.lignes.length} lignes, ${totalCellules} cellules.`,
       dureeMs,

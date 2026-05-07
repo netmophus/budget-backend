@@ -25,6 +25,7 @@ import { DataSource, Repository } from 'typeorm';
 
 import { AuditLog } from '../../audit/entities/audit-log.entity';
 import { AuditService } from '../../audit/audit.service';
+import { PermissionsService } from '../../auth/permissions.service';
 import { DimVersion } from './entities/dim-version.entity';
 import { VersionWorkflowService } from './version-workflow.service';
 
@@ -106,15 +107,31 @@ describe('VersionWorkflowService', () => {
   let auditService: AuditService;
   let service: VersionWorkflowService;
 
-  const preparateur = { email: 'preparateur@miznas.local' };
-  const controleur = { email: 'controleur@miznas.local' };
-  const directeur = { email: 'directeur@miznas.local' };
+  // Lot 4.2-fix.A : userId requis pour le helper
+  // PermissionsService.getDelegationContextPour. Mock global :
+  // par défaut, NATIF (retour null) — les tests dédiés via délégation
+  // surchargent ce mock localement.
+  const preparateur = {
+    userId: '101',
+    email: 'preparateur@miznas.local',
+  };
+  const controleur = { userId: '102', email: 'controleur@miznas.local' };
+  const directeur = { userId: '103', email: 'directeur@miznas.local' };
+  let permissionsServiceMock: { getDelegationContextPour: jest.Mock };
 
   beforeAll(async () => {
     dataSource = await createDataSource();
     repo = dataSource.getRepository(DimVersion);
     auditService = new AuditService(dataSource.getRepository(AuditLog));
-    service = new VersionWorkflowService(repo, dataSource, auditService);
+    permissionsServiceMock = {
+      getDelegationContextPour: jest.fn().mockResolvedValue(null),
+    };
+    service = new VersionWorkflowService(
+      repo,
+      dataSource,
+      auditService,
+      permissionsServiceMock as unknown as PermissionsService,
+    );
   });
 
   afterAll(async () => {
@@ -493,6 +510,139 @@ describe('VersionWorkflowService', () => {
       expect(final.utilisateurSoumission).toBe(preparateur.email);
       expect(final.utilisateurValidation).toBe(controleur.email);
       expect(final.utilisateurGel).toBe(directeur.email);
+    });
+  });
+
+  // ─── Lot 4.2-fix.A : via_delegation_id dans le payload audit ─────
+
+  describe('via_delegation_id (Lot 4.2-fix.A)', () => {
+    function getPayloadApres(rows: Array<{ payload_apres: unknown }>): Record<string, unknown> {
+      return rows[0]!.payload_apres as Record<string, unknown>;
+    }
+
+    async function getAuditPayload(
+      versionId: string,
+      typeAction: string,
+    ): Promise<Record<string, unknown>> {
+      const rows = (await dataSource.query(
+        `SELECT payload_apres FROM audit_log
+          WHERE id_cible = $1 AND type_action = $2
+          ORDER BY id DESC LIMIT 1`,
+        [String(versionId), typeAction],
+      )) as Array<{ payload_apres: unknown }>;
+      return getPayloadApres(rows);
+    }
+
+    afterEach(() => {
+      // Reset au défaut NATIF (null) pour ne pas polluer les autres tests.
+      permissionsServiceMock.getDelegationContextPour.mockResolvedValue(null);
+    });
+
+    it('SOUMETTRE_BUDGET via délégation : payload contient via_delegation_id', async () => {
+      permissionsServiceMock.getDelegationContextPour.mockResolvedValue('77');
+      const id = await rawInsertVersion(dataSource, { codeVersion: 'V1' });
+      await addLignes(dataSource, id, 1);
+      await service.soumettre(id, {}, preparateur);
+      expect(
+        permissionsServiceMock.getDelegationContextPour,
+      ).toHaveBeenCalledWith('101', 'BUDGET.SOUMETTRE');
+      const payload = await getAuditPayload(id, 'SOUMETTRE_BUDGET');
+      expect(payload.via_delegation_id).toBe('77');
+    });
+
+    it('SOUMETTRE_BUDGET natif : payload SANS via_delegation_id', async () => {
+      const id = await rawInsertVersion(dataSource, { codeVersion: 'V2' });
+      await addLignes(dataSource, id, 1);
+      await service.soumettre(id, {}, preparateur);
+      const payload = await getAuditPayload(id, 'SOUMETTRE_BUDGET');
+      expect('via_delegation_id' in payload).toBe(false);
+    });
+
+    it('VALIDER_BUDGET via délégation : payload contient via_delegation_id', async () => {
+      const id = await rawInsertVersion(dataSource, {
+        codeVersion: 'V3',
+        statut: 'soumis',
+      });
+      permissionsServiceMock.getDelegationContextPour.mockResolvedValue('88');
+      await service.valider(id, {}, controleur);
+      expect(
+        permissionsServiceMock.getDelegationContextPour,
+      ).toHaveBeenCalledWith('102', 'BUDGET.VALIDER');
+      const payload = await getAuditPayload(id, 'VALIDER_BUDGET');
+      expect(payload.via_delegation_id).toBe('88');
+    });
+
+    it('VALIDER_BUDGET natif : payload SANS via_delegation_id', async () => {
+      const id = await rawInsertVersion(dataSource, {
+        codeVersion: 'V4',
+        statut: 'soumis',
+      });
+      await service.valider(id, {}, controleur);
+      const payload = await getAuditPayload(id, 'VALIDER_BUDGET');
+      expect('via_delegation_id' in payload).toBe(false);
+    });
+
+    it('PUBLIER_BUDGET via délégation : payload contient via_delegation_id', async () => {
+      const id = await rawInsertVersion(dataSource, {
+        codeVersion: 'V5',
+        statut: 'valide',
+      });
+      permissionsServiceMock.getDelegationContextPour.mockResolvedValue('123');
+      await service.publier(id, { commentaire: 'OK' }, directeur);
+      expect(
+        permissionsServiceMock.getDelegationContextPour,
+      ).toHaveBeenCalledWith('103', 'BUDGET.PUBLIER');
+      const payload = await getAuditPayload(id, 'PUBLIER_BUDGET');
+      expect(payload.via_delegation_id).toBe('123');
+    });
+
+    it('PUBLIER_BUDGET natif : payload SANS via_delegation_id', async () => {
+      const id = await rawInsertVersion(dataSource, {
+        codeVersion: 'V6',
+        statut: 'valide',
+      });
+      await service.publier(id, { commentaire: 'OK' }, directeur);
+      const payload = await getAuditPayload(id, 'PUBLIER_BUDGET');
+      expect('via_delegation_id' in payload).toBe(false);
+    });
+
+    it('REJETER_BUDGET via délégation : payload contient via_delegation_id', async () => {
+      const id = await rawInsertVersion(dataSource, {
+        codeVersion: 'V7',
+        statut: 'soumis',
+      });
+      permissionsServiceMock.getDelegationContextPour.mockResolvedValue('456');
+      await service.rejeter(id, { commentaire: 'Erreurs détectées' }, controleur);
+      expect(
+        permissionsServiceMock.getDelegationContextPour,
+      ).toHaveBeenCalledWith('102', 'BUDGET.VALIDER');
+      const payload = await getAuditPayload(id, 'REJETER_BUDGET');
+      expect(payload.via_delegation_id).toBe('456');
+    });
+
+    it('REJETER_BUDGET natif : payload SANS via_delegation_id', async () => {
+      const id = await rawInsertVersion(dataSource, {
+        codeVersion: 'V8',
+        statut: 'soumis',
+      });
+      await service.rejeter(id, { commentaire: 'NOK' }, controleur);
+      const payload = await getAuditPayload(id, 'REJETER_BUDGET');
+      expect('via_delegation_id' in payload).toBe(false);
+    });
+
+    it('cas mixte (helper retourne null = priorité NATIF) : pas de via_delegation_id', async () => {
+      // Simule un user qui a la perm en NATIF ET DELEGATION : le helper
+      // applique la priorité NATIF et retourne null (cf. spec
+      // PermissionsService). On vérifie ici que workflow respecte cette
+      // décision et n'écrit pas via_delegation_id.
+      const id = await rawInsertVersion(dataSource, {
+        codeVersion: 'V9',
+        statut: 'soumis',
+      });
+      permissionsServiceMock.getDelegationContextPour.mockResolvedValue(null);
+      await service.valider(id, { commentaire: 'OK' }, controleur);
+      const payload = await getAuditPayload(id, 'VALIDER_BUDGET');
+      expect('via_delegation_id' in payload).toBe(false);
     });
   });
 });

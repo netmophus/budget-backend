@@ -42,6 +42,7 @@ import { DataSource, EntityManager } from 'typeorm';
 import { z } from 'zod';
 
 import { AuditService } from '../../audit/audit.service';
+import { PermissionsService } from '../../auth/permissions.service';
 import {
   ImportBudgetErrorCode,
   ImportBudgetErrorDto,
@@ -133,6 +134,7 @@ export class BudgetImportService {
     private readonly dataSource: DataSource,
     private readonly perimetreService: PerimetreService,
     private readonly auditService: AuditService,
+    private readonly permissionsService: PermissionsService,
   ) {}
 
   // ─── Point d'entrée public ───────────────────────────────────────
@@ -249,6 +251,12 @@ export class BudgetImportService {
     };
 
     // 9. Audit (succès ou rollback : toujours consigné)
+    // Lot 4.2-fix.A : enrichissement via_delegation_id si l'import
+    // s'appuie sur une permission BUDGET.SAISIR reçue par délégation.
+    const viaDelegationId = await this.permissionsService.getDelegationContextPour(
+      user.userId,
+      'BUDGET.SAISIR',
+    );
     await this.auditService.log({
       utilisateur: user.email,
       typeAction: 'IMPORT_BUDGET_BULK',
@@ -266,6 +274,9 @@ export class BudgetImportService {
         lignesRejetees,
         transactionRollback,
         warningsCount: warnings.length,
+        ...(viaDelegationId !== null
+          ? { via_delegation_id: viaDelegationId }
+          : {}),
       },
       commentaire:
         `Import ${rapport.fichier} (${rapport.formatDetecte}) — ` +
