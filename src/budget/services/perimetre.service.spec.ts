@@ -581,22 +581,90 @@ describe('PerimetreService.getPerimetreEffectif (Lot 4.1)', () => {
     expect(result).toBeNull();
   });
 
-  it("getCrAutorisesPourUser : union user_perimetres + bridge_user_role (rétrocompat)", async () => {
+  // ─── Lot 4.1-fix2.A : priorité user_perimetres ─────────────────
+
+  it("Lot 4.1-fix2 : user_perimetres prioritaire — bridge global ignoré", async () => {
     const userId = seed.userIds['preparateur_civ@miznas.local']!;
-    // Ancien périmètre (bridge)
+    // Bridge 'global' → admin théorique
+    await ds.query(
+      `INSERT INTO bridge_user_role ("fk_user","fk_role","perimetre_type","est_actif","utilisateur_creation")
+       VALUES ($1, $2, 'global', true, 'system')`,
+      [userId, seed.roleIds['ADMIN']!],
+    );
+    // Mais une affectation explicite CR_SET dans user_perimetres
+    await ajouterPerimetre(userId, 'CR_SET', {
+      cibleCrIds: [
+        seed.crIds['CR_AG_ABJ_PLATEAU']!,
+        seed.crIds['CR_AG_ABJ_COCODY']!,
+      ],
+    });
+    const result = await service.getCrAutorisesPourUser(userId);
+    // Doit retourner EXACTEMENT 2 CR (pas null, pas l'union avec
+    // tous les CR de l'univers) — l'affectation explicite restreint.
+    expect(result).not.toBeNull();
+    expect((result as string[]).sort()).toEqual(
+      [
+        seed.crIds['CR_AG_ABJ_PLATEAU']!,
+        seed.crIds['CR_AG_ABJ_COCODY']!,
+      ].sort(),
+    );
+  });
+
+  it("Lot 4.1-fix2 : user_perimetres STRUCTURE prioritaire — bridge global ignoré", async () => {
+    const userId = seed.userIds['preparateur_civ@miznas.local']!;
+    await ds.query(
+      `INSERT INTO bridge_user_role ("fk_user","fk_role","perimetre_type","est_actif","utilisateur_creation")
+       VALUES ($1, $2, 'global', true, 'system')`,
+      [userId, seed.roleIds['ADMIN']!],
+    );
+    await ajouterPerimetre(userId, 'STRUCTURE', {
+      cibleId: seed.structureIds['BR_CIV']!,
+    });
+    const result = await service.getCrAutorisesPourUser(userId);
+    expect(result).not.toBeNull();
+    // 6 CR sous BR_CIV — pas l'univers complet
+    expect(result).toHaveLength(6);
+  });
+
+  it("Lot 4.1-fix2 : fallback bridge_user_role si user_perimetres VIDE", async () => {
+    const userId = seed.userIds['preparateur_civ@miznas.local']!;
     await ds.query(
       `INSERT INTO bridge_user_role ("fk_user","fk_role","perimetre_type","perimetre_id","est_actif","utilisateur_creation")
        VALUES ($1, $2, 'centre_responsabilite', $3, true, 'system')`,
       [userId, seed.roleIds['PREPARATEUR']!, seed.crIds['CR_AG_ABJ_PLATEAU']!],
     );
-    // Nouveau périmètre (user_perimetres)
+    // Aucune ligne user_perimetres → fallback bridge
+    const result = await service.getCrAutorisesPourUser(userId);
+    expect(result).toEqual([seed.crIds['CR_AG_ABJ_PLATEAU']!]);
+  });
+
+  it("Lot 4.1-fix2 : fallback bridge 'global' → null (admin) si user_perimetres VIDE", async () => {
+    const userId = seed.userIds['admin@miznas.local']!;
+    await ds.query(
+      `INSERT INTO bridge_user_role ("fk_user","fk_role","perimetre_type","est_actif","utilisateur_creation")
+       VALUES ($1, $2, 'global', true, 'system')`,
+      [userId, seed.roleIds['ADMIN']!],
+    );
+    const result = await service.getCrAutorisesPourUser(userId);
+    expect(result).toBeNull(); // admin global
+  });
+
+  it("Lot 4.1-fix2 : user_perimetres expirée (date_fin dépassée) → fallback bridge", async () => {
+    const userId = seed.userIds['preparateur_civ@miznas.local']!;
+    await ds.query(
+      `INSERT INTO bridge_user_role ("fk_user","fk_role","perimetre_type","est_actif","utilisateur_creation")
+       VALUES ($1, $2, 'global', true, 'system')`,
+      [userId, seed.roleIds['ADMIN']!],
+    );
+    // Affectation expirée hier
+    const hier = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
     await ajouterPerimetre(userId, 'CR', {
-      cibleId: seed.crIds['CR_AG_ABJ_COCODY']!,
+      cibleId: seed.crIds['CR_AG_ABJ_PLATEAU']!,
+      dateDebut: '2024-01-01',
+      dateFin: hier,
     });
     const result = await service.getCrAutorisesPourUser(userId);
-    expect(result).not.toBeNull();
-    expect((result as string[]).sort()).toEqual(
-      [seed.crIds['CR_AG_ABJ_PLATEAU']!, seed.crIds['CR_AG_ABJ_COCODY']!].sort(),
-    );
+    // L'affectation expirée est ignorée → fallback bridge global → null
+    expect(result).toBeNull();
   });
 });

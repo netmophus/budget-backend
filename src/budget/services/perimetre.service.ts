@@ -52,37 +52,55 @@ export class PerimetreService {
    * filtre (admin global). `[]` = aucun CR (situation rare mais
    * possible). Stringifié bigint.
    *
-   * Lot 4.1 — la source de vérité bascule de `bridge_user_role` vers
-   * `user_perimetres`. Pour ne pas casser les déploiements en cours
-   * (où le backfill peut ne pas être encore exécuté), on lit les
-   * deux sources et on en fait l'union (dette tracée — Lot 6 :
-   * retirer la lecture `bridge_user_role.perimetre_type` une fois la
-   * coexistence stabilisée).
+   * Lot 4.1-fix2.A — Stratégie de **priorité** (au lieu d'union) :
+   *   1. user_perimetres a au moins une ligne active à dateRef
+   *      → on calcule UNIQUEMENT à partir de user_perimetres.
+   *      Le rôle 'global' du bridge_user_role est ignoré dans ce
+   *      cas (l'affectation explicite restreint le user, même s'il
+   *      est techniquement admin).
+   *   2. Sinon → fallback bridge_user_role (rétrocompat Lot 1) :
+   *      'global' → null (admin),
+   *      structure / centre_responsabilite → CR du périmètre legacy.
    *
-   * Le rôle global ('global' dans `bridge_user_role.perimetre_type`)
-   * reste détecté via le bridge (court-circuit admin).
+   * Sans ce changement, les rôles globaux (encore présents pour
+   * tous les personas du seed Lot 4.1-fix) annulent toute
+   * restriction multi-périmètres → bug critique remonté au
+   * smoke test BSIC Niger.
    */
   async getCrAutorisesPourUser(userId: string): Promise<string[] | null> {
-    // 1. Détection admin global via bridge_user_role (inchangé).
+    // 1. Vérifie qu'au moins un rôle actif existe (sinon
+    //    UnauthorizedException — règle Lot 1 inchangée).
     const roles = await this.loadRolesActifs(userId);
     if (roles.length === 0) {
       throw new UnauthorizedException(
         `Aucun rôle actif pour l'utilisateur ${userId}. Accès budget refusé.`,
       );
     }
-    if (
-      roles.some((r) => (r.perimetreType ?? 'global').toLowerCase() === 'global')
-    ) {
-      return null;
+
+    // 2. Priorité user_perimetres si ≥ 1 ligne active à dateRef.
+    const today = new Date().toISOString().slice(0, 10);
+    const aDesAffectations = await this.userPerimetreRepo
+      .createQueryBuilder('up')
+      .where('up.fkUser = :userId', { userId })
+      .andWhere('up.actif = true')
+      .andWhere('up.dateDebut <= :today', { today })
+      .andWhere('(up.dateFin IS NULL OR up.dateFin >= :today)', { today })
+      .getCount();
+
+    if (aDesAffectations > 0) {
+      // user_perimetres prend la main → on ignore bridge_user_role.
+      return this.getPerimetreEffectif(userId, today);
     }
 
-    // 2. Union de user_perimetres (Lot 4.1) et des anciennes
-    //    affectations bridge_user_role (rétrocompat).
-    const setIds = new Set<string>(await this.getPerimetreEffectif(userId));
-    for (const id of await this.crsViaBridgeUserRole(roles)) {
-      setIds.add(id);
+    // 3. Fallback bridge_user_role (rétrocompat Lot 1).
+    if (
+      roles.some(
+        (r) => (r.perimetreType ?? 'global').toLowerCase() === 'global',
+      )
+    ) {
+      return null; // admin global
     }
-    return Array.from(setIds);
+    return this.crsViaBridgeUserRole(roles);
   }
 
   /**
