@@ -1,0 +1,28 @@
+<p>Bonjour {{destinataire.prenom}} {{destinataire.nom}},</p>
+
+<p>Une <strong>nouvelle affectation de périmètre</strong> vient de vous être attribuée par un administrateur.</p>
+
+<table cellpadding="0" cellspacing="0" style="margin:12px 0; font-size:14px;">
+<tr><td style="padding:4px 12px 4px 0; color:#656d76;">Type de cible&nbsp;:</td>
+<td><strong>{{cibleType}}</strong></td></tr>
+{{#if cibleId}}
+<tr><td style="padding:4px 12px 4px 0; color:#656d76;">Cible&nbsp;:</td>
+<td>{{cibleId}}</td></tr>
+{{/if}}
+{{#if cibleCrIds}}
+<tr><td style="padding:4px 12px 4px 0; color:#656d76;">CR concernés&nbsp;:</td>
+<td>{{cibleCrIds.length}} centres</td></tr>
+{{/if}}
+<tr><td style="padding:4px 12px 4px 0; color:#656d76;">Date d'effet&nbsp;:</td>
+<td>{{dateDebut}}</td></tr>
+{{#if motif}}
+<tr><td style="padding:4px 12px 4px 0; color:#656d76;">Motif&nbsp;:</td>
+<td>{{motif}}</td></tr>
+{{/if}}
+</table>
+
+<p>Cette affectation est immédiatement active. Vous pouvez consulter le détail de votre périmètre depuis votre profil.</p>
+
+<p style="margin:20px 0;">
+<a href="{{app_base_url}}{{lien_action}}" style="background:#0969da; color:#ffffff; padding:8px 16px; border-radius:6px; text-decoration:none; display:inline-block;">Mon profil</a>
+</p>

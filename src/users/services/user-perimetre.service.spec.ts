@@ -128,10 +128,13 @@ describe('UserPerimetreService', () => {
   beforeAll(async () => {
     ds = await createDataSource();
     auditService = new AuditService(ds.getRepository(AuditLog));
+    // Lot 4.3 — mock EventEmitter2 (couplage faible vers notifications)
+    const events = { emit: jest.fn(), emitAsync: jest.fn() } as never;
     service = new UserPerimetreService(
       ds.getRepository(UserPerimetre),
       ds.getRepository(User),
       auditService,
+      events,
     );
     ids = await seed(ds);
   });

@@ -1,0 +1,14 @@
+<p>Bonjour {{destinataire.prenom}} {{destinataire.nom}},</p>
+
+<p>La version budgétaire <strong>{{codeVersion}}</strong> que vous aviez soumise vient d'être <strong>rejetée</strong> par {{auteurEmail}}.</p>
+
+<p style="background:#ffebe9; border-left:3px solid #cf222e; padding:8px 12px; margin:12px 0;">
+<strong>Motif de rejet&nbsp;:</strong><br>
+{{commentaire}}
+</p>
+
+<p>La version est repassée en statut <em>Brouillon</em>&nbsp;: vous pouvez la corriger et la re-soumettre quand elle sera prête.</p>
+
+<p style="margin:20px 0;">
+<a href="{{app_base_url}}{{lien_action}}" style="background:#0969da; color:#ffffff; padding:8px 16px; border-radius:6px; text-decoration:none; display:inline-block;">Reprendre la saisie</a>
+</p>

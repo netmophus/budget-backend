@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
+import { EventEmitterModule } from '@nestjs/event-emitter';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { LoggerModule } from 'nestjs-pino';
 import { AppController } from './app.controller';
@@ -12,6 +13,7 @@ import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
 import { PermissionsGuard } from './auth/guards/permissions.guard';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 import { DelegationsModule } from './delegations/delegations.module';
+import { NotificationsModule } from './notifications/notifications.module';
 import { FaitBudgetModule } from './faits/budget/fait-budget.module';
 import { BudgetModule } from './budget/budget.module';
 import { HealthModule } from './health/health.module';
@@ -90,6 +92,15 @@ import { UsersModule } from './users/users.module';
         migrationsRun: false,
       }),
     }),
+    // Lot 4.3 — bus d'événements applicatif (couplage faible). Doit
+    // être enregistré globalement pour que les services métier puissent
+    // injecter EventEmitter2 sans dépendre de NotificationsModule.
+    EventEmitterModule.forRoot({
+      wildcard: false,
+      delimiter: '.',
+      maxListeners: 20,
+      verboseMemoryLeak: true,
+    }),
     HealthModule,
     UsersModule,
     RolesModule,
@@ -110,6 +121,8 @@ import { UsersModule } from './users/users.module';
     BudgetModule,
     // Lot 4.2 — délégations temporaires
     DelegationsModule,
+    // Lot 4.3 — notifications email
+    NotificationsModule,
     // Référentiels secondaires (énumérations) — Lot 2.5-bis-A.
     RefTypeStructureModule,
     RefPaysModule,

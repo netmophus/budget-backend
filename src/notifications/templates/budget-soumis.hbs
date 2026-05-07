@@ -1,0 +1,18 @@
+<p>Bonjour {{destinataire.prenom}} {{destinataire.nom}},</p>
+
+<p>La version budgétaire <strong>{{codeVersion}}</strong> vient d'être <strong>soumise pour validation</strong> par {{auteurEmail}}.</p>
+
+{{#if commentaire}}
+<p style="background:#ddf4ff; border-left:3px solid #0969da; padding:8px 12px; margin:12px 0;">
+<em>Commentaire de soumission&nbsp;:</em><br>
+{{commentaire}}
+</p>
+{{/if}}
+
+<p>Vous êtes destinataire de ce message car vous disposez de la permission <code>BUDGET.VALIDER</code> sur le périmètre de cette version.</p>
+
+<p style="margin:20px 0;">
+<a href="{{app_base_url}}{{lien_action}}" style="background:#0969da; color:#ffffff; padding:8px 16px; border-radius:6px; text-decoration:none; display:inline-block;">Examiner la version</a>
+</p>
+
+<p style="font-size:12px; color:#656d76;">Action attendue&nbsp;: <strong>valider</strong> ou <strong>rejeter avec commentaire</strong> la version dans la file <em>« À valider »</em>.</p>

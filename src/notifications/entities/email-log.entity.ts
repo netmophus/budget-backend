@@ -1,0 +1,105 @@
+import {
+  Column,
+  Entity,
+  Index,
+  JoinColumn,
+  ManyToOne,
+  PrimaryGeneratedColumn,
+} from 'typeorm';
+
+import { User } from '../../users/entities/user.entity';
+
+export type StatutEmail = 'EN_ATTENTE' | 'ENVOYE' | 'ECHEC' | 'SUPPRIME';
+
+/**
+ * Événements supportés par le module notifications (Lot 4.3).
+ * Le mandat conserve la numérotation E1-E9 du prompt global,
+ * E6 (rappel délégation J-3) volontairement reporté Lot 6.
+ */
+export type TypeEvenement =
+  | 'BUDGET_SOUMIS'        // E1
+  | 'BUDGET_VALIDE'        // E2
+  | 'BUDGET_REJETE'        // E3
+  | 'BUDGET_PUBLIE'        // E4
+  | 'DELEGATION_CREEE'     // E5
+  | 'DELEGATION_EXPIREE'   // E7
+  | 'DELEGATION_REVOQUEE'  // E8
+  | 'AFFECTATION_CREEE';   // E9
+
+/**
+ * email_log (Lot 4.3) — trace de chaque envoi d'email (réel ou
+ * dry-run ou supprimé par préférence). Append-only : pas de
+ * DELETE, pas d'UPDATE en dehors du retry.
+ *
+ * Le snapshot `destinataire_email` est conservé indépendamment de
+ * `fk_destinataire` pour rester lisible même si le user est
+ * supprimé (FK ON DELETE SET NULL).
+ */
+@Entity({ name: 'email_log' })
+@Index('idx_email_log_statut', ['statut'])
+@Index('idx_email_log_destinataire', ['fkDestinataire', 'dateCreation'])
+@Index('idx_email_log_evenement', ['evenement', 'dateCreation'])
+export class EmailLog {
+  @PrimaryGeneratedColumn('identity', { type: 'bigint' })
+  id!: string;
+
+  @Column({ name: 'evenement', type: 'varchar', length: 64 })
+  evenement!: TypeEvenement;
+
+  @Column({ name: 'fk_destinataire', type: 'bigint', nullable: true })
+  fkDestinataire!: string | null;
+
+  @Column({ name: 'destinataire_email', type: 'varchar', length: 255 })
+  destinataireEmail!: string;
+
+  @Column({ name: 'sujet', type: 'text' })
+  sujet!: string;
+
+  @Column({ name: 'template', type: 'varchar', length: 64 })
+  template!: string;
+
+  @Column({ name: 'payload', type: 'jsonb', default: () => "'{}'::jsonb" })
+  payload!: Record<string, unknown>;
+
+  @Column({ name: 'statut', type: 'varchar', length: 20 })
+  statut!: StatutEmail;
+
+  @Column({ name: 'tentatives', type: 'int', default: 0 })
+  tentatives!: number;
+
+  @Column({ name: 'dernier_message_erreur', type: 'text', nullable: true })
+  dernierMessageErreur!: string | null;
+
+  @Column({ name: 'envoye_le', type: 'timestamp', nullable: true })
+  envoyeLe!: Date | null;
+
+  @Column({
+    name: 'date_creation',
+    type: 'timestamp',
+    default: () => 'CURRENT_TIMESTAMP',
+  })
+  dateCreation!: Date;
+
+  @Column({
+    name: 'utilisateur_creation',
+    type: 'varchar',
+    length: 255,
+    default: 'system',
+  })
+  utilisateurCreation!: string;
+
+  @Column({ name: 'date_modification', type: 'timestamp', nullable: true })
+  dateModification!: Date | null;
+
+  @Column({
+    name: 'utilisateur_modification',
+    type: 'varchar',
+    length: 255,
+    nullable: true,
+  })
+  utilisateurModification!: string | null;
+
+  @ManyToOne(() => User, { onDelete: 'SET NULL', nullable: true })
+  @JoinColumn({ name: 'fk_destinataire' })
+  destinataire!: User | null;
+}

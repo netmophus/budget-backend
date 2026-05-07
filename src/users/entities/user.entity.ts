@@ -65,6 +65,28 @@ export class User {
   })
   utilisateurModification!: string | null;
 
+  // Lot 4.3 — Préférences notifications email.
+  @Column({
+    name: 'notifications_email_actives',
+    type: 'boolean',
+    default: true,
+  })
+  notificationsEmailActives!: boolean;
+
+  /**
+   * Liste blanche d'événements acceptés. NULL = tous les types acceptés
+   * (défaut). Valeurs possibles : BUDGET_SOUMIS, BUDGET_VALIDE,
+   * BUDGET_REJETE, BUDGET_PUBLIE, DELEGATION_CREEE, DELEGATION_EXPIREE,
+   * DELEGATION_REVOQUEE, AFFECTATION_CREEE.
+   */
+  @Column({
+    name: 'notifications_email_types',
+    type: 'text',
+    array: true,
+    nullable: true,
+  })
+  notificationsEmailTypes!: string[] | null;
+
   @OneToMany(() => UserRole, (userRole) => userRole.user)
   userRoles!: UserRole[];
 }

@@ -41,11 +41,18 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 
 import { AuditService } from '../audit/audit.service';
 import { PermissionsService } from '../auth/permissions.service';
+import {
+  type DelegationEventPayload,
+  EVENT_DELEGATION_CREATED,
+  EVENT_DELEGATION_EXPIRED,
+  EVENT_DELEGATION_REVOKED,
+} from '../notifications/notifications.events';
 import { UserPerimetre } from '../users/entities/user-perimetre.entity';
 import { User } from '../users/entities/user.entity';
 import {
@@ -84,6 +91,7 @@ export class DelegationsService {
     private readonly userRepo: Repository<User>,
     private readonly auditService: AuditService,
     private readonly permissionsService: PermissionsService,
+    private readonly events: EventEmitter2,
   ) {}
 
   // ─── Création ────────────────────────────────────────────────────
@@ -272,6 +280,17 @@ export class DelegationsService {
       return saved;
     });
 
+    // Lot 4.3 — émission événement post-commit (couplage faible).
+    this.events.emit(EVENT_DELEGATION_CREATED, {
+      delegationId: String(created.id),
+      fkDelegant: String(created.fkDelegant),
+      fkDelegataire: String(created.fkDelegataire),
+      permissions: created.permissions,
+      dateDebut: created.dateDebut,
+      dateFin: created.dateFin,
+      motif: created.motif,
+    } satisfies DelegationEventPayload);
+
     return { delegation: created, warnings };
   }
 
@@ -299,7 +318,7 @@ export class DelegationsService {
       );
     }
 
-    return this.delegRepo.manager.transaction(async (tx) => {
+    const result = await this.delegRepo.manager.transaction(async (tx) => {
       const dRepo = tx.getRepository(Delegation);
       const upRepo = tx.getRepository(UserPerimetre);
 
@@ -347,6 +366,20 @@ export class DelegationsService {
       );
       return saved;
     });
+
+    // Lot 4.3 — émission post-commit
+    this.events.emit(EVENT_DELEGATION_REVOKED, {
+      delegationId: String(d.id),
+      fkDelegant: String(d.fkDelegant),
+      fkDelegataire: String(d.fkDelegataire),
+      permissions: d.permissions,
+      dateDebut: d.dateDebut,
+      dateFin: d.dateFin,
+      motif: d.motif,
+      motifRevocation: dto.motif,
+    } satisfies DelegationEventPayload);
+
+    return result;
   }
 
   // ─── Listing ─────────────────────────────────────────────────────
@@ -468,6 +501,17 @@ export class DelegationsService {
         );
         nb++;
       });
+
+      // Lot 4.3 — émission post-commit pour chaque délégation expirée.
+      this.events.emit(EVENT_DELEGATION_EXPIRED, {
+        delegationId: String(d.id),
+        fkDelegant: String(d.fkDelegant),
+        fkDelegataire: String(d.fkDelegataire),
+        permissions: d.permissions,
+        dateDebut: d.dateDebut,
+        dateFin: d.dateFin,
+        motif: d.motif,
+      } satisfies DelegationEventPayload);
     }
     if (nb > 0) {
       this.logger.log(`Cron expiration : ${nb} délégation(s) désactivée(s).`);

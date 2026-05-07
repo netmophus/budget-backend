@@ -1,0 +1,20 @@
+<p>Bonjour {{destinataire.prenom}} {{destinataire.nom}},</p>
+
+<p>Une délégation de droits vous a été <strong>accordée</strong>.</p>
+
+<table cellpadding="0" cellspacing="0" style="margin:12px 0; font-size:14px;">
+<tr><td style="padding:4px 12px 4px 0; color:#656d76;">Permissions déléguées&nbsp;:</td>
+<td><strong>{{#each permissions}}{{this}}{{#unless @last}}, {{/unless}}{{/each}}</strong></td></tr>
+<tr><td style="padding:4px 12px 4px 0; color:#656d76;">Période&nbsp;:</td>
+<td>du <strong>{{dateDebut}}</strong> au <strong>{{dateFin}}</strong></td></tr>
+<tr><td style="padding:4px 12px 4px 0; color:#656d76;">Motif&nbsp;:</td>
+<td>{{motif}}</td></tr>
+</table>
+
+<p style="background:#fff8c5; border-left:3px solid #9a6700; padding:8px 12px; margin:12px 0; font-size:13px;">
+<strong>Anti-chaînage strict (BCEAO)</strong>&nbsp;: vous ne pouvez pas re-déléguer ces permissions à un tiers. La chaîne s'arrête à vous.
+</p>
+
+<p style="margin:20px 0;">
+<a href="{{app_base_url}}{{lien_action}}" style="background:#0969da; color:#ffffff; padding:8px 16px; border-radius:6px; text-decoration:none; display:inline-block;">Voir mes délégations</a>
+</p>

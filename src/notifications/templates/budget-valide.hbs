@@ -1,0 +1,16 @@
+<p>Bonjour {{destinataire.prenom}} {{destinataire.nom}},</p>
+
+<p>La version budgétaire <strong>{{codeVersion}}</strong> a été <strong>validée</strong> par {{auteurEmail}}.</p>
+
+{{#if commentaire}}
+<p style="background:#dafbe1; border-left:3px solid #1a7f37; padding:8px 12px; margin:12px 0;">
+<em>Commentaire de validation&nbsp;:</em><br>
+{{commentaire}}
+</p>
+{{/if}}
+
+<p>Cette version peut désormais faire l'objet d'une <strong>publication (gel)</strong> par un détenteur de <code>BUDGET.PUBLIER</code>. Une fois publiée, elle deviendra <em>immuable</em> au sens BCEAO (conservation 10 ans).</p>
+
+<p style="margin:20px 0;">
+<a href="{{app_base_url}}{{lien_action}}" style="background:#0969da; color:#ffffff; padding:8px 16px; border-radius:6px; text-decoration:none; display:inline-block;">Voir la version</a>
+</p>

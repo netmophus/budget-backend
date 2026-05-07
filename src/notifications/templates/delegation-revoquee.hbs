@@ -1,0 +1,23 @@
+<p>Bonjour {{destinataire.prenom}} {{destinataire.nom}},</p>
+
+<p>La délégation que vous aviez reçue a été <strong>révoquée</strong> avant son terme.</p>
+
+{{#if motifRevocation}}
+<p style="background:#ffebe9; border-left:3px solid #cf222e; padding:8px 12px; margin:12px 0;">
+<strong>Motif de révocation&nbsp;:</strong><br>
+{{motifRevocation}}
+</p>
+{{/if}}
+
+<table cellpadding="0" cellspacing="0" style="margin:12px 0; font-size:14px;">
+<tr><td style="padding:4px 12px 4px 0; color:#656d76;">Permissions concernées&nbsp;:</td>
+<td><strong>{{#each permissions}}{{this}}{{#unless @last}}, {{/unless}}{{/each}}</strong></td></tr>
+<tr><td style="padding:4px 12px 4px 0; color:#656d76;">Période initiale&nbsp;:</td>
+<td>{{dateDebut}} → {{dateFin}}</td></tr>
+</table>
+
+<p>Les permissions associées vous ont été retirées avec effet immédiat.</p>
+
+<p style="margin:20px 0;">
+<a href="{{app_base_url}}{{lien_action}}" style="background:#0969da; color:#ffffff; padding:8px 16px; border-radius:6px; text-decoration:none; display:inline-block;">Voir mes délégations</a>
+</p>

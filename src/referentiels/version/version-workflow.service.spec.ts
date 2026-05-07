@@ -126,11 +126,14 @@ describe('VersionWorkflowService', () => {
     permissionsServiceMock = {
       getDelegationContextPour: jest.fn().mockResolvedValue(null),
     };
+    // Lot 4.3 — mock EventEmitter2 (couplage faible vers notifications)
+    const events = { emit: jest.fn(), emitAsync: jest.fn() } as never;
     service = new VersionWorkflowService(
       repo,
       dataSource,
       auditService,
       permissionsServiceMock as unknown as PermissionsService,
+      events,
     );
   });
 

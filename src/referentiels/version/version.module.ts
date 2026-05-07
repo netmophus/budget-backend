@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { EventEmitterModule } from '@nestjs/event-emitter';
 import { TypeOrmModule } from '@nestjs/typeorm';
 
 import { AuditModule } from '../../audit/audit.module';
@@ -23,6 +24,8 @@ import { VersionWorkflowService } from './version-workflow.service';
     // Lot 3.2 — hook Q9 : auto-création scénario MEDIAN + audit
     ScenarioModule,
     AuditModule,
+    // Lot 4.3 — VersionWorkflowService émet 4 events budget.*
+    EventEmitterModule.forRoot(),
   ],
   controllers: [VersionController],
   providers: [VersionService, VersionWorkflowService],

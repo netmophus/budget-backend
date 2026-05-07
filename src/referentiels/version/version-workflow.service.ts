@@ -27,11 +27,19 @@ import {
   NotFoundException,
   UnprocessableEntityException,
 } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
 
 import { AuditService } from '../../audit/audit.service';
 import { PermissionsService } from '../../auth/permissions.service';
+import {
+  type BudgetEventPayload,
+  EVENT_BUDGET_PUBLISHED,
+  EVENT_BUDGET_REJECTED,
+  EVENT_BUDGET_SUBMITTED,
+  EVENT_BUDGET_VALIDATED,
+} from '../../notifications/notifications.events';
 import { DimVersion } from './entities/dim-version.entity';
 import { VersionResponseDto } from './dto/version-response.dto';
 import {
@@ -55,6 +63,7 @@ export class VersionWorkflowService {
     private readonly dataSource: DataSource,
     private readonly auditService: AuditService,
     private readonly permissionsService: PermissionsService,
+    private readonly events: EventEmitter2,
   ) {}
 
   // ─── Soumettre : ouvert → soumis ────────────────────────────────
@@ -132,6 +141,17 @@ export class VersionWorkflowService {
         commentaire: `Soumission de ${v.codeVersion} (${nbLignes} ligne(s) à valider).`,
       });
 
+      // Lot 4.3 — émission événement (couplage faible). Le listener
+      // NotificationsModule s'abonne et déclenche les emails. Si aucun
+      // listener n'est enregistré, l'émission ne casse rien.
+      this.events.emit(EVENT_BUDGET_SUBMITTED, {
+        versionId: String(versionId),
+        codeVersion: v.codeVersion,
+        auteurEmail: user.email,
+        auteurId: user.userId,
+        commentaire: dto.commentaire ?? null,
+      } satisfies BudgetEventPayload);
+
       return toVersionResponse(saved);
     });
   }
@@ -183,6 +203,14 @@ export class VersionWorkflowService {
         },
         commentaire: `Validation de ${v.codeVersion}.`,
       });
+
+      this.events.emit(EVENT_BUDGET_VALIDATED, {
+        versionId: String(versionId),
+        codeVersion: v.codeVersion,
+        auteurEmail: user.email,
+        auteurId: user.userId,
+        commentaire: dto.commentaire ?? null,
+      } satisfies BudgetEventPayload);
 
       return toVersionResponse(saved);
     });
@@ -243,6 +271,14 @@ export class VersionWorkflowService {
         commentaire: `Rejet de ${v.codeVersion} : ${dto.commentaire.slice(0, 200)}`,
       });
 
+      this.events.emit(EVENT_BUDGET_REJECTED, {
+        versionId: String(versionId),
+        codeVersion: v.codeVersion,
+        auteurEmail: user.email,
+        auteurId: user.userId,
+        commentaire: dto.commentaire,
+      } satisfies BudgetEventPayload);
+
       return toVersionResponse(saved);
     });
   }
@@ -299,6 +335,14 @@ export class VersionWorkflowService {
           `Publication (gel) de ${v.codeVersion} — action irréversible. ` +
           'Conservation BCEAO 10 ans.',
       });
+
+      this.events.emit(EVENT_BUDGET_PUBLISHED, {
+        versionId: String(versionId),
+        codeVersion: v.codeVersion,
+        auteurEmail: user.email,
+        auteurId: user.userId,
+        commentaire: dto.commentaire ?? null,
+      } satisfies BudgetEventPayload);
 
       return toVersionResponse(saved);
     });

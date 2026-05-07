@@ -170,12 +170,15 @@ describe('DelegationsService', () => {
       ],
       [ids.delegataireId]: [],
     });
+    // Lot 4.3 — mock EventEmitter2 (couplage faible vers notifications)
+    const events = { emit: jest.fn(), emitAsync: jest.fn() } as never;
     service = new DelegationsService(
       ds.getRepository(Delegation),
       ds.getRepository(UserPerimetre),
       ds.getRepository(User),
       auditService,
       permsMock,
+      events,
     );
   });
 
@@ -280,12 +283,14 @@ describe('DelegationsService', () => {
     const permsRestreints = makePermissionsServiceMock({
       [ids.delegantId]: ['BUDGET.SAISIR'],
     });
+    const events2 = { emit: jest.fn(), emitAsync: jest.fn() } as never;
     const restrictedService = new DelegationsService(
       ds.getRepository(Delegation),
       ds.getRepository(UserPerimetre),
       ds.getRepository(User),
       auditService,
       permsRestreints,
+      events2,
     );
     await expect(
       restrictedService.creer(

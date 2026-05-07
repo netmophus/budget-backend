@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { EventEmitterModule } from '@nestjs/event-emitter';
 import { ScheduleModule } from '@nestjs/schedule';
 import { TypeOrmModule } from '@nestjs/typeorm';
 
@@ -17,6 +18,8 @@ import { Delegation } from './entities/delegation.entity';
     AuditModule,
     AuthModule,
     ScheduleModule.forRoot(),
+    // Lot 4.3 — DelegationsService émet 3 events delegation.*
+    EventEmitterModule.forRoot(),
   ],
   controllers: [DelegationsController],
   providers: [DelegationsService, DelegationsCronService],

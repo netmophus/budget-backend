@@ -1,0 +1,17 @@
+<p>Bonjour {{destinataire.prenom}} {{destinataire.nom}},</p>
+
+<p>La version budgétaire <strong>{{codeVersion}}</strong> a été <strong>publiée (gelée)</strong> par {{auteurEmail}}.</p>
+
+<p style="background:#fff8c5; border-left:3px solid #9a6700; padding:8px 12px; margin:12px 0;">
+<strong>Action irréversible BCEAO.</strong> Cette version est désormais immuable. Elle servira de référence pour les états réglementaires et sera conservée 10 ans dans les archives.
+</p>
+
+{{#if commentaire}}
+<p><em>Commentaire de publication&nbsp;:</em> {{commentaire}}</p>
+{{/if}}
+
+<p>Vous êtes destinataire de ce message en tant que partie prenante du périmètre concerné (soumetteur, validateur ou saisisseur).</p>
+
+<p style="margin:20px 0;">
+<a href="{{app_base_url}}{{lien_action}}" style="background:#0969da; color:#ffffff; padding:8px 16px; border-radius:6px; text-decoration:none; display:inline-block;">Consulter la version publiée</a>
+</p>

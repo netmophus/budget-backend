@@ -17,10 +17,15 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 
 import { AuditService } from '../../audit/audit.service';
+import {
+  type AffectationEventPayload,
+  EVENT_AFFECTATION_CREATED,
+} from '../../notifications/notifications.events';
 import { User } from '../entities/user.entity';
 import {
   type CiblePerimetreType,
@@ -63,6 +68,7 @@ export class UserPerimetreService {
     @InjectRepository(User)
     private readonly userRepo: Repository<User>,
     private readonly auditService: AuditService,
+    private readonly events: EventEmitter2,
   ) {}
 
   // ─── Lecture ─────────────────────────────────────────────────────
@@ -185,7 +191,7 @@ export class UserPerimetreService {
     // 5. INSERT + audit dans une transaction atomique (Lot 4.1-fix2.B).
     //    Si l'audit échoue, l'affectation est rollback automatiquement.
     try {
-      return await this.repo.manager.transaction(async (tx) => {
+      const saved = await this.repo.manager.transaction(async (tx) => {
         const upRepo = tx.getRepository(UserPerimetre);
         const entity = upRepo.create({
           fkUser: userId,
@@ -225,6 +231,22 @@ export class UserPerimetreService {
         );
         return saved;
       });
+
+      // Lot 4.3 — émission post-commit (couplage faible).
+      this.events.emit(EVENT_AFFECTATION_CREATED, {
+        affectationId: String(saved.id),
+        fkUser: userId,
+        cibleType: saved.cibleType,
+        cibleId: saved.cibleId === null ? null : String(saved.cibleId),
+        cibleCrIds:
+          saved.cibleCrIds === null
+            ? null
+            : saved.cibleCrIds.map((x) => String(x)),
+        dateDebut: saved.dateDebut,
+        motif: saved.motif,
+      } satisfies AffectationEventPayload);
+
+      return saved;
     } catch (err) {
       // Conflit unique (mêmes user/cible/origine déjà actif, ou
       // CR_SET strictement identique pour le même user — index

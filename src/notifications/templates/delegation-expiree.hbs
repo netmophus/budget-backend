@@ -1,0 +1,16 @@
+<p>Bonjour {{destinataire.prenom}} {{destinataire.nom}},</p>
+
+<p>La délégation référencée ci-dessous a <strong>expiré automatiquement</strong> à sa date de fin&nbsp;:</p>
+
+<table cellpadding="0" cellspacing="0" style="margin:12px 0; font-size:14px;">
+<tr><td style="padding:4px 12px 4px 0; color:#656d76;">Permissions concernées&nbsp;:</td>
+<td><strong>{{#each permissions}}{{this}}{{#unless @last}}, {{/unless}}{{/each}}</strong></td></tr>
+<tr><td style="padding:4px 12px 4px 0; color:#656d76;">Période&nbsp;:</td>
+<td>du {{dateDebut}} au <strong>{{dateFin}}</strong></td></tr>
+</table>
+
+<p>Aucune action n'est requise de votre part. Si une nouvelle délégation est nécessaire, le délégant doit la créer explicitement.</p>
+
+<p style="margin:20px 0;">
+<a href="{{app_base_url}}{{lien_action}}" style="background:#0969da; color:#ffffff; padding:8px 16px; border-radius:6px; text-decoration:none; display:inline-block;">Voir mes délégations</a>
+</p>
