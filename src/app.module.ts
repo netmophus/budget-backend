@@ -11,6 +11,7 @@ import { AuthModule } from './auth/auth.module';
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
 import { PermissionsGuard } from './auth/guards/permissions.guard';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
+import { DelegationsModule } from './delegations/delegations.module';
 import { FaitBudgetModule } from './faits/budget/fait-budget.module';
 import { BudgetModule } from './budget/budget.module';
 import { HealthModule } from './health/health.module';
@@ -107,6 +108,8 @@ import { UsersModule } from './users/users.module';
     VersionModule,
     FaitBudgetModule,
     BudgetModule,
+    // Lot 4.2 — délégations temporaires
+    DelegationsModule,
     // Référentiels secondaires (énumérations) — Lot 2.5-bis-A.
     RefTypeStructureModule,
     RefPaysModule,
