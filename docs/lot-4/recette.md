@@ -644,3 +644,35 @@ SELECT statut, payload->>'_motifSuppression' FROM email_log
 
 À la livraison, marquer ce document daté avec le résultat de
 chaque scénario (✓ / ✗ / commentaire).
+
+---
+
+## Suivi d'exécution
+
+Tableau à compléter au fil des campagnes de recette. Une ligne
+par exécution réelle (un scénario peut être ré-exécuté plusieurs
+fois — duppliquer la ligne).
+
+**Légende** :
+- ⬜ à faire
+- ✅ passé (toutes les vérifications SQL OK + UI conforme)
+- ❌ échec (au moins une vérification a échoué — décrire en notes)
+- ⚠️ partiel (le scénario passe mais avec un comportement inattendu
+  qui n'invalide pas la capacité — décrire en notes)
+
+| Scénario | Date d'exécution | Exécutant | Statut | Notes |
+|----------|------------------|-----------|--------|-------|
+| **R1** Multi-périmètres simple STRUCTURE        |  |  | ⬜ |  |
+| **R2** Multi-périmètres CR_SET avec date_fin    |  |  | ⬜ |  |
+| **R3** Délégation nominal complet               |  |  | ⬜ |  |
+| **R4** Expiration auto (cron)                   |  |  | ⬜ |  |
+| **R5** ANTI-CHAÎNAGE STRICT (BCEAO)             |  |  | ⬜ |  |
+| **R6** Workflow complet × 5 emails              |  |  | ⬜ |  |
+| **R7.A** Mode dry-run global                    |  |  | ⬜ |  |
+| **R7.B** Préférences user (toggle + liste blanche) |  |  | ⬜ |  |
+
+> Si un scénario échoue, créer une issue référençant ce document
+> (`docs/lot-4/recette.md`) avec le numéro Rn, la date, et le bloc
+> de la vérification SQL incriminée. La correction doit faire
+> repasser **R5 en priorité** (anti-chaînage strict — exigence
+> BCEAO non négociable).
