@@ -43,11 +43,17 @@ function urRow(opts: {
 describe('PermissionsService', () => {
   let service: PermissionsService;
   let userRepo: jest.Mocked<Pick<Repository<User>, 'findOne'>>;
-  let userRoleRepo: { createQueryBuilder: jest.Mock };
+  let userRoleRepo: {
+    createQueryBuilder: jest.Mock;
+    manager: { query: jest.Mock };
+  };
 
   beforeEach(async () => {
     userRepo = { findOne: jest.fn() };
-    userRoleRepo = { createQueryBuilder: jest.fn() };
+    userRoleRepo = {
+      createQueryBuilder: jest.fn(),
+      manager: { query: jest.fn().mockResolvedValue([]) },
+    };
 
     const moduleRef: TestingModule = await Test.createTestingModule({
       providers: [
@@ -163,6 +169,77 @@ describe('PermissionsService', () => {
       expect(
         await service.hasPermission('1', ['USER.LIRE', 'USER.GERER'], 'all'),
       ).toBe(false);
+    });
+  });
+
+  // Lot 4.2 — permissions natives + déléguées avec contexte
+  describe('getPermissionsEffectivesAvecContexte', () => {
+    beforeEach(() => {
+      userRepo.findOne.mockResolvedValue({ id: '1', estActif: true } as User);
+      userRoleRepo.createQueryBuilder.mockReturnValue(
+        makeQb([
+          urRow({
+            perimetreType: 'global',
+            permissions: [{ code: 'USER.LIRE', module: 'USER' }],
+          }),
+        ]),
+      );
+    });
+
+    it('marque les permissions natives via=NATIF', async () => {
+      const result = await service.getPermissionsEffectivesAvecContexte('1');
+      expect(result).toHaveLength(1);
+      expect(result[0]).toMatchObject({
+        code_permission: 'USER.LIRE',
+        via: 'NATIF',
+      });
+      expect(result[0]!.delegation_id).toBeUndefined();
+    });
+
+    it('ajoute les permissions reçues par délégation avec via=DELEGATION et delegation_id', async () => {
+      userRoleRepo.manager.query.mockResolvedValue([
+        { id: '99', permissions: ['VALIDATION', 'SAISIE'] },
+      ]);
+      const result = await service.getPermissionsEffectivesAvecContexte(
+        '1',
+        '2027-01-15',
+      );
+      // 1 native + 2 déléguées (VALIDATION → BUDGET.VALIDER, SAISIE → BUDGET.SAISIR)
+      expect(result).toHaveLength(3);
+      const deleguees = result.filter((r) => r.via === 'DELEGATION');
+      expect(deleguees).toHaveLength(2);
+      expect(deleguees.map((d) => d.code_permission).sort()).toEqual([
+        'BUDGET.SAISIR',
+        'BUDGET.VALIDER',
+      ]);
+      expect(deleguees.every((d) => d.delegation_id === '99')).toBe(true);
+    });
+
+    it("interroge la table delegations avec dateRef quand fourni", async () => {
+      await service.getPermissionsEffectivesAvecContexte('1', '2027-06-15');
+      expect(userRoleRepo.manager.query).toHaveBeenCalledWith(
+        expect.stringContaining('FROM delegations'),
+        ['1', '2027-06-15'],
+      );
+    });
+
+    it('utilise CURRENT_DATE par défaut si dateRef absent', async () => {
+      const today = new Date().toISOString().slice(0, 10);
+      await service.getPermissionsEffectivesAvecContexte('1');
+      expect(userRoleRepo.manager.query).toHaveBeenCalledWith(
+        expect.any(String),
+        ['1', today],
+      );
+    });
+
+    it('ignore les verbes inconnus dans le mapping', async () => {
+      userRoleRepo.manager.query.mockResolvedValue([
+        { id: '7', permissions: ['SAISIE', 'INCONNU'] },
+      ]);
+      const result = await service.getPermissionsEffectivesAvecContexte('1');
+      const deleguees = result.filter((r) => r.via === 'DELEGATION');
+      expect(deleguees).toHaveLength(1);
+      expect(deleguees[0]!.code_permission).toBe('BUDGET.SAISIR');
     });
   });
 });
