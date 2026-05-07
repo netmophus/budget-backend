@@ -9,7 +9,7 @@
  *   - Vérification de l'existence du user cible
  *   - Vérification de l'existence des cibles (structure / CR)
  *   - Vérification que `date_fin >= date_debut` si fournie
- *   - Audit `AFFECTATION_CREEE` ou `AFFECTATION_RETIREE`
+ *   - Audit `CREER_AFFECTATION` ou `RETIRER_AFFECTATION`
  */
 import {
   BadRequestException,
@@ -182,55 +182,65 @@ export class UserPerimetreService {
       );
     }
 
-    // 5. INSERT
-    const entity = this.repo.create({
-      fkUser: userId,
-      cibleType: dto.cibleType,
-      cibleId: dto.cibleId ?? null,
-      cibleCrIds: dto.cibleCrIds ?? null,
-      origine: dto.origine ?? 'AFFECTATION',
-      dateDebut,
-      dateFin: dto.dateFin ?? null,
-      actif: true,
-      motif: dto.motif ?? null,
-      utilisateurCreation: auteurEmail,
-    });
-    let saved: UserPerimetre;
+    // 5. INSERT + audit dans une transaction atomique (Lot 4.1-fix2.B).
+    //    Si l'audit échoue, l'affectation est rollback automatiquement.
     try {
-      saved = await this.repo.save(entity);
+      return await this.repo.manager.transaction(async (tx) => {
+        const upRepo = tx.getRepository(UserPerimetre);
+        const entity = upRepo.create({
+          fkUser: userId,
+          cibleType: dto.cibleType,
+          cibleId: dto.cibleId ?? null,
+          cibleCrIds: dto.cibleCrIds ?? null,
+          origine: dto.origine ?? 'AFFECTATION',
+          dateDebut,
+          dateFin: dto.dateFin ?? null,
+          actif: true,
+          motif: dto.motif ?? null,
+          utilisateurCreation: auteurEmail,
+        });
+        const saved = await upRepo.save(entity);
+
+        await this.auditService.log(
+          {
+            utilisateur: auteurEmail,
+            typeAction: 'CREER_AFFECTATION',
+            entiteCible: 'user_perimetres',
+            idCible: String(saved.id),
+            statut: 'success',
+            payloadApres: {
+              userId,
+              cibleType: saved.cibleType,
+              cibleId: saved.cibleId,
+              cibleCrIds: saved.cibleCrIds,
+              origine: saved.origine,
+              dateDebut: saved.dateDebut,
+              dateFin: saved.dateFin,
+            },
+            commentaire:
+              `Affectation ${saved.cibleType} créée pour user ${userId} ` +
+              `(origine ${saved.origine}).`,
+          },
+          tx,
+        );
+        return saved;
+      });
     } catch (err) {
-      // Conflit unique (mêmes user/cible/origine déjà actif)
+      // Conflit unique (mêmes user/cible/origine déjà actif, ou
+      // CR_SET strictement identique pour le même user — index
+      // uq_user_perimetres_cr_set_actif posé au Lot 4.1-fix2.C).
       const msg = err instanceof Error ? err.message : String(err);
-      if (msg.includes('uq_user_perimetres_actif') || msg.includes('duplicate')) {
+      if (
+        msg.includes('uq_user_perimetres_actif') ||
+        msg.includes('uq_user_perimetres_cr_set_actif') ||
+        msg.includes('duplicate')
+      ) {
         throw new ConflictException(
           `Affectation déjà existante pour ce user / cible / origine.`,
         );
       }
       throw err;
     }
-
-    // 6. Audit
-    await this.auditService.log({
-      utilisateur: auteurEmail,
-      typeAction: 'AFFECTATION_CREEE',
-      entiteCible: 'user_perimetres',
-      idCible: String(saved.id),
-      statut: 'success',
-      payloadApres: {
-        userId,
-        cibleType: saved.cibleType,
-        cibleId: saved.cibleId,
-        cibleCrIds: saved.cibleCrIds,
-        origine: saved.origine,
-        dateDebut: saved.dateDebut,
-        dateFin: saved.dateFin,
-      },
-      commentaire:
-        `Affectation ${saved.cibleType} créée pour user ${userId} ` +
-        `(origine ${saved.origine}).`,
-    });
-
-    return saved;
   }
 
   // ─── Désactivation soft ──────────────────────────────────────────
@@ -253,25 +263,32 @@ export class UserPerimetreService {
         `Affectation ${perimetreId} déjà inactive.`,
       );
     }
-    p.actif = false;
-    p.dateModification = new Date();
-    p.utilisateurModification = auteurEmail;
-    await this.repo.save(p);
+    // Désactivation soft + audit en transaction atomique (Lot 4.1-fix2.B).
+    await this.repo.manager.transaction(async (tx) => {
+      const upRepo = tx.getRepository(UserPerimetre);
+      p.actif = false;
+      p.dateModification = new Date();
+      p.utilisateurModification = auteurEmail;
+      await upRepo.save(p);
 
-    await this.auditService.log({
-      utilisateur: auteurEmail,
-      typeAction: 'AFFECTATION_RETIREE',
-      entiteCible: 'user_perimetres',
-      idCible: String(p.id),
-      statut: 'success',
-      payloadApres: {
-        userId,
-        cibleType: p.cibleType,
-        cibleId: p.cibleId,
-        cibleCrIds: p.cibleCrIds,
-        origine: p.origine,
-      },
-      commentaire: `Affectation ${p.cibleType} ${p.id} retirée (soft).`,
+      await this.auditService.log(
+        {
+          utilisateur: auteurEmail,
+          typeAction: 'RETIRER_AFFECTATION',
+          entiteCible: 'user_perimetres',
+          idCible: String(p.id),
+          statut: 'success',
+          payloadApres: {
+            userId,
+            cibleType: p.cibleType,
+            cibleId: p.cibleId,
+            cibleCrIds: p.cibleCrIds,
+            origine: p.origine,
+          },
+          commentaire: `Affectation ${p.cibleType} ${p.id} retirée (soft).`,
+        },
+        tx,
+      );
     });
   }
 

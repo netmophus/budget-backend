@@ -257,7 +257,7 @@ describe('UserPerimetresController (e2e)', () => {
     expect(res.body.cibleType).toBe('CR');
     expect(res.body.actif).toBe(true);
     const audits = (await dataSource.query(
-      `SELECT type_action FROM audit_log WHERE type_action='AFFECTATION_CREEE'`,
+      `SELECT type_action FROM audit_log WHERE type_action='CREER_AFFECTATION'`,
     )) as Array<{ type_action: string }>;
     expect(audits).toHaveLength(1);
   });
@@ -287,7 +287,7 @@ describe('UserPerimetresController (e2e)', () => {
     )) as Array<{ actif: boolean }>;
     expect(row[0]!.actif).toBe(false);
     const audits = (await dataSource.query(
-      `SELECT type_action FROM audit_log WHERE type_action='AFFECTATION_RETIREE'`,
+      `SELECT type_action FROM audit_log WHERE type_action='RETIRER_AFFECTATION'`,
     )) as Array<{ type_action: string }>;
     expect(audits).toHaveLength(1);
   });

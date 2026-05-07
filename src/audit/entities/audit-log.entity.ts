@@ -35,8 +35,16 @@ export type TypeAction =
   // Lot 3.7 — import en masse depuis fichier CSV/XLSX
   | 'IMPORT_BUDGET_BULK'
   // Lot 4.1 — gestion des affectations multi-périmètres
-  | 'AFFECTATION_CREEE'
-  | 'AFFECTATION_RETIREE';
+  // Lot 4.1-fix2.B : renommés pour aligner sur le style verbe-sujet
+  // (CREER_AFFECTATION / RETIRER_AFFECTATION) qui est cohérent avec
+  // SOUMETTRE_BUDGET, VALIDER_BUDGET, etc.
+  | 'CREER_AFFECTATION'
+  | 'RETIRER_AFFECTATION'
+  // Lot 4.2 (anticipation — codes seedés au Lot 4.1-fix2 pour éviter
+  // une nouvelle migration au démarrage du 4.2)
+  | 'CREER_DELEGATION'
+  | 'REVOQUER_DELEGATION'
+  | 'EXPIRER_DELEGATION';
 
 export type AuditStatut = 'success' | 'failure';
 

@@ -5,7 +5,7 @@
  *  - création STRUCTURE / CR / CR_SET avec validation cible
  *  - rejet CR_SET avec < 2 CR
  *  - rejet date_fin < date_debut
- *  - audit AFFECTATION_CREEE / AFFECTATION_RETIREE
+ *  - audit CREER_AFFECTATION / RETIRER_AFFECTATION
  *  - retrait soft (actif=false)
  *  - lister avec filtres actif / origine / dateRef
  */
@@ -259,7 +259,7 @@ describe('UserPerimetreService', () => {
     ).rejects.toThrow(NotFoundException);
   });
 
-  it('création écrit un audit AFFECTATION_CREEE', async () => {
+  it('création écrit un audit CREER_AFFECTATION', async () => {
     await service.creer(
       ids.userId,
       { cibleType: 'CR', cibleId: ids.crCivId },
@@ -267,7 +267,7 @@ describe('UserPerimetreService', () => {
     );
     const audits = (await ds.query(
       `SELECT type_action, statut, payload_apres
-         FROM audit_log WHERE type_action='AFFECTATION_CREEE'`,
+         FROM audit_log WHERE type_action='CREER_AFFECTATION'`,
     )) as Array<{
       type_action: string;
       statut: string;
@@ -280,7 +280,7 @@ describe('UserPerimetreService', () => {
 
   // ─── Retrait soft ────────────────────────────────────────────────
 
-  it('retire désactive (actif=false) et écrit un audit AFFECTATION_RETIREE', async () => {
+  it('retire désactive (actif=false) et écrit un audit RETIRER_AFFECTATION', async () => {
     const created = await service.creer(
       ids.userId,
       { cibleType: 'CR', cibleId: ids.crCivId },
@@ -293,7 +293,7 @@ describe('UserPerimetreService', () => {
     )) as Array<{ actif: boolean }>;
     expect(row[0]!.actif).toBe(false);
     const audits = (await ds.query(
-      `SELECT type_action FROM audit_log WHERE type_action='AFFECTATION_RETIREE'`,
+      `SELECT type_action FROM audit_log WHERE type_action='RETIRER_AFFECTATION'`,
     )) as Array<{ type_action: string }>;
     expect(audits).toHaveLength(1);
   });
@@ -351,6 +351,63 @@ describe('UserPerimetreService', () => {
     );
     const principal = await service.lister(ids.userId, { origine: 'PRINCIPAL' });
     expect(principal).toHaveLength(1);
+  });
+
+  // ─── Lot 4.1-fix2.B : transaction atomique create + audit ──────
+  //
+  // Note pg-mem : le ROLLBACK Postgres n'est pas implémenté côté
+  // pg-mem (chaque statement est commit immédiatement). Le rollback
+  // réel est validé en prod par la migration 049 + tests
+  // d'intégration. Ici on valide :
+  //  1) Si l'audit échoue, l'erreur remonte au caller (la transaction
+  //     n'avale pas l'exception).
+  //  2) auditService.log est appelé avec un EntityManager (2e arg)
+  //     pour permettre le rollback solidaire en prod.
+
+  it('Lot 4.1-fix2.B : creer — si audit échoue, l\'erreur remonte au caller', async () => {
+    const auditSpy = jest
+      .spyOn(auditService, 'log')
+      .mockRejectedValueOnce(new Error('audit_log INSERT failed'));
+    await expect(
+      service.creer(
+        ids.userId,
+        { cibleType: 'CR', cibleId: ids.crCivId },
+        'admin@miznas.local',
+      ),
+    ).rejects.toThrow(/audit_log INSERT failed/);
+    auditSpy.mockRestore();
+  });
+
+  it('Lot 4.1-fix2.B : creer — auditService.log appelé avec EntityManager (rollback solidaire)', async () => {
+    const auditSpy = jest.spyOn(auditService, 'log');
+    await service.creer(
+      ids.userId,
+      { cibleType: 'CR', cibleId: ids.crCivId },
+      'admin@miznas.local',
+    );
+    expect(auditSpy).toHaveBeenCalledTimes(1);
+    // 2e argument = manager transactionnel (sinon rollback impossible)
+    const args = auditSpy.mock.calls[0]!;
+    expect(args).toHaveLength(2);
+    expect(args[1]).toBeDefined();
+    auditSpy.mockRestore();
+  });
+
+  it('Lot 4.1-fix2.B : retirer — audit appelé avec manager + erreur audit remonte', async () => {
+    const created = await service.creer(
+      ids.userId,
+      { cibleType: 'CR', cibleId: ids.crCivId },
+      'admin@miznas.local',
+    );
+    const auditSpy = jest
+      .spyOn(auditService, 'log')
+      .mockRejectedValueOnce(new Error('audit_log INSERT failed'));
+    await expect(
+      service.retirer(ids.userId, String(created.id), 'admin'),
+    ).rejects.toThrow(/audit_log INSERT failed/);
+    expect(auditSpy.mock.calls[0]).toHaveLength(2);
+    expect(auditSpy.mock.calls[0]![1]).toBeDefined();
+    auditSpy.mockRestore();
   });
 
   it('lister avec dateRef exclut les périmètres antérieurs / futurs', async () => {

@@ -67,9 +67,18 @@ export class AuditService {
     private readonly repo: Repository<AuditLog>,
   ) {}
 
-  async log(entry: AuditLogEntry): Promise<void> {
-    // Insertion synchrone : si elle échoue, l'appelant verra l'erreur remonter.
-    await this.repo.insert({
+  /**
+   * Lot 4.1-fix2.B — accepte un EntityManager optionnel pour
+   * insérer l'audit dans la même transaction que l'opération
+   * appelante (rollback solidaire si l'audit échoue, et inversement).
+   * Sans manager fourni, comportement inchangé : INSERT autonome.
+   */
+  async log(
+    entry: AuditLogEntry,
+    manager?: import('typeorm').EntityManager,
+  ): Promise<void> {
+    const repo = manager ? manager.getRepository(AuditLog) : this.repo;
+    await repo.insert({
       utilisateur: entry.utilisateur,
       ipSource: entry.ipSource ?? null,
       userAgent: entry.userAgent ? entry.userAgent.substring(0, 500) : null,
