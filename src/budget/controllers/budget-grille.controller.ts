@@ -37,6 +37,10 @@ export class BudgetGrilleController {
   constructor(private readonly service: BudgetSaisieService) {}
 
   @Get()
+  // Lot Administration ADMIN.D — la consultation read-only de la grille
+  // exige BUDGET.LIRE (pas BUDGET.SAISIR). Permet à un VALIDATEUR de
+  // visualiser le contenu sans avoir besoin du droit d'écriture.
+  // Le filtrage par périmètre RBAC est appliqué par PerimetreService.
   @RequirePermissions('BUDGET.LIRE')
   @ApiOperation({
     summary:

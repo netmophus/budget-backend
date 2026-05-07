@@ -301,4 +301,15 @@ export class AuthService {
       { dateRevocation: new Date(), motifRevocation: motif },
     );
   }
+
+  /**
+   * Wrapper public pour le Lot Administration — utilisé par
+   * UsersAdminService.forcerDeconnexion.
+   */
+  async revokerTousTokensActifs(
+    userId: string,
+    motif: MotifRevocation = 'forced',
+  ): Promise<void> {
+    return this.revokeAllActiveTokens(userId, motif);
+  }
 }

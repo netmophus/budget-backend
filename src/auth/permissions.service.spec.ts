@@ -108,6 +108,43 @@ describe('PermissionsService', () => {
     ]);
   });
 
+  // Lot Administration ADMIN.D — cumul de rôles autorisé (D2)
+  it('cumul rôles : 2 bridge_user_role actifs → permissions = UNION', async () => {
+    userRepo.findOne.mockResolvedValue({ id: '1', estActif: true } as User);
+    userRoleRepo.createQueryBuilder.mockReturnValue(
+      makeQb([
+        urRow({
+          permissions: [
+            { code: 'BUDGET.SAISIR', module: 'BUDGET' },
+            { code: 'BUDGET.LIRE', module: 'BUDGET' },
+          ],
+        }),
+        urRow({
+          permissions: [
+            { code: 'BUDGET.SOUMETTRE', module: 'BUDGET' },
+            { code: 'BUDGET.VALIDER', module: 'BUDGET' },
+            { code: 'BUDGET.LIRE', module: 'BUDGET' },
+          ],
+        }),
+      ]),
+    );
+
+    const result = await service.getEffectivePermissions('1');
+    const codes = result.map((p) => p.code_permission);
+    expect(codes).toContain('BUDGET.SAISIR');
+    expect(codes).toContain('BUDGET.SOUMETTRE');
+    expect(codes).toContain('BUDGET.VALIDER');
+    expect(codes).toContain('BUDGET.LIRE');
+    // Cumul SAISISSEUR + VALIDATEUR : peut saisir ET valider
+    expect(
+      await service.hasPermission(
+        '1',
+        ['BUDGET.SAISIR', 'BUDGET.VALIDER'],
+        'all',
+      ),
+    ).toBe(true);
+  });
+
   it('multiplies permissions across roles on different periphery scopes', async () => {
     userRepo.findOne.mockResolvedValue({ id: '1', estActif: true } as User);
     userRoleRepo.createQueryBuilder.mockReturnValue(

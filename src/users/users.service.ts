@@ -88,6 +88,29 @@ export class UsersService {
     };
   }
 
+  /**
+   * Recherche serveur (Lot Administration ADMIN.C) — ILIKE sur
+   * email/nom/prenom OR, est_actif=true, limite 10, tri alpha email.
+   * Utilisée par le composant <UserAutocomplete /> pour les
+   * sélecteurs de users (CreerDelegationDialog, etc.).
+   */
+  async recherche(q: string, limit = 10): Promise<UserResponseDto[]> {
+    const safeLimit = Math.min(Math.max(1, limit), 50);
+    if (!q || q.trim().length === 0) return [];
+    const pattern = `%${q.trim()}%`;
+    const items = await this.userRepo
+      .createQueryBuilder('u')
+      .where('u.estActif = :true', { true: true })
+      .andWhere(
+        '(u.email ILIKE :p OR u.nom ILIKE :p OR u.prenom ILIKE :p)',
+        { p: pattern },
+      )
+      .orderBy('u.email', 'ASC')
+      .limit(safeLimit)
+      .getMany();
+    return items.map(toUserResponse);
+  }
+
   async findOne(id: string): Promise<UserDetailResponseDto> {
     const user = await this.userRepo.findOne({ where: { id } });
     if (!user) {

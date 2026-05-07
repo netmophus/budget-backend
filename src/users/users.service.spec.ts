@@ -168,4 +168,59 @@ describe('UsersService', () => {
       expect(JSON.stringify(result)).not.toContain('secret-must-not-leak');
     });
   });
+
+  // ─── Lot Administration ADMIN.C — recherche serveur ─────────────
+
+  describe('recherche', () => {
+    function makeQbReturning(rows: User[]) {
+      return {
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockReturnThis(),
+        limit: jest.fn().mockReturnThis(),
+        getMany: jest.fn().mockResolvedValue(rows),
+      };
+    }
+
+    beforeEach(() => {
+      // étendre le mock userRepo avec createQueryBuilder
+      (userRepo as unknown as { createQueryBuilder: jest.Mock }).createQueryBuilder =
+        jest.fn();
+    });
+
+    it('retourne [] pour une query vide', async () => {
+      const result = await service.recherche('');
+      expect(result).toEqual([]);
+    });
+
+    it("ILIKE sur email/nom/prenom OR + filtre est_actif=true", async () => {
+      const qb = makeQbReturning([makeUser({ email: 'aicha@test.local' })]);
+      (userRepo as unknown as { createQueryBuilder: jest.Mock }).createQueryBuilder =
+        jest.fn().mockReturnValue(qb);
+      const result = await service.recherche('aich', 10);
+      expect(result).toHaveLength(1);
+      expect(qb.where).toHaveBeenCalledWith('u.estActif = :true', { true: true });
+      expect(qb.andWhere).toHaveBeenCalledWith(
+        '(u.email ILIKE :p OR u.nom ILIKE :p OR u.prenom ILIKE :p)',
+        { p: '%aich%' },
+      );
+      expect(qb.limit).toHaveBeenCalledWith(10);
+    });
+
+    it('borne la limite à 50 (anti-DoS)', async () => {
+      const qb = makeQbReturning([]);
+      (userRepo as unknown as { createQueryBuilder: jest.Mock }).createQueryBuilder =
+        jest.fn().mockReturnValue(qb);
+      await service.recherche('test', 9999);
+      expect(qb.limit).toHaveBeenCalledWith(50);
+    });
+
+    it('borne la limite à 1 minimum', async () => {
+      const qb = makeQbReturning([]);
+      (userRepo as unknown as { createQueryBuilder: jest.Mock }).createQueryBuilder =
+        jest.fn().mockReturnValue(qb);
+      await service.recherche('test', 0);
+      expect(qb.limit).toHaveBeenCalledWith(1);
+    });
+  });
 });

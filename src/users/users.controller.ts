@@ -3,6 +3,7 @@ import {
   ApiBearerAuth,
   ApiOkResponse,
   ApiOperation,
+  ApiQuery,
   ApiTags,
 } from '@nestjs/swagger';
 import {
@@ -17,6 +18,7 @@ import {
 import { ListUsersQueryDto } from './dto/list-users-query.dto';
 import { PaginatedUsersDto } from './dto/paginated-users.dto';
 import { UserDetailResponseDto } from './dto/user-detail-response.dto';
+import { UserResponseDto } from './dto/user-response.dto';
 import { UsersService } from './users.service';
 
 @ApiTags('users')
@@ -36,6 +38,23 @@ export class UsersController {
   @ApiOkResponse({ type: PaginatedUsersDto })
   findAll(@Query() query: ListUsersQueryDto): Promise<PaginatedUsersDto> {
     return this.usersService.findAll(query);
+  }
+
+  @Get('recherche')
+  @ApiOperation({
+    summary:
+      "Recherche serveur d'utilisateurs actifs (autocomplete). " +
+      'ILIKE sur email/nom/prenom OR, est_actif=true, limite 10.',
+  })
+  @ApiQuery({ name: 'q', required: true })
+  @ApiQuery({ name: 'limit', required: false })
+  @ApiOkResponse({ type: [UserResponseDto] })
+  recherche(
+    @Query('q') q: string,
+    @Query('limit') limit?: string,
+  ): Promise<UserResponseDto[]> {
+    const lim = limit ? Math.min(50, Math.max(1, parseInt(limit, 10) || 10)) : 10;
+    return this.usersService.recherche(q ?? '', lim);
   }
 
   @Get('me/permissions')
