@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import {
   IsArray,
   IsInt,
@@ -9,6 +9,20 @@ import {
   Max,
   Min,
 } from 'class-validator';
+
+/**
+ * Normalise une query string `crIds=14` (scalaire) ou
+ * `crIds=14&crIds=15` (array) en `string[]`. Évite le 400
+ * « crIds must be an array » quand l'utilisateur ne sélectionne
+ * qu'un seul CR. Lot 5.2-fix2.
+ */
+function toStringArray(value: unknown): string[] | undefined {
+  if (value === undefined || value === null || value === '') return undefined;
+  if (Array.isArray(value)) {
+    return value.map((v) => String(v)).filter((s) => s.length > 0);
+  }
+  return [String(value)];
+}
 
 /**
  * Filtres du tableau de bord budget vs réalisé (Lot 5.2).
@@ -31,6 +45,7 @@ export class FiltresEcartsDto {
     description: 'Restriction par CR. Vide = tous CR du périmètre user.',
   })
   @IsOptional()
+  @Transform(({ value }) => toStringArray(value))
   @IsArray()
   @IsString({ each: true })
   crIds?: string[];
@@ -40,6 +55,7 @@ export class FiltresEcartsDto {
     description: 'Restriction par lignes métier.',
   })
   @IsOptional()
+  @Transform(({ value }) => toStringArray(value))
   @IsArray()
   @IsString({ each: true })
   ligneMetierIds?: string[];
