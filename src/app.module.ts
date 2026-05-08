@@ -15,6 +15,7 @@ import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 import { DelegationsModule } from './delegations/delegations.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { RealiseModule } from './realise/realise.module';
+import { TableauBordModule } from './tableau-de-bord/tableau-bord.module';
 import { FaitBudgetModule } from './faits/budget/fait-budget.module';
 import { BudgetModule } from './budget/budget.module';
 import { HealthModule } from './health/health.module';
@@ -126,6 +127,8 @@ import { UsersModule } from './users/users.module';
     NotificationsModule,
     // Lot 5.1 — réalisé budgétaire
     RealiseModule,
+    // Lot 5.2 — tableau de bord budget vs réalisé
+    TableauBordModule,
     // Référentiels secondaires (énumérations) — Lot 2.5-bis-A.
     RefTypeStructureModule,
     RefPaysModule,
