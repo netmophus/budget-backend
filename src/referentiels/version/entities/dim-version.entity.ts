@@ -4,9 +4,24 @@ export type TypeVersion =
   | 'budget_initial'
   | 'reforecast_1'
   | 'reforecast_2'
-  | 'atterrissage';
+  | 'atterrissage'
+  // Lot 5.3 — reforecast trimestriel publication-écrasement.
+  | 'reforecast';
 
 export type StatutVersion = 'ouvert' | 'soumis' | 'valide' | 'gele';
+
+/**
+ * Statut de cycle de vie de publication (Lot 5.3). Distinct du
+ * `statut` workflow ouvert/soumis/valide/gele : un reforecast peut
+ * être en n'importe quel statut workflow et être marqué OBSOLETE
+ * quand un nouveau reforecast pour la même clé l'écrase.
+ */
+export type StatutPublicationVersion = 'ACTIVE' | 'OBSOLETE';
+
+export type MethodeExtrapolation =
+  | 'MOYENNE_TRIMESTRE'
+  | 'BUDGET_INITIAL'
+  | 'MANUELLE';
 
 /**
  * `dim_version` — Versions de budget. Cf. `docs/modele-donnees.md` §3.9.
@@ -128,4 +143,47 @@ export class DimVersion {
     nullable: true,
   })
   utilisateurModification!: string | null;
+
+  // ─── Reforecast trimestriel (Lot 5.3) ──────────────────────────
+  // Renseignés UNIQUEMENT pour les versions `type_version =
+  // 'reforecast'`. Pour les autres types, ces colonnes sont NULL
+  // (cf. CHECK chk_dim_version_reforecast_coherence).
+
+  @Column({ name: 'fk_version_source', type: 'bigint', nullable: true })
+  fkVersionSource!: string | null;
+
+  @Column({ name: 'fk_scenario_source', type: 'bigint', nullable: true })
+  fkScenarioSource!: string | null;
+
+  @Column({ name: 'trimestre_consolide', type: 'int', nullable: true })
+  trimestreConsolide!: number | null;
+
+  @Column({ name: 'annee_consolide', type: 'int', nullable: true })
+  anneeConsolide!: number | null;
+
+  @Column({
+    name: 'methode_extrapolation',
+    type: 'varchar',
+    length: 30,
+    nullable: true,
+  })
+  methodeExtrapolation!: MethodeExtrapolation | null;
+
+  @Column({
+    name: 'statut_publication',
+    type: 'varchar',
+    length: 20,
+    default: 'ACTIVE',
+  })
+  statutPublication!: StatutPublicationVersion;
+
+  @Column({ name: 'date_obsolescence', type: 'timestamp', nullable: true })
+  dateObsolescence!: Date | null;
+
+  @Column({
+    name: 'fk_version_remplacante',
+    type: 'bigint',
+    nullable: true,
+  })
+  fkVersionRemplacante!: string | null;
 }

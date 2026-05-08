@@ -61,7 +61,15 @@ export type TypeAction =
   | 'IMPORTER_REALISE'
   | 'SAISIR_REALISE'
   | 'VALIDER_REALISE'
-  | 'SUPPRIMER_REALISE';
+  | 'SUPPRIMER_REALISE'
+  // Lot 5.3 — Reforecast trimestriel. Codes ajoutés en base via
+  // migration 055 (1779200000160-AjoutReforecastTrimestriel.ts).
+  | 'LANCER_REFORECAST'
+  | 'SOUMETTRE_REFORECAST'
+  | 'VALIDER_REFORECAST'
+  | 'REJETER_REFORECAST'
+  | 'PUBLIER_REFORECAST'
+  | 'MARQUER_REFORECAST_OBSOLETE';
 
 export type AuditStatut = 'success' | 'failure';
 
