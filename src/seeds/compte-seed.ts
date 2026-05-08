@@ -11,6 +11,7 @@
  * Référence : `docs/modele-donnees.md` §3.4
  */
 import 'reflect-metadata';
+import type { DataSource } from 'typeorm';
 import { AppDataSource } from '../data-source';
 import type { SensCompte } from '../referentiels/compte/entities/dim-compte.entity';
 
@@ -189,15 +190,18 @@ export const COMPTES_INITIAUX: readonly CompteSeedRow[] = [
   row('102100', 'Compte ordinaire BCEAO', 1, 4, '102', { sens: 'D' }),
 ];
 
-async function seedComptes(): Promise<void> {
-  await AppDataSource.initialize();
+export async function seedComptes(ds: DataSource = AppDataSource): Promise<void> {
+  const ownsConnection = !ds.isInitialized;
+  if (ownsConnection) {
+    await ds.initialize();
+  }
   try {
     const force = process.argv.slice(2).includes('--force');
     if (force) {
       console.log('[seed:comptes] --force : purge de dim_compte');
       // Casser la FK auto-référente avant DELETE.
-      await AppDataSource.query(`UPDATE dim_compte SET fk_compte_parent = NULL`);
-      await AppDataSource.query(`DELETE FROM dim_compte`);
+      await ds.query(`UPDATE dim_compte SET fk_compte_parent = NULL`);
+      await ds.query(`DELETE FROM dim_compte`);
     }
 
     const today = new Date().toISOString().slice(0, 10);
@@ -206,7 +210,7 @@ async function seedComptes(): Promise<void> {
 
     for (const c of COMPTES_INITIAUX) {
       // Idempotence : sauter si version courante existe.
-      const existing = (await AppDataSource.query(
+      const existing = (await ds.query(
         `SELECT id FROM dim_compte WHERE code_compte = $1 AND version_courante = true`,
         [c.codeCompte],
       )) as Array<{ id: string }>;
@@ -226,7 +230,7 @@ async function seedComptes(): Promise<void> {
         parentId = cached;
       }
 
-      await AppDataSource.query(
+      await ds.query(
         `INSERT INTO dim_compte
           ("code_compte","libelle","classe","sous_classe","fk_compte_parent",
            "niveau","sens","code_poste_budgetaire","est_compte_collectif",
@@ -251,14 +255,14 @@ async function seedComptes(): Promise<void> {
           today,
         ],
       );
-      const inserted = (await AppDataSource.query(
+      const inserted = (await ds.query(
         `SELECT id FROM dim_compte WHERE code_compte = $1 AND version_courante = true`,
         [c.codeCompte],
       )) as Array<{ id: string }>;
       idByCode.set(c.codeCompte, String(inserted[0]!.id));
     }
 
-    const stats = await AppDataSource.query(
+    const stats = await ds.query(
       `SELECT
          COUNT(*)::int AS total,
          COUNT(*) FILTER (WHERE version_courante = true)::int AS courants,
@@ -270,7 +274,9 @@ async function seedComptes(): Promise<void> {
       `[seed:comptes] total=${row0.total} courants=${row0.courants} racines=${row0.racines} (attendu : ${COMPTES_INITIAUX.length} / ${COMPTES_INITIAUX.length} / 6)`,
     );
   } finally {
-    await AppDataSource.destroy();
+    if (ownsConnection) {
+      await ds.destroy();
+    }
   }
 }
 

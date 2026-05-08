@@ -16,6 +16,7 @@
  * fk_structure_parent → dim_structure(id) ON DELETE RESTRICT).
  */
 import 'reflect-metadata';
+import type { DataSource } from 'typeorm';
 import { AppDataSource } from '../data-source';
 import {
   CodePaysUemoa,
@@ -121,15 +122,18 @@ export const STRUCTURES_INITIALES: readonly StructureSeedRow[] = [
   },
 ];
 
-async function seedStructures(): Promise<void> {
-  await AppDataSource.initialize();
+export async function seedStructures(ds: DataSource = AppDataSource): Promise<void> {
+  const ownsConnection = !ds.isInitialized;
+  if (ownsConnection) {
+    await ds.initialize();
+  }
   try {
     const force = process.argv.slice(2).includes('--force');
     if (force) {
       console.log(
         '[seed:structures] --force : purge de dim_structure avant régénération',
       );
-      await AppDataSource.query(`DELETE FROM dim_structure`);
+      await ds.query(`DELETE FROM dim_structure`);
     }
 
     const today = new Date().toISOString().slice(0, 10);
@@ -138,7 +142,7 @@ async function seedStructures(): Promise<void> {
 
     for (const s of STRUCTURES_INITIALES) {
       // Idempotence : sauter si une version courante existe déjà.
-      const existing = (await AppDataSource.query(
+      const existing = (await ds.query(
         `SELECT id FROM dim_structure WHERE code_structure = $1 AND version_courante = true`,
         [s.codeStructure],
       )) as Array<{ id: string }>;
@@ -160,7 +164,7 @@ async function seedStructures(): Promise<void> {
         parentId = cached;
       }
 
-      await AppDataSource.query(
+      await ds.query(
         `INSERT INTO dim_structure
            ("code_structure","libelle","libelle_court","type_structure",
             "niveau_hierarchique","fk_structure_parent","code_pays",
@@ -179,14 +183,14 @@ async function seedStructures(): Promise<void> {
         ],
       );
 
-      const inserted = (await AppDataSource.query(
+      const inserted = (await ds.query(
         `SELECT id FROM dim_structure WHERE code_structure = $1 AND version_courante = true`,
         [s.codeStructure],
       )) as Array<{ id: string }>;
       idByCode.set(s.codeStructure, String(inserted[0]!.id));
     }
 
-    const stats = await AppDataSource.query(
+    const stats = await ds.query(
       `SELECT
          COUNT(*)::int AS total,
          COUNT(*) FILTER (WHERE version_courante = true)::int AS courantes,
@@ -198,7 +202,9 @@ async function seedStructures(): Promise<void> {
       `[seed:structures] total=${row.total} courantes=${row.courantes} racines=${row.racines} (attendu : 9 / 9 / 1)`,
     );
   } finally {
-    await AppDataSource.destroy();
+    if (ownsConnection) {
+      await ds.destroy();
+    }
   }
 }
 

@@ -5,6 +5,7 @@
  * alternatif bas (pessimiste). Tous en `statut='actif'`.
  */
 import 'reflect-metadata';
+import type { DataSource } from 'typeorm';
 import { AppDataSource } from '../data-source';
 import type { TypeScenario } from '../referentiels/scenario/entities/dim-scenario.entity';
 
@@ -36,23 +37,26 @@ export const SCENARIOS_INITIAUX: readonly ScenarioSeedRow[] = [
   },
 ];
 
-async function seedScenarios(): Promise<void> {
-  await AppDataSource.initialize();
+export async function seedScenarios(ds: DataSource = AppDataSource): Promise<void> {
+  const ownsConnection = !ds.isInitialized;
+  if (ownsConnection) {
+    await ds.initialize();
+  }
   try {
     const force = process.argv.slice(2).includes('--force');
     if (force) {
       console.log('[seed:scenarios] --force : purge de dim_scenario');
-      await AppDataSource.query(`DELETE FROM dim_scenario`);
+      await ds.query(`DELETE FROM dim_scenario`);
     }
 
     for (const s of SCENARIOS_INITIAUX) {
-      const existing = (await AppDataSource.query(
+      const existing = (await ds.query(
         `SELECT id FROM dim_scenario WHERE code_scenario = $1`,
         [s.codeScenario],
       )) as Array<{ id: string }>;
       if (existing.length > 0) continue;
 
-      await AppDataSource.query(
+      await ds.query(
         `INSERT INTO dim_scenario
           ("code_scenario","libelle","type_scenario","statut","commentaire","utilisateur_creation")
          VALUES ($1,$2,$3,'actif',$4,'system')`,
@@ -60,7 +64,7 @@ async function seedScenarios(): Promise<void> {
       );
     }
 
-    const stats = await AppDataSource.query(
+    const stats = await ds.query(
       `SELECT COUNT(*)::int AS total,
               COUNT(*) FILTER (WHERE statut='actif')::int AS actifs
        FROM dim_scenario`,
@@ -70,7 +74,9 @@ async function seedScenarios(): Promise<void> {
       `[seed:scenarios] total=${r0.total} actifs=${r0.actifs} (attendu : ${SCENARIOS_INITIAUX.length} / ${SCENARIOS_INITIAUX.length})`,
     );
   } finally {
-    await AppDataSource.destroy();
+    if (ownsConnection) {
+      await ds.destroy();
+    }
   }
 }
 

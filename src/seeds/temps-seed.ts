@@ -13,6 +13,7 @@
  * - Idempotent : `ON CONFLICT (date) DO NOTHING`.
  */
 import 'reflect-metadata';
+import type { DataSource } from 'typeorm';
 import { AppDataSource } from '../data-source';
 
 const LIBELLES_MOIS_FR: readonly string[] = [
@@ -179,18 +180,23 @@ export function defaultRange(
   return { startYear: cur - 5, endYear: cur + 4 };
 }
 
-async function seedTemps(): Promise<void> {
-  await AppDataSource.initialize();
+export async function seedTemps(ds: DataSource = AppDataSource): Promise<void> {
+  const ownsConnection = !ds.isInitialized;
+  if (ownsConnection) {
+    await ds.initialize();
+  }
 
   try {
     // Mode `--force` : purge avant régénération. Utile quand la
     // sémantique des flags change (cf. refacto 2.2A.bis sur
     // est_fin_de_*) car `ON CONFLICT (date) DO NOTHING` ne met pas
     // à jour les lignes déjà présentes. Mode par défaut idempotent.
+    // NB : `--force` est ignoré quand la fonction est appelée depuis un
+    // process Jest e2e (process.argv pointe sur jest, pas seed).
     const force = process.argv.slice(2).includes('--force');
     if (force) {
       console.log('[seed:temps] --force : purge de dim_temps avant régénération');
-      await AppDataSource.query(`DELETE FROM dim_temps`);
+      await ds.query(`DELETE FROM dim_temps`);
     }
 
     const { startYear, endYear } = defaultRange();
@@ -223,7 +229,7 @@ async function seedTemps(): Promise<void> {
           r.libelleMois,
         );
       }
-      const result = await AppDataSource.query(
+      const result = await ds.query(
         `INSERT INTO "dim_temps"
          ("date","annee","trimestre","mois","jour","semaine_iso",
           "jour_ouvre","est_fin_de_mois","est_fin_de_trimestre",
@@ -236,7 +242,7 @@ async function seedTemps(): Promise<void> {
       inserted += typeof affected === 'number' ? affected : slice.length;
     }
 
-    const stats = await AppDataSource.query(
+    const stats = await ds.query(
       `SELECT COUNT(*)::int AS total FROM "dim_temps"`,
     );
     const total = (stats[0] as { total: number }).total;
@@ -244,7 +250,9 @@ async function seedTemps(): Promise<void> {
       `[seed:temps] period=${startYear}-${endYear} generated=${rows.length} table_total=${total}`,
     );
   } finally {
-    await AppDataSource.destroy();
+    if (ownsConnection) {
+      await ds.destroy();
+    }
   }
 }
 

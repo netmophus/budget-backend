@@ -6,6 +6,7 @@
  * donc pas seeder de versions déjà gelées au Lot 3.1.
  */
 import 'reflect-metadata';
+import type { DataSource } from 'typeorm';
 import { AppDataSource } from '../data-source';
 import type { TypeVersion } from '../referentiels/version/entities/dim-version.entity';
 
@@ -41,23 +42,26 @@ export const VERSIONS_INITIALES: readonly VersionSeedRow[] = [
   },
 ];
 
-async function seedVersions(): Promise<void> {
-  await AppDataSource.initialize();
+export async function seedVersions(ds: DataSource = AppDataSource): Promise<void> {
+  const ownsConnection = !ds.isInitialized;
+  if (ownsConnection) {
+    await ds.initialize();
+  }
   try {
     const force = process.argv.slice(2).includes('--force');
     if (force) {
       console.log('[seed:versions] --force : purge de dim_version');
-      await AppDataSource.query(`DELETE FROM dim_version`);
+      await ds.query(`DELETE FROM dim_version`);
     }
 
     for (const v of VERSIONS_INITIALES) {
-      const existing = (await AppDataSource.query(
+      const existing = (await ds.query(
         `SELECT id FROM dim_version WHERE code_version = $1`,
         [v.codeVersion],
       )) as Array<{ id: string }>;
       if (existing.length > 0) continue;
 
-      await AppDataSource.query(
+      await ds.query(
         `INSERT INTO dim_version
           ("code_version","libelle","type_version","exercice_fiscal",
            "statut","commentaire","utilisateur_creation")
@@ -66,7 +70,7 @@ async function seedVersions(): Promise<void> {
       );
     }
 
-    const stats = await AppDataSource.query(
+    const stats = await ds.query(
       `SELECT COUNT(*)::int AS total,
               COUNT(*) FILTER (WHERE statut='ouvert')::int AS ouverts
        FROM dim_version`,
@@ -76,7 +80,9 @@ async function seedVersions(): Promise<void> {
       `[seed:versions] total=${r0.total} ouverts=${r0.ouverts} (attendu : ${VERSIONS_INITIALES.length} / ${VERSIONS_INITIALES.length})`,
     );
   } finally {
-    await AppDataSource.destroy();
+    if (ownsConnection) {
+      await ds.destroy();
+    }
   }
 }
 

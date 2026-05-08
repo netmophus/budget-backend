@@ -18,6 +18,7 @@
  */
 import 'reflect-metadata';
 import * as bcrypt from 'bcrypt';
+import type { DataSource } from 'typeorm';
 import { AppDataSource } from '../data-source';
 
 const ADMIN_EMAIL = 'admin@miznas.local';
@@ -217,11 +218,14 @@ const ROLES: RoleSeed[] = [
   },
 ];
 
-async function seedAuth(): Promise<void> {
-  await AppDataSource.initialize();
+export async function seedAuth(ds: DataSource = AppDataSource): Promise<void> {
+  const ownsConnection = !ds.isInitialized;
+  if (ownsConnection) {
+    await ds.initialize();
+  }
 
   try {
-    await AppDataSource.transaction(async (manager) => {
+    await ds.transaction(async (manager) => {
       // 1. Permissions (idempotent via ON CONFLICT)
       for (const permission of PERMISSIONS) {
         await manager.query(
@@ -328,7 +332,9 @@ async function seedAuth(): Promise<void> {
       );
     });
   } finally {
-    await AppDataSource.destroy();
+    if (ownsConnection) {
+      await ds.destroy();
+    }
   }
 }
 
