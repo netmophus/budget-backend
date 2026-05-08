@@ -49,8 +49,14 @@ interface LigneBrute {
   fk_ligne_metier: string;
   code_ligne_metier: string;
   fk_temps: string;
-  date_temps: string;
-  libelle_mois: string;
+  /**
+   * Important : en prod, le pilote `pg` renvoie un `Date` JS pour
+   * une colonne `date`. `String(date).slice(0,7)` produit alors
+   * `"Wed Mar"` au lieu de `"2027-03"`. On lit donc directement
+   * `t.mois` (smallint) et `t.annee` ci-dessous, et on n'utilise
+   * `date_temps` que pour le tri SQL (ORDER BY t.date).
+   */
+  mois_num: number;
   annee: number;
   montant_budget: string; // numeric → string PG
   montant_realise: string | null;
@@ -188,8 +194,7 @@ export class AnalyseEcartsService {
         fb.fk_ligne_metier,
         lm.code_ligne_metier,
         fb.fk_temps,
-        t.date AS date_temps,
-        t.libelle_mois,
+        t.mois AS mois_num,
         t.annee,
         fb.montant_fcfa AS montant_budget,
         fr.montant AS montant_realise
@@ -249,8 +254,8 @@ export class AnalyseEcartsService {
       const nature = classeToNature(r.classe_compte);
       const sens = sensEcartFor(nature, ecart);
 
-      const moisStr = String(r.date_temps).slice(0, 7);
-      const moisNum = Number(moisStr.slice(5, 7));
+      const moisNum = Number(r.mois_num);
+      const moisStr = `${r.annee}-${String(moisNum).padStart(2, '0')}`;
       const moisNomFr = MOIS_LIBELLES_FR[moisNum - 1] ?? `Mois ${moisNum}`;
       const libelleMois = `${moisNomFr} ${r.annee}`;
 
