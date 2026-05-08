@@ -6,6 +6,48 @@ en interne pour BSIC ; pas de release publique).
 
 ---
 
+## [v0.5.0-mvp] — 2026-05 — MVP fonctionnel + démarrage industrialisation
+
+Tag de release marquant la transition entre la livraison du MVP
+fonctionnel (Lots 1 → 5) et le démarrage du Lot 6
+(industrialisation, dettes techniques, finitions).
+
+État du MVP :
+- 3 modules métier opérationnels (Élaboration, Multi-périmètres
+  + délégations + notifications, Administration, Exécution).
+- 55 migrations en base, 8 personas seedés.
+- 1082 tests backend + 536 frontend = 1618 tests verts (1094
+  backend après les sanity tests Lot 5.4 + ces 12 tests).
+- 0 régression cumulée depuis Lot 1.
+
+### Industrialisation (Lot 6.1)
+
+- **CI GitHub Actions** sur les 2 repos
+  (`.github/workflows/ci.yml`) : jobs `setup` + `lint` +
+  `typecheck` + `build` + `test` (+ `audit-codes-coherence`
+  côté backend uniquement). Bloque les PR sur `main` qui
+  régressent.
+- Script `scripts/check-audit-codes-coherence.js` qui
+  vérifie l'alignement migrations ↔ type union TypeAction
+  (parade au bug Lot Administration où un code audit était
+  inséré en base sans être déclaré dans le type TS).
+- Documentation [`docs/ci-cd.md`](docs/ci-cd.md) avec
+  description des jobs, recommandations branch protection
+  rules, dette typecheck héritée à apurer Lot 6.6.
+
+### Dette typecheck rendue visible
+
+La CI strict révèle **20 erreurs TS sur 7 fichiers backend**
+(majoritairement dans `test/integration/fk-ref-secondaire`
+hors-périmètre Jest et 6 mocks de tests obsolètes) et **~67
+erreurs sur ~49 fichiers frontend** (principalement le
+namespace `JSX` masqué post-React 19 + 2 mocks obsolètes).
+Traitement consolidé prévu Lot 6.6.
+
+GitHub : [comparer v0.5.0-mvp vs Lot 4](https://github.com/netmophus/budget-backend/compare/main...v0.5.0-mvp)
+
+---
+
 ## [Lot 5] — 2026-05 — Module Exécution (réalisé, tableau de bord, reforecast)
 
 Le Lot 5 ouvre le **module Exécution** de MIZNAS : capture du
