@@ -6,6 +6,132 @@ en interne pour BSIC ; pas de release publique).
 
 ---
 
+## [Lot 5] — 2026-05 — Module Exécution (réalisé, tableau de bord, reforecast)
+
+Le Lot 5 ouvre le **module Exécution** de MIZNAS : capture du
+réalisé budgétaire mensuel, restitution agrégée des écarts budget
+vs réalisé, et reforecast trimestriel avec workflow de validation
++ écrasement OBSOLETE.
+
+Doc consolidée : [`docs/lot-5/README.md`](docs/lot-5/README.md).
+
+### Réalisé (Lot 5.1 + 5.1-fix1)
+
+- Nouvelle table `fait_realise` (grain mensuel sur 5 dimensions :
+  CR / compte / ligne_metier / temps / devise), workflow simple
+  2 statuts unidirectionnel `IMPORTE → VALIDE` (décision Q4).
+- 5 permissions RBAC `REALISE.LIRE` / `REALISE.SAISIR` /
+  `REALISE.IMPORTER` / `REALISE.VALIDER` / `REALISE.SUPPRIMER`
+  attribuées aux rôles métier existants.
+- 4 codes audit `IMPORTER_REALISE` / `SAISIR_REALISE` /
+  `VALIDER_REALISE` / `SUPPRIMER_REALISE`.
+- Page `/realise/saisie` : grille mensuelle + dialogues création
+  / modification / validation en lot / import Excel/CSV avec
+  rapport détaillé (lignes OK / KO + raisons).
+- Filtrage périmètre uniquement à l'écriture (saisie + import) ;
+  lecture transverse (cohérent décision ADMIN.D du Lot
+  Administration).
+- Fix 5.1-fix1 : résolution `YYYY-MM`→`fk_temps` via endpoint
+  dédié `/referentiels/temps/par-date/:date` (l'ancienne stratégie
+  de filtrage par query params était bloquée par le
+  ValidationPipe `whitelist=true`).
+
+### Tableau de bord budget vs réalisé (Lot 5.2 + 5.2-fix1/2 + 5-fix-ui)
+
+- Service d'agrégation `AnalyseEcartsService` : 1 seule passe SQL
+  avec `LEFT JOIN` sur `fait_realise statut='VALIDE'` pour avoir
+  les lignes `MANQUANT` (budget existe, pas de réalisé) sans
+  double requête.
+- 4 niveaux d'alerte paramétrables : `NORMAL` / `ATTENTION` (≥
+  seuil_attention %) / `CRITIQUE` (≥ seuil_critique %) /
+  `MANQUANT` (réalisé null).
+- Sens UEMOA selon classe compte : classe 6 = `CHARGE` (favorable
+  si réalisé < budget), classe 7 = `PRODUIT` (favorable si
+  réalisé > budget), autres = `BILAN` toujours `NEUTRE`.
+- Export Excel 3 onglets (Synthèse / Détail des écarts / Filtres)
+  avec couleurs conditionnelles sur la colonne « Niveau ».
+- Page `/tableau-de-bord/budget-vs-realise` : 4 KPI cards +
+  filtres + tableau triable + filtre rapide
+  (TOUS / CRITIQUE / ATTENTION / MANQUANT) + recherche par CR /
+  compte.
+- Permission **double** `BUDGET.LIRE ∧ REALISE.LIRE` (mode `all`).
+- Fix 5.2-fix1 : sérialisation axios `crIds` en format « repeat »
+  (`crIds=14&crIds=15`) au lieu de `brackets` rejeté par le DTO.
+- Fix 5.2-fix2 : DTO accepte scalaire ou array via `@Transform`
+  (le cas un seul CR sélectionné produisait une string scalaire).
+- Fix 5-fix-ui : bug racine du libellé « Mois NaN 2027 » (pilote
+  pg renvoie `Date` JS, slice produisait `"Wed Mar"`) corrigé via
+  lecture directe `t.mois` / `t.annee` au lieu de slicer ; helper
+  frontend partagé `formaterMois()` pour toutes les pages
+  (corrige aussi « Mars 2027 2027 » dans la grille réalisé) ; KPI
+  cards passent à « — » en cas d'erreur API.
+
+### Reforecast trimestriel (Lot 5.3.A backend + 5.3.B frontend)
+
+- Extension de `dim_version` avec 9 colonnes pour gérer les
+  versions de type `'reforecast'` :
+  - métadonnées de génération : `fk_version_source`,
+    `fk_scenario_source`, `trimestre_consolide`,
+    `annee_consolide`, `methode_extrapolation`
+  - cycle de vie d'écrasement : `statut_publication`
+    (ACTIVE/OBSOLETE), `date_obsolescence`,
+    `fk_version_remplacante`
+- 1 nouvelle permission `BUDGET.REFORECAST_LANCER` attribuée à
+  ADMIN + VALIDATEUR ; le workflow réutilise les permissions
+  existantes (`BUDGET.SAISIR/SOUMETTRE/VALIDER/PUBLIER`) — Q3
+  produit.
+- 6 codes audit `LANCER_REFORECAST` /
+  `SOUMETTRE/VALIDER/REJETER/PUBLIER_REFORECAST` /
+  `MARQUER_REFORECAST_OBSOLETE` ; le `VersionWorkflowService`
+  émet `*_REFORECAST` à la place de `*_BUDGET` quand
+  `type_version='reforecast'` (helper `codeAudit()` polymorphe,
+  0 duplication).
+- Service `ReforecastService.lancer()` transactionnel :
+  validations (version source `gele`, scénario actif, trimestre
+  ∈ [1,4], ≥ 1 fait_realise VALIDE), création nouvelle version
+  REFORECAST en BROUILLON ACTIVE, génération automatique des
+  lignes `fait_budget` extrapolées selon 3 méthodes
+  (`MOYENNE_TRIMESTRE`, `BUDGET_INITIAL`, `MANUELLE`), marquage
+  OBSOLETE des reforecasts ACTIVE pré-existants pour la même
+  clé (Q1 produit — décision d'écrasement).
+- 8 endpoints REST sous `/reforecast` (lancer / lister / détail /
+  grille / comparaison / soumettre / valider / rejeter / publier).
+- Page `/reforecast` (liste avec filtres + bouton « Lancer ») et
+  `/reforecast/:id` (détail avec onglets Grille + Comparaison vs
+  source + boutons workflow polymorphes + banner OBSOLETE).
+- Composant `Tabs` maison (sans Radix pour respecter la
+  contrainte « aucune nouvelle dépendance npm »).
+
+### Recette + doc (Lot 5.4)
+
+- 7 scénarios bout-en-bout R1 → R7 documentés dans
+  [`docs/lot-5/recette.md`](docs/lot-5/recette.md) avec
+  pré-requis + étapes UI + vérifications SQL + cas négatifs.
+- 5 diagrammes mermaid dans
+  [`docs/lot-5/sequences.md`](docs/lot-5/sequences.md) couvrant
+  saisie/validation réalisé, import Excel, tableau de bord,
+  reforecast workflow et arbre de décision « origine cellule ».
+- Grille de suivi recette en bas du fichier `recette.md` (à
+  remplir par les contrôleurs au fur et à mesure).
+
+### Migrations
+
+| # | Fichier | Lot |
+|---|---------|-----|
+| **053** | `1779200000150-CreerFaitRealiseEtPermissions.ts` | 5.1 |
+| **055** | `1779200000160-AjoutReforecastTrimestriel.ts` | 5.3 |
+
+Toutes idempotentes.
+
+### Tests
+
+- Tests automatisés ajoutés Lot 5 : ~286 (~103 backend + ~183
+  frontend cumulés).
+- Tests totaux MIZNAS : **1082 backend + 536 frontend = 1618**
+  verts, 0 régression cumulée depuis Lot 1.
+
+---
+
 ## [Lot 4] — 2026-05 — Multi-périmètres, délégations, notifications
 
 Le Lot 4 ferme le module budgétaire en lui donnant ses trois

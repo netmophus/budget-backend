@@ -298,42 +298,50 @@ Toute évolution fonctionnelle doit être tracée par rapport à ces référenti
 
 ## 9. Statut du projet
 
-**Lot 2.5 INTÉGRALEMENT LIVRÉ — 02/05/2026**. Les 6 CRUDs UI des
-dimensions référentielles métier (Structure, Segment, Produit, Ligne
-métier, Compte avec import CSV, CR) sont opérationnels. Le pattern
-de factorisation Phase A 2.5C (`<RefSecondaireSelect>` +
-`useScd2EditDiff`) compte 7 instances et 6 consommateurs
-respectivement, sur l'ensemble du Lot 2.5. L'application est prête
-pour le **Lot 3 (Module B — Élaboration budgétaire)**.
+**Lot 5 INTÉGRALEMENT LIVRÉ — mai 2026**. Le **module Exécution**
+de MIZNAS est désormais opérationnel : saisie / import du réalisé
+budgétaire mensuel, restitution agrégée des écarts budget vs
+réalisé, et reforecast trimestriel avec workflow de validation et
+écrasement OBSOLETE. L'élaboration (Lot 3) et les capacités
+transverses (Lot 4 — multi-périmètres, délégations, notifications)
+restent en place inchangées. Le projet est prêt pour le Lot 6
+(industrialisation, dettes techniques résiduelles).
 
-| Lot                                 | Statut |
-| ----------------------------------- | ------ |
-| Lot 0 — Documentation               | ✅ Livré |
-| Lot 1 — Socle transverse            | ✅ Livré |
-| Lot 2 — Référentiels SCD2           | ✅ **Livré** (2.1, 2.2, 2.3, 2.4, 2.5A-F livrés) |
-| Lot 2.5 — CRUD UI dimensions        | ✅ **Livré — 02/05/2026** (6 sous-étapes A-F : 6/6 CRUDs UI) |
-| Lot 2.5-bis — Référentiels secondaires paramétrables | ✅ **Livré — 01/05/2026** (5 sous-étapes A-E) |
-| Lot 3 — Élaboration budgétaire      | 🟡 En cours (3.1 + 3.2 + 3.3 + 3.4 livrés ; 3.5 workflow + 3.6 indicateurs consolidés + 3.7 import à venir) |
-| Lot 4 — PNB / Charges               | ⏳ À venir |
-| Lot 5 — Reporting / ALM             | ⏳ À venir |
-| Lot 6 — Stabilisation               | ⏳ À venir |
+| Lot                                                  | Statut |
+| ---------------------------------------------------- | ------ |
+| Lot 0 — Documentation                                | ✅ Livré |
+| Lot 1 — Socle transverse (auth, RBAC, audit)         | ✅ Livré |
+| Lot 2 — Référentiels SCD2 (5 sous-lots)              | ✅ Livré |
+| Lot 2.5 — CRUD UI dimensions (6 sous-étapes)         | ✅ Livré |
+| Lot 2.5-bis — Référentiels secondaires paramétrables | ✅ Livré |
+| Lot 3 — Élaboration budgétaire (saisie, validation, indicateurs, import) | ✅ Livré |
+| Lot 4 — Multi-périmètres, délégations, notifications | ✅ Livré |
+| Lot Administration — CRUD users + RBAC fixes         | ✅ Livré |
+| **Lot 5 — Module Exécution (réalisé + tableau de bord + reforecast)** | ✅ **Livré — mai 2026** |
+| Lot 6 — Industrialisation, dettes techniques         | ⏳ À venir |
 
-**Chiffres clés actuels** :
+**Chiffres clés actuels (post-Lot 5)** :
 
-- **41 migrations en base** (3 Lot 1 + 12 dimensions/faits Lot 2 + 13
-  ref secondaires Lot 2.5-bis-A + 13 FK Lot 2.5-bis-B)
-- **10 dimensions / 10 référentielles** livrées via UI complète
-  (Structure, Segment, Produit, Ligne métier, Compte, CR, Calendrier,
-  Devises, Comptes import CSV, Configuration ref_*) ; les 2
-  restantes — `dim_version` et `dim_scenario` — relèvent du Lot 3
-- **13 référentiels secondaires** paramétrables (cf.
-  `docs/referentiels-secondaires.md`)
-- **658 tests backend verts** (jest + pg-mem) — `fk-ref-secondaire.spec.ts`
-  déplacé hors du périmètre `jest src/` standard
-- **239 tests frontend verts** (vitest + testing-library) — 49 → 239
-  sur l'ensemble du Lot 2.5 (+190 nets)
-- **2 dépôts GitHub** : `budget-backend` (porte également `docs/`) +
-  `budget-frontend`
+- **55 migrations en base** (Lot 1 → Lot 5)
+- **1082 tests backend verts** (Jest + pg-mem)
+- **536 tests frontend verts** (Vitest + Testing Library)
+- **1618 tests automatisés au total**, 0 régression cumulée depuis
+  Lot 1
+- **3 modules métier opérationnels** : Élaboration (budget, scenarios,
+  versions, indicateurs, import), Exécution (réalisé, tableau de
+  bord, reforecast), Administration (users, rôles, permissions,
+  délégations)
+- **2 dépôts GitHub** : `budget-backend` (porte également `docs/`)
+  + `budget-frontend`
+
+### Modules livrés
+
+| Module | Capacités | Doc |
+|--------|-----------|-----|
+| Élaboration | Saisie grille mensuelle, scenarios MEDIAN, versions Brouillon→Soumis→Validé→Publié, indicateurs consolidés, import bulk Excel/CSV | [`docs/lot-3*/`](docs/) |
+| Multi-périmètres + délégations + notifications | Affectations flexibles (STRUCTURE/CR/CR_SET), délégations temporaires anti-chaînage, 8 templates email événementiels | [`docs/lot-4/README.md`](docs/lot-4/README.md) |
+| Administration | CRUD users, attribution / retrait rôles, reset password, force déconnexion | [`docs/lot-administration.md`](docs/lot-administration.md) |
+| **Exécution (Lot 5)** | Saisie / import réalisé, tableau de bord budget vs réalisé (KPI + export Excel), reforecast trimestriel (3 méthodes d'extrapolation, écrasement OBSOLETE) | [`docs/lot-5/README.md`](docs/lot-5/README.md) |
 
 **Dimensions livrées au Lot 2** :
 
