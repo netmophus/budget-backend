@@ -1,0 +1,130 @@
+# CI Backend MIZNAS — Lot 6.1
+#
+# Bloque les PR sur main si :
+#   - les tests Jest échouent
+#   - le build NestJS échoue
+#   - tsc strict (--noEmit) remonte des erreurs
+#   - le linter ESLint remonte des erreurs
+#
+# Tous les jobs réutilisent le `node_modules` mis en cache par
+# `setup`. Les jobs build / lint / test / typecheck tournent en
+# parallèle.
+
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+# Annule un run en cours si un nouveau push intervient sur la même
+# branche (économie de minutes Actions).
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  setup:
+    name: Install + cache
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      node-version: ${{ steps.detect-node.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: detect-node
+        run: echo "version=22" >> "$GITHUB_OUTPUT"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install dependencies (npm ci)
+        run: npm ci
+
+  lint:
+    name: ESLint
+    needs: setup
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: ESLint (sans --fix, lecture seule)
+        # `npm run lint` du package.json contient `--fix` qui modifie
+        # les sources. En CI on veut juste signaler les erreurs.
+        run: npx eslint "{src,apps,libs,test}/**/*.ts"
+
+  typecheck:
+    name: tsc strict (--noEmit)
+    needs: setup
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # NB Lot 6.1 : le job échouera tant que la dette typecheck héritée
+    # (test/integration/fk-ref-secondaire + ~7 .spec.ts) n'est pas
+    # nettoyée — c'est l'objectif (révélation de la dette pour le
+    # Lot 6.6). La liste des fichiers en erreur est documentée dans
+    # `docs/ci-cd.md §Dette typecheck`.
+    continue-on-error: false
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx tsc --noEmit
+
+  build:
+    name: nest build
+    needs: setup
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+
+  test:
+    name: Jest
+    needs: setup
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm test -- --ci --runInBand
+        env:
+          # NestJS Logger en silent pour réduire le bruit CI.
+          NODE_ENV: test
+
+  audit-codes-coherence:
+    # Vérifie que tous les codes ref_type_action_audit insérés dans
+    # les migrations sont déclarés dans le type union TypeAction
+    # (src/audit/entities/audit-log.entity.ts). Détecte la dette
+    # type bug Lot Administration (codes oubliés dans le type TS).
+    name: Cohérence codes audit / TypeAction
+    needs: setup
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Vérifier alignement migrations ↔ TypeAction
+        run: node scripts/check-audit-codes-coherence.js
