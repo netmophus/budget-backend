@@ -15,6 +15,7 @@ import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 import { DelegationsModule } from './delegations/delegations.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { RealiseModule } from './realise/realise.module';
+import { ReforecastModule } from './reforecast/reforecast.module';
 import { TableauBordModule } from './tableau-de-bord/tableau-bord.module';
 import { FaitBudgetModule } from './faits/budget/fait-budget.module';
 import { BudgetModule } from './budget/budget.module';
@@ -129,6 +130,8 @@ import { UsersModule } from './users/users.module';
     RealiseModule,
     // Lot 5.2 — tableau de bord budget vs réalisé
     TableauBordModule,
+    // Lot 5.3 — reforecast trimestriel
+    ReforecastModule,
     // Référentiels secondaires (énumérations) — Lot 2.5-bis-A.
     RefTypeStructureModule,
     RefPaysModule,
