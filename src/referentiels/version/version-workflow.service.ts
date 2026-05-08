@@ -41,6 +41,7 @@ import {
   EVENT_BUDGET_VALIDATED,
 } from '../../notifications/notifications.events';
 import { DimVersion } from './entities/dim-version.entity';
+import type { TypeAction } from '../../audit/entities/audit-log.entity';
 import { VersionResponseDto } from './dto/version-response.dto';
 import {
   PublierVersionDto,
@@ -53,6 +54,38 @@ import { toVersionResponse } from './version.service';
 interface AuthCaller {
   userId: string;
   email: string;
+}
+
+/**
+ * Lot 5.3.A — émission du code audit polymorphe selon
+ * `type_version`. Pour les versions de type 'reforecast' (Lot 5.3),
+ * on émet le code `*_REFORECAST` au lieu de `*_BUDGET`.
+ */
+function codeAudit(
+  type: string,
+  base: 'SOUMETTRE' | 'VALIDER' | 'REJETER' | 'PUBLIER',
+): TypeAction {
+  if (type === 'reforecast') {
+    return `${base}_REFORECAST` as TypeAction;
+  }
+  return `${base}_BUDGET` as TypeAction;
+}
+
+/**
+ * Garde-fou : une version de type 'reforecast' marquée OBSOLETE ne
+ * peut plus changer de statut workflow (Q1 décision produit Lot
+ * 5.3 — l'écrasement est définitif).
+ */
+function assertReforecastNonObsolete(v: DimVersion): void {
+  if (
+    v.typeVersion === 'reforecast' &&
+    v.statutPublication === 'OBSOLETE'
+  ) {
+    throw new ConflictException(
+      'Ce reforecast est OBSOLETE (remplacé par un nouveau reforecast). ' +
+        "Aucune transition de workflow n'est possible.",
+    );
+  }
 }
 
 @Injectable()
@@ -92,6 +125,7 @@ export class VersionWorkflowService {
             `Statut actuel : '${v.statut}'.`,
         );
       }
+      assertReforecastNonObsolete(v);
 
       // Une version vide (aucune ligne fait_budget) ne peut pas être
       // soumise — sinon on transmet pour validation un travail nul.
@@ -125,7 +159,7 @@ export class VersionWorkflowService {
 
       await this.auditService.log({
         utilisateur: user.email,
-        typeAction: 'SOUMETTRE_BUDGET',
+        typeAction: codeAudit(v.typeVersion, 'SOUMETTRE'),
         entiteCible: 'dim_version',
         idCible: String(versionId),
         statut: 'success',
@@ -179,6 +213,7 @@ export class VersionWorkflowService {
             `Statut actuel : '${v.statut}'.`,
         );
       }
+      assertReforecastNonObsolete(v);
 
       v.statut = 'valide';
       v.commentaireValidation = dto.commentaire ?? null;
@@ -188,7 +223,7 @@ export class VersionWorkflowService {
 
       await this.auditService.log({
         utilisateur: user.email,
-        typeAction: 'VALIDER_BUDGET',
+        typeAction: codeAudit(v.typeVersion, 'VALIDER'),
         entiteCible: 'dim_version',
         idCible: String(versionId),
         statut: 'success',
@@ -240,6 +275,7 @@ export class VersionWorkflowService {
             `Statut actuel : '${v.statut}'.`,
         );
       }
+      assertReforecastNonObsolete(v);
 
       // Retour en Brouillon, conservation du commentaire de rejet
       // pour le préparateur. Effacer les champs de soumission
@@ -255,7 +291,7 @@ export class VersionWorkflowService {
 
       await this.auditService.log({
         utilisateur: user.email,
-        typeAction: 'REJETER_BUDGET',
+        typeAction: codeAudit(v.typeVersion, 'REJETER'),
         entiteCible: 'dim_version',
         idCible: String(versionId),
         statut: 'success',
@@ -306,6 +342,7 @@ export class VersionWorkflowService {
             `Statut actuel : '${v.statut}'.`,
         );
       }
+      assertReforecastNonObsolete(v);
 
       v.statut = 'gele';
       v.commentairePublication = dto.commentaire ?? null;
@@ -318,7 +355,7 @@ export class VersionWorkflowService {
 
       await this.auditService.log({
         utilisateur: user.email,
-        typeAction: 'PUBLIER_BUDGET',
+        typeAction: codeAudit(v.typeVersion, 'PUBLIER'),
         entiteCible: 'dim_version',
         idCible: String(versionId),
         statut: 'success',
