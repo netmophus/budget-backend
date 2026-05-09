@@ -93,6 +93,11 @@ export default async function globalSetup(): Promise<void> {
   process.env.LOG_LEVEL = process.env.LOG_LEVEL ?? 'silent';
   process.env.BCRYPT_ROUNDS = '4';
   process.env.EMAIL_DRY_RUN = 'true';
+  // Lot 6.4.B — désactive le rate limiting login par défaut en e2e
+  // car plusieurs specs (auth, password, perimetres-delegations,
+  // emails) font 6+ logins successifs depuis la même IP. Le test
+  // dédié rate-limit.e2e-spec.ts override temporairement à 'false'.
+  process.env.LOGIN_RATE_LIMIT_DISABLED = 'true';
   process.env.SMTP_FROM = process.env.SMTP_FROM ?? 'miznas-e2e@local';
   process.env.APP_BASE_URL = process.env.APP_BASE_URL ?? 'http://localhost:5173';
   // Lot 6.3 — connexion Redis pour BullMQ (queue 'emails').
