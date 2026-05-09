@@ -24,11 +24,13 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import * as bcrypt from 'bcrypt';
-import { randomBytes } from 'node:crypto';
 import { Repository } from 'typeorm';
 
 import { AuditService } from '../../audit/audit.service';
 import { AuthService } from '../../auth/auth.service';
+import { genererMotDePasseTemporaire } from '../../auth/password-policy';
+import { EmailQueueProducer } from '../../notifications/email-queue.producer';
+import { EmailLog } from '../../notifications/entities/email-log.entity';
 import { Role } from '../../roles/entities/role.entity';
 import {
   AttribuerRoleDto,
@@ -44,7 +46,8 @@ import { User } from '../entities/user.entity';
 import { UserRole } from '../entities/user-role.entity';
 
 const BCRYPT_COST = 10;
-const MOT_PASSE_TEMPORAIRE_LONGUEUR = 14;
+/** Lot 6.4.C — durée de validité d'un mdp temporaire (jours). */
+const RESET_MDP_DUREE_JOURS = 7;
 
 interface AuthCaller {
   userId: string;
@@ -63,24 +66,12 @@ function toUserResponse(u: User): UserResponseDto {
   };
 }
 
-/**
- * Génère un mot de passe temporaire 14 caractères alphanumériques
- * mélangés à quelques symboles autorisés pour respecter les
- * politiques de mot de passe banque tout en restant lisible
- * (pas d'I, l, 1, 0, O qui se confondent).
- */
-function genererMotDePasseTemporaire(): string {
-  const chars =
-    'ABCDEFGHJKLMNPQRSTUVWXYZ' +
-    'abcdefghijkmnpqrstuvwxyz' +
-    '23456789' +
-    '!@#$%&*?';
-  const buf = randomBytes(MOT_PASSE_TEMPORAIRE_LONGUEUR);
-  let pwd = '';
-  for (let i = 0; i < MOT_PASSE_TEMPORAIRE_LONGUEUR; i++) {
-    pwd += chars[buf[i]! % chars.length];
-  }
-  return pwd;
+function formatDateFr(d: Date): string {
+  return d.toLocaleDateString('fr-FR', {
+    day: '2-digit',
+    month: 'long',
+    year: 'numeric',
+  });
 }
 
 @Injectable()
@@ -92,8 +83,11 @@ export class UsersAdminService {
     private readonly userRoleRepo: Repository<UserRole>,
     @InjectRepository(Role)
     private readonly roleRepo: Repository<Role>,
+    @InjectRepository(EmailLog)
+    private readonly emailLogRepo: Repository<EmailLog>,
     private readonly auditService: AuditService,
     private readonly authService: AuthService,
+    private readonly emailQueue: EmailQueueProducer,
   ) {}
 
   // ─── Création ──────────────────────────────────────────────
@@ -278,6 +272,32 @@ export class UsersAdminService {
 
   // ─── Reset password ────────────────────────────────────────
 
+  /**
+   * Lot 6.4.C — refactor pour async + email :
+   *  1. Génère un mdp temporaire 32 chars conforme à la policy
+   *     (≥1 maj/min/chiffre/spécial garantis).
+   *  2. UPDATE user : nouveau hash + doitChangerMdp=true +
+   *     dateExpirationMdp = now + 7 jours.
+   *  3. Audit RESET_PASSWORD_USER (mot de passe en clair JAMAIS
+   *     stocké en payload).
+   *  4. INSERT email_log statut EN_ATTENTE — payload SANS le mdp en
+   *     clair (juste raison + admin émetteur + date d'expiration).
+   *  5. Publier le job BullMQ avec `secrets = { mdpTemporaire,
+   *     dateExpiration }`. Les secrets transitent uniquement dans
+   *     le job (Redis éphémère) et le mail SMTP. Au worker, ils sont
+   *     fusionnés au moment du rendu Handlebars sans repasser par
+   *     email_log.payload.
+   *  6. Réponse API : `{ success, message }` — PAS le mdp.
+   *
+   * BREAKING CHANGE Lot 6.4.C : la réponse ne contient plus
+   * `motDePasseTemporaire`. Le frontend Admin doit afficher un toast
+   * "Email envoyé à <email>" au lieu d'afficher le mdp.
+   *
+   * Le job email est publié EN DEHORS de la transaction DB pour
+   * éviter qu'un échec de commit ne laisse un job orphelin dans
+   * Redis (côté inverse, si Redis tombe après le commit, l'email_log
+   * reste EN_ATTENTE et peut être rejoué via /admin/email-log/:id/rejouer).
+   */
   async resetPassword(
     id: string,
     currentUser: AuthCaller,
@@ -287,9 +307,17 @@ export class UsersAdminService {
 
     const motDePasseTemporaire = genererMotDePasseTemporaire();
     const hash = await bcrypt.hash(motDePasseTemporaire, BCRYPT_COST);
+    const dateExpirationMdp =
+      this.authService.nouvelleDateExpiration(RESET_MDP_DUREE_JOURS);
+    const dateExpirationFr = formatDateFr(dateExpirationMdp);
+
     u.motDePasseHash = hash;
+    u.doitChangerMdp = true;
+    u.dateExpirationMdp = dateExpirationMdp;
     u.dateModification = new Date();
     u.utilisateurModification = currentUser.email;
+
+    let emailLogId: string | null = null;
 
     await this.userRepo.manager.transaction(async (tx) => {
       await tx.getRepository(User).save(u);
@@ -305,17 +333,48 @@ export class UsersAdminService {
           payloadApres: {
             email: u.email,
             longueurMotDePasseGenere: motDePasseTemporaire.length,
+            dateExpiration: dateExpirationFr,
           },
-          commentaire: `Reset password pour ${u.email} (mot de passe en clair fourni en réponse, non logué).`,
+          commentaire: `Reset password pour ${u.email} (mdp envoyé par email, doitChangerMdp=true).`,
         },
         tx,
       );
+
+      // INSERT email_log statut EN_ATTENTE. Le payload NE contient
+      // PAS le mdp — uniquement la raison + métadonnées non sensibles.
+      const emailRepo = tx.getRepository(EmailLog);
+      const log = emailRepo.create({
+        evenement: 'RESET_PASSWORD_ADMIN',
+        fkDestinataire: u.id,
+        destinataireEmail: u.email,
+        sujet: '[MIZNAS] Votre mot de passe a été réinitialisé',
+        template: 'reset-password-admin',
+        payload: {
+          raison: 'reset_admin',
+          adminEmail: currentUser.email,
+          dateExpiration: dateExpirationFr,
+        },
+        statut: 'EN_ATTENTE',
+        tentatives: 0,
+      });
+      const saved = await emailRepo.save(log);
+      emailLogId = saved.id;
     });
 
+    // Publication du job BullMQ HORS transaction : si la transaction
+    // rollback, on ne publie pas un job orphelin. Si la publication
+    // fail (Redis down), email_log reste EN_ATTENTE et peut être
+    // republié manuellement via /admin/email-log/:id/rejouer.
+    if (emailLogId !== null) {
+      await this.emailQueue.publier(emailLogId, {
+        mdpTemporaire: motDePasseTemporaire,
+        dateExpiration: dateExpirationFr,
+      });
+    }
+
     return {
-      motDePasseTemporaire,
-      message:
-        'Mot de passe temporaire généré. Communiquez-le au user de manière sécurisée — il ne sera plus affiché.',
+      success: true,
+      message: `Email de réinitialisation envoyé à ${u.email}.`,
     };
   }
 
