@@ -19,6 +19,15 @@ import { Queue } from 'bullmq';
 
 export interface EmailJobData {
   emailLogId: string;
+  /**
+   * Lot 6.4.C — secrets transitoires (ex: mot de passe temporaire
+   * d'un reset admin). Stockés UNIQUEMENT dans le job BullMQ (Redis,
+   * éphémère le temps du traitement) — JAMAIS dans `email_log.payload`
+   * ni dans `audit_log`. Disponibles au worker au moment du rendu
+   * Handlebars ; détruits avec le job (removeOnComplete=100,
+   * removeOnFail=1000).
+   */
+  secrets?: Record<string, string>;
 }
 
 export interface QueueStats {
@@ -38,17 +47,20 @@ export class EmailQueueProducer {
     @InjectQueue(EMAIL_QUEUE_NAME) private readonly queue: Queue<EmailJobData>,
   ) {}
 
-  async publier(emailLogId: string): Promise<void> {
-    await this.queue.add(
-      EMAIL_JOB_NAME,
-      { emailLogId },
-      {
-        attempts: 3,
-        backoff: { type: 'exponential', delay: 2_000 },
-        removeOnComplete: 100,
-        removeOnFail: 1_000,
-      },
-    );
+  async publier(
+    emailLogId: string,
+    secrets?: Record<string, string>,
+  ): Promise<void> {
+    const data: EmailJobData = { emailLogId };
+    if (secrets && Object.keys(secrets).length > 0) {
+      data.secrets = secrets;
+    }
+    await this.queue.add(EMAIL_JOB_NAME, data, {
+      attempts: 3,
+      backoff: { type: 'exponential', delay: 2_000 },
+      removeOnComplete: 100,
+      removeOnFail: 1_000,
+    });
   }
 
   /**
