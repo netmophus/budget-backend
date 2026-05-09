@@ -173,6 +173,141 @@ describe('AuthService', () => {
         }),
       );
     });
+
+    // ─── Lot 6.4.A — flags mdpExpire / doitChangerMdp ───────────────
+
+    it('retourne mdpExpire=true si dateExpirationMdp est dépassée', async () => {
+      const hash = await bcrypt.hash('correct', 4);
+      userRepo.findOne.mockResolvedValue(
+        makeUser({
+          motDePasseHash: hash,
+          dateExpirationMdp: new Date(Date.now() - 86_400_000), // hier
+          doitChangerMdp: false,
+        }),
+      );
+
+      const result = await service.login(
+        'admin@miznas.local',
+        'correct',
+        null,
+        null,
+      );
+      expect(result.mdpExpire).toBe(true);
+      expect(result.doitChangerMdp).toBe(false);
+    });
+
+    it('retourne doitChangerMdp=true si user.doit_changer_mdp = true', async () => {
+      const hash = await bcrypt.hash('correct', 4);
+      userRepo.findOne.mockResolvedValue(
+        makeUser({
+          motDePasseHash: hash,
+          dateExpirationMdp: new Date(Date.now() + 86_400_000),
+          doitChangerMdp: true,
+        }),
+      );
+
+      const result = await service.login(
+        'admin@miznas.local',
+        'correct',
+        null,
+        null,
+      );
+      expect(result.doitChangerMdp).toBe(true);
+    });
+
+    it('flags false par défaut pour un user récent sans expiration ni reset', async () => {
+      const hash = await bcrypt.hash('correct', 4);
+      userRepo.findOne.mockResolvedValue(
+        makeUser({
+          motDePasseHash: hash,
+          dateExpirationMdp: null,
+          doitChangerMdp: false,
+        }),
+      );
+
+      const result = await service.login(
+        'admin@miznas.local',
+        'correct',
+        null,
+        null,
+      );
+      expect(result.mdpExpire).toBe(false);
+      expect(result.doitChangerMdp).toBe(false);
+    });
+  });
+
+  describe('changerMdp', () => {
+    it('hash le nouveau mdp + UPDATE doit_changer_mdp=false + nouvelle expiration', async () => {
+      const hash = await bcrypt.hash('AncienConforme1!', 4);
+      const user = makeUser({
+        motDePasseHash: hash,
+        doitChangerMdp: true,
+        dateExpirationMdp: new Date(Date.now() - 86_400_000),
+      });
+      userRepo.findOne.mockResolvedValue(user);
+
+      const result = await service.changerMdp(
+        '1',
+        'AncienConforme1!',
+        'NouveauValide99@',
+        null,
+        null,
+      );
+
+      expect(result.mdpExpire).toBe(false);
+      expect(result.doitChangerMdp).toBe(false);
+      expect(userRepo.save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          doitChangerMdp: false,
+          dateExpirationMdp: expect.any(Date),
+        }),
+      );
+      expect(auditService.log).toHaveBeenCalledWith(
+        expect.objectContaining({
+          typeAction: 'PASSWORD_CHANGED',
+          statut: 'success',
+        }),
+      );
+    });
+
+    it('rejette avec UnauthorizedException si ancien mdp incorrect', async () => {
+      const hash = await bcrypt.hash('AncienVrai1!', 4);
+      userRepo.findOne.mockResolvedValue(makeUser({ motDePasseHash: hash }));
+
+      await expect(
+        service.changerMdp('1', 'mauvais', 'NouveauValide99@', null, null),
+      ).rejects.toThrow(UnauthorizedException);
+      expect(auditService.log).toHaveBeenCalledWith(
+        expect.objectContaining({
+          typeAction: 'PASSWORD_CHANGED',
+          statut: 'failure',
+        }),
+      );
+    });
+
+    it("rejette si nouveau mdp = ancien mdp", async () => {
+      const hash = await bcrypt.hash('IdentiqueValide1!', 4);
+      userRepo.findOne.mockResolvedValue(makeUser({ motDePasseHash: hash }));
+
+      await expect(
+        service.changerMdp(
+          '1',
+          'IdentiqueValide1!',
+          'IdentiqueValide1!',
+          null,
+          null,
+        ),
+      ).rejects.toThrow(/différent/);
+    });
+
+    it('rejette si le nouveau mdp ne respecte pas la politique', async () => {
+      const hash = await bcrypt.hash('AncienConforme1!', 4);
+      userRepo.findOne.mockResolvedValue(makeUser({ motDePasseHash: hash }));
+
+      await expect(
+        service.changerMdp('1', 'AncienConforme1!', 'court', null, null),
+      ).rejects.toThrow(/12 caractères|majuscule|chiffre|spécial/);
+    });
   });
 
   describe('refresh', () => {
