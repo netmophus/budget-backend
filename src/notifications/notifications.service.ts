@@ -31,6 +31,7 @@ import { Repository } from 'typeorm';
 
 import { PermissionsService } from '../auth/permissions.service';
 import { User } from '../users/entities/user.entity';
+import { EmailQueueProducer } from './email-queue.producer';
 import {
   EmailLog,
   type StatutEmail,
@@ -104,6 +105,9 @@ export class NotificationsService {
     private readonly userRepo: Repository<User>,
     private readonly config: ConfigService,
     private readonly permissionsService: PermissionsService,
+    // Lot 6.3 — publication async dans la queue BullMQ. L'envoi SMTP
+    // réel et la transition ENVOYE/ECHEC sont effectués par EmailWorker.
+    private readonly emailQueue: EmailQueueProducer,
   ) {}
 
   // ─── Configuration ──────────────────────────────────────────────
@@ -286,9 +290,20 @@ export class NotificationsService {
   // ─── Envoi ──────────────────────────────────────────────────────
 
   /**
-   * Envoie l'email à un destinataire (ou trace SUPPRIME).
-   * Logique de filtrage préférences appliquée ici afin que la
-   * trace existe systématiquement dans email_log.
+   * Crée la trace `email_log` et publie le job dans la queue BullMQ
+   * (Lot 6.3 — refactor async). Retourne immédiatement, sans attendre
+   * SMTP. Le worker `EmailWorker` traitera l'envoi en arrière-plan
+   * avec retries automatiques (cf. `EmailQueueProducer.publier()`).
+   *
+   * Cas où l'email N'EST PAS publié dans la queue (statut SUPPRIME) :
+   *  - préférence user désactivée (toggle global ou liste blanche)
+   *  - mode dry-run global (`EMAIL_DRY_RUN=true`)
+   *
+   * Le résultat `envoye: false` ne signifie PAS un échec — il signifie
+   * que l'envoi SMTP n'a pas encore été tenté (job en queue) ou que
+   * l'email a été supprimé volontairement. Le statut effectif se lit
+   * sur `emailLog.statut` : EN_ATTENTE / EN_COURS / ENVOYE / ECHEC /
+   * SUPPRIME.
    */
   async envoyer(
     evenement: TypeEvenement,
@@ -319,21 +334,9 @@ export class NotificationsService {
       return { emailLog: log, envoye: false };
     }
 
-    // 3. Préparation du contenu
-    const sujet = SUJETS[evenement];
-    const template = TEMPLATES[evenement];
-    const variables = {
-      ...payload,
-      destinataire: {
-        prenom: destinataire.prenom,
-        nom: destinataire.nom,
-        email: destinataire.email,
-      },
-      app_base_url: this.getAppBaseUrl(),
-      annee: new Date().getFullYear(),
-    };
-
-    // 4. Création (ou récupération) de la ligne email_log
+    // 3. Création (ou récupération) de la ligne email_log statut EN_ATTENTE.
+    //    Pour un rejeu, on remet à zéro le compteur et l'erreur — la
+    //    queue gérera ses propres retries.
     let log = options.emailLogId
       ? await this.emailLogRepo.findOne({ where: { id: options.emailLogId } })
       : null;
@@ -342,49 +345,24 @@ export class NotificationsService {
         evenement,
         fkDestinataire: destinataire.id,
         destinataireEmail: destinataire.email,
-        sujet,
-        template,
+        sujet: SUJETS[evenement],
+        template: TEMPLATES[evenement],
         payload,
         statut: 'EN_ATTENTE',
         tentatives: 0,
       });
       log = await this.emailLogRepo.save(log);
+    } else {
+      log.statut = 'EN_ATTENTE';
+      log.tentatives = 0;
+      log.dernierMessageErreur = null;
+      log = await this.emailLogRepo.save(log);
     }
 
-    // 5. Tentatives avec backoff
-    const html = this.rendreTemplate(template, variables);
-    const backoffsMs = [1000, 3000, 10000];
-    let derniereErreur: string | null = null;
-    for (let i = 0; i < backoffsMs.length; i++) {
-      log.tentatives++;
-      try {
-        await this.getTransporter().sendMail({
-          from: this.config.get<string>('SMTP_FROM', 'miznas@bsic.local'),
-          to: destinataire.email,
-          subject: sujet,
-          html,
-        });
-        log.statut = 'ENVOYE';
-        log.envoyeLe = new Date();
-        log.dernierMessageErreur = null;
-        log = await this.emailLogRepo.save(log);
-        return { emailLog: log, envoye: true };
-      } catch (err) {
-        derniereErreur = err instanceof Error ? err.message : String(err);
-        this.logger.warn(
-          `Tentative ${log.tentatives}/${backoffsMs.length} ` +
-            `échouée pour ${destinataire.email} (${evenement}) : ${derniereErreur}`,
-        );
-        if (i < backoffsMs.length - 1) {
-          await new Promise((r) => setTimeout(r, backoffsMs[i]));
-        }
-      }
-    }
+    // 4. Publication dans la queue BullMQ. Le worker fera l'envoi
+    //    SMTP + transition ENVOYE/ECHEC.
+    await this.emailQueue.publier(log.id);
 
-    // 6. Échec définitif
-    log.statut = 'ECHEC';
-    log.dernierMessageErreur = derniereErreur;
-    log = await this.emailLogRepo.save(log);
     return { emailLog: log, envoye: false };
   }
 
@@ -523,6 +501,7 @@ export class NotificationsService {
     )) ?? [];
     const parStatut: Record<StatutEmail, number> = {
       EN_ATTENTE: 0,
+      EN_COURS: 0,
       ENVOYE: 0,
       ECHEC: 0,
       SUPPRIME: 0,
