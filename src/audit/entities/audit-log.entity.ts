@@ -69,7 +69,12 @@ export type TypeAction =
   | 'VALIDER_REFORECAST'
   | 'REJETER_REFORECAST'
   | 'PUBLIER_REFORECAST'
-  | 'MARQUER_REFORECAST_OBSOLETE';
+  | 'MARQUER_REFORECAST_OBSOLETE'
+  // Lot 6.4 — Sécurisation des mots de passe. Codes en EN/UPPERCASE
+  // pour cohérence avec les codes auth existants (LOGIN, LOGIN_FAILED,
+  // RESET_PASSWORD_USER). Seedés via migration 1779200000190.
+  | 'PASSWORD_CHANGED'
+  | 'LOGIN_RATE_LIMITED';
 
 export type AuditStatut = 'success' | 'failure';
 
