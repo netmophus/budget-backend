@@ -17,6 +17,8 @@ import { DataSource } from 'typeorm';
 import { AuditLog } from '../../audit/entities/audit-log.entity';
 import { AuditService } from '../../audit/audit.service';
 import type { AuthService } from '../../auth/auth.service';
+import type { EmailQueueProducer } from '../../notifications/email-queue.producer';
+import { EmailLog } from '../../notifications/entities/email-log.entity';
 import { Permission } from '../../roles/entities/permission.entity';
 import { Role } from '../../roles/entities/role.entity';
 import { RolePermission } from '../../roles/entities/role-permission.entity';
@@ -45,7 +47,7 @@ async function createDataSource(): Promise<DataSource> {
   const db = buildMemDb();
   const ds = db.adapters.createTypeormDataSource({
     type: 'postgres',
-    entities: [User, UserRole, Role, Permission, RolePermission, AuditLog],
+    entities: [User, UserRole, Role, Permission, RolePermission, AuditLog, EmailLog],
     synchronize: true,
   }) as DataSource;
   await ds.initialize();
@@ -103,7 +105,23 @@ async function seed(ds: DataSource): Promise<SeedIds> {
 function makeAuthMock(): AuthService {
   return {
     revokerTousTokensActifs: jest.fn().mockResolvedValue(undefined),
+    // Lot 6.4.A — utilisé par resetPassword pour calculer la date
+    // d'expiration du mdp temporaire (now + 7 jours).
+    nouvelleDateExpiration: jest.fn(
+      (jours?: number) =>
+        new Date(Date.now() + (jours ?? 90) * 86_400_000),
+    ),
   } as unknown as AuthService;
+}
+
+interface QueueMock {
+  publier: jest.Mock;
+}
+
+function makeQueueMock(): EmailQueueProducer & QueueMock {
+  return {
+    publier: jest.fn().mockResolvedValue(undefined),
+  } as unknown as EmailQueueProducer & QueueMock;
 }
 
 describe('UsersAdminService', () => {
@@ -111,6 +129,7 @@ describe('UsersAdminService', () => {
   let svc: UsersAdminService;
   let auditSvc: AuditService;
   let authMock: AuthService;
+  let queueMock: EmailQueueProducer & QueueMock;
   let ids: SeedIds;
 
   beforeAll(async () => {
@@ -128,12 +147,15 @@ describe('UsersAdminService', () => {
     ids = await seed(ds);
     auditSvc = new AuditService(ds.getRepository(AuditLog));
     authMock = makeAuthMock();
+    queueMock = makeQueueMock();
     svc = new UsersAdminService(
       ds.getRepository(User),
       ds.getRepository(UserRole),
       ds.getRepository(Role),
+      ds.getRepository(EmailLog), // Lot 6.4.C
       auditSvc,
       authMock,
+      queueMock, // Lot 6.4.C
     );
   });
 
@@ -282,19 +304,69 @@ describe('UsersAdminService', () => {
   // ─── reset password ────────────────────────────────────────────
 
   describe('resetPassword', () => {
-    it('génère un mot de passe ≥ 12 chars, hash bcrypt, audit sans clair', async () => {
+    it("génère un mdp temporaire (≥12 chars, conforme à la policy), force doit_changer_mdp + expiration 7j, publie un job email avec mdp en secret (pas en payload), réponse API SANS mdp", async () => {
       const r = await svc.resetPassword(ids.ciblId, auteur(ids.adminId));
-      expect(r.motDePasseTemporaire.length).toBeGreaterThanOrEqual(12);
-      const u = await ds.getRepository(User).findOne({ where: { id: ids.ciblId } });
-      expect(await bcrypt.compare(r.motDePasseTemporaire, u!.motDePasseHash)).toBe(true);
-      // SÉCURITÉ : le mot de passe en clair n'est PAS dans audit_log.
+
+      // 1. Réponse API : success + message, PAS de motDePasseTemporaire
+      // (breaking change Lot 6.4.C).
+      expect(r).toEqual({
+        success: true,
+        message: expect.stringContaining('cible@test.local'),
+      });
+      expect((r as unknown as { motDePasseTemporaire?: string }).motDePasseTemporaire).toBeUndefined();
+
+      // 2. User en base : doit_changer_mdp=true, date_expiration_mdp posée,
+      //    nouveau hash bcrypt.
+      const u = await ds
+        .getRepository(User)
+        .findOne({ where: { id: ids.ciblId } });
+      expect(u!.doitChangerMdp).toBe(true);
+      expect(u!.dateExpirationMdp).not.toBeNull();
+      // L'expiration est ~7 jours dans le futur (tolérance 1 min).
+      const diffMs = u!.dateExpirationMdp!.getTime() - Date.now();
+      expect(diffMs).toBeGreaterThan(6 * 86_400_000);
+      expect(diffMs).toBeLessThan(8 * 86_400_000);
+
+      // 3. Job email publié avec secrets (mdp en clair dans les
+      //    secrets BullMQ, pas en email_log.payload).
+      expect(queueMock.publier).toHaveBeenCalledTimes(1);
+      const [emailLogId, secrets] = queueMock.publier.mock.calls[0] as [
+        string | number, // pg-mem renvoie les bigint en number, Postgres en string
+        Record<string, string>,
+      ];
+      expect(emailLogId).toBeDefined();
+      expect(secrets).toEqual(
+        expect.objectContaining({
+          mdpTemporaire: expect.any(String),
+          dateExpiration: expect.any(String),
+        }),
+      );
+      const mdpClair = secrets.mdpTemporaire;
+      expect(mdpClair.length).toBeGreaterThanOrEqual(12);
+      expect(mdpClair).toMatch(/[A-Z]/);
+      expect(mdpClair).toMatch(/[a-z]/);
+      expect(mdpClair).toMatch(/[0-9]/);
+      expect(mdpClair).toMatch(/[^A-Za-z0-9]/);
+      // Le mdp clair valide bien le hash bcrypt en base.
+      expect(await bcrypt.compare(mdpClair, u!.motDePasseHash)).toBe(true);
+
+      // 4. email_log inséré statut EN_ATTENTE, payload SANS mdp.
+      const log = await ds
+        .getRepository(EmailLog)
+        .findOne({ where: { id: emailLogId } });
+      expect(log).not.toBeNull();
+      expect(log!.statut).toBe('EN_ATTENTE');
+      expect(log!.evenement).toBe('RESET_PASSWORD_ADMIN');
+      expect(JSON.stringify(log!.payload)).not.toContain(mdpClair);
+
+      // 5. SÉCURITÉ : le mdp en clair n'apparaît PAS dans audit_log.
       const audits = (await ds.query(
         `SELECT payload_apres, commentaire FROM audit_log
           WHERE type_action='RESET_PASSWORD_USER'`,
       )) as Array<{ payload_apres: unknown; commentaire: string }>;
       expect(audits).toHaveLength(1);
       const blob = JSON.stringify(audits[0]) + audits[0]!.commentaire;
-      expect(blob).not.toContain(r.motDePasseTemporaire);
+      expect(blob).not.toContain(mdpClair);
     });
   });
 
