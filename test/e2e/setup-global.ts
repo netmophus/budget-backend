@@ -26,6 +26,8 @@ import { seedStructures } from '../../src/seeds/structure-seed';
 import { seedCrs } from '../../src/seeds/cr-seed';
 import { seedComptes } from '../../src/seeds/compte-seed';
 import { seedLignesMetier } from '../../src/seeds/ligne-metier-seed';
+import { seedProduits } from '../../src/seeds/produit-seed';
+import { seedSegments } from '../../src/seeds/segment-seed';
 import { seedVersions } from '../../src/seeds/version-seed';
 import { seedScenarios } from '../../src/seeds/scenario-seed';
 
@@ -150,6 +152,8 @@ export default async function globalSetup(): Promise<void> {
   await seedCrs(ds);
   await seedComptes(ds);
   await seedLignesMetier(ds);
+  await seedProduits(ds);
+  await seedSegments(ds);
   await seedVersions(ds);
   await seedScenarios(ds);
 
