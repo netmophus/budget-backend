@@ -29,13 +29,17 @@ export class EmailWorker extends WorkerHost {
   }
 
   async process(job: Job<EmailJobData>): Promise<void> {
-    const { emailLogId } = job.data;
+    const { emailLogId, secrets } = job.data;
     const attemptsMade = job.attemptsMade;
     const maxAttempts = job.opts.attempts ?? 1;
     const isLastAttempt = attemptsMade + 1 >= maxAttempts;
 
     try {
-      await this.notifications.traiterJob(emailLogId, attemptsMade);
+      // Lot 6.4.C : `secrets` (mdp temporaire d'un reset admin) est
+      // transmis depuis le job BullMQ vers traiterJob. NotificationsService
+      // les fusionnera dans les variables Handlebars au moment du
+      // rendu, sans les stocker dans email_log.
+      await this.notifications.traiterJob(emailLogId, attemptsMade, secrets);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       this.logger.warn(

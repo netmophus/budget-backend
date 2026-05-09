@@ -8,6 +8,98 @@ en interne pour BSIC ; pas de release publique).
 
 ## [Non publié]
 
+### Lot 6.4 — Sécurisation des mots de passe (mai 2026)
+
+#### Ajouté
+
+**Palier 6.4.A — Politique mdp + expiration + force change**
+- `src/auth/password-policy.ts` : politique partagée (≥ 12 + 1 maj
+  + 1 min + 1 chiffre + 1 spécial), décorateur `@MotDePasseValide()`
+  pour DTO, helper `genererMotDePasseTemporaire(longueur=32)`
+  policy-conforme (Fisher-Yates + `crypto.randomBytes`).
+- Migration `1779200000180-CreerExpirationMotsDePasse` : colonnes
+  `date_expiration_mdp` + `doit_changer_mdp` (idempotent via
+  information_schema).
+- Migration `1779200000190-AjouterCodesAuditPasswordSecurity` :
+  codes audit `PASSWORD_CHANGED` + `LOGIN_RATE_LIMITED` ajoutés
+  à la contrainte CHECK de `audit_log.type_action`.
+- Endpoint `PATCH /me/password` (DTO `ChangerMdpDto`, audit
+  `PASSWORD_CHANGED`, ré-émet de nouveaux tokens sans flags) +
+  decorator `@AllowExpiredPassword()` pour bypass guard.
+- `PasswordExpiredGuard` (`APP_GUARD` global) : 403 sur toute route
+  authentifiée si JWT a `mdpExpire` ou `dcm` posé, avec code
+  applicatif `MDP_EXPIRE` ou `MDP_TEMPORAIRE`. Whitelist via
+  `@Public()` ou `@AllowExpiredPassword()`.
+- Login response étendue : `mdpExpire`, `doitChangerMdp` ; JWT
+  payload encode aussi ces flags (`mdpExpire`, `dcm`).
+- Variable env `MDP_DUREE_VALIDITE_JOURS` (défaut 90j).
+
+**Palier 6.4.B — Rate limiting login**
+- `LoginRateLimiterService` : 2 fenêtres in-memory (5/60s par IP +
+  5/15min par email), désactivable via `LOGIN_RATE_LIMIT_DISABLED=true`.
+- `LoginRateLimitGuard` sur `POST /auth/login` : audit
+  `LOGIN_RATE_LIMITED` + header `Retry-After` + 429 avec code
+  applicatif `LOGIN_RATE_LIMITED`.
+
+**Palier 6.4.C — Reset password admin async + force change UI**
+- `EmailQueueModule` (extraction du Producer + `BullModule.registerQueue`)
+  pour isoler le `EmailWorker` et permettre aux modules consommateurs
+  d'importer la queue sans tirer le `BullExplorer` transitivement
+  (fix DI pour les e2e backend pg-mem).
+- `EmailJobData.secrets?: Record<string, string>` : transit éphémère
+  via Redis pour les valeurs sensibles (mdp temporaire reset),
+  fusionnés en Handlebars au dernier moment, **jamais persistés** en
+  `email_log.payload`.
+- Template `reset-password-admin.hbs` (mdp en clair, expiration,
+  avertissement compromission) + sujet/template enregistrés dans
+  `notifications.service.ts`.
+- Endpoint `POST /admin/users/:id/forcer-changement-mdp`
+  (USER.GERER) : pose `doit_changer_mdp = true` sans toucher au
+  hash. Audit `RESET_PASSWORD_USER` avec
+  `payloadApres.operation = 'forcer-changement-mdp'`. N'envoie pas
+  d'email. Cas d'usage support (suspicion de compromission).
+- Documentation `.env.example` : `LOGIN_RATE_LIMIT_DISABLED=false`
+  avec rappel "NE JAMAIS activer en pré-prod ou en production".
+- Documentation `docs/lot-6/6.4-securite-mots-de-passe.md` — flux
+  complet, invariants sécurité, dette, env vars.
+
+#### Modifié
+
+- `UsersAdminService.resetPassword` refactoré async via queue :
+  génère un mdp temporaire 32 chars (policy-conforme), pose
+  `doit_changer_mdp=true` + `date_expiration_mdp = now() + 7j`,
+  INSERT email_log `EN_ATTENTE` SANS le mdp dans le payload, puis
+  publie le job avec `secrets={ mdpTemporaire }` HORS transaction.
+  **Breaking change** : `ResetPasswordResponseDto = { success, message }`
+  (suppression de `motDePasseTemporaire` dans la réponse).
+- `AllExceptionsFilter` : préserve le `code` applicatif du payload
+  des `HttpException` (`MDP_TEMPORAIRE`, `MDP_EXPIRE`,
+  `LOGIN_RATE_LIMITED`). Backwards-compatible pour les exceptions
+  sans `code`.
+
+#### Décisions / Sécurité
+
+- **Mot de passe en clair jamais retourné par l'API** (post-reset
+  admin), **jamais persisté en `email_log.payload` ni
+  `audit_log.payload`**, transit unique via Redis (job data BullMQ).
+- **Codes audit EN/UPPERCASE** : conservation de la convention
+  existante du module auth (cohérence avec `LOGIN`, `LOGIN_FAILED`)
+  malgré la convention FR du reste de l'application.
+- **Rate limit storage in-memory** : OK V1 mono-instance, dette
+  tracée pour migration Redis en V2 (Lot 7+).
+- **`@nestjs/throttler` non utilisé** : implémentation custom pour
+  contrôle fin (2 fenêtres sur clés différentes IP/email) + audit
+  intégré au pipeline.
+
+#### Tests
+
+- 22 unit (palier A) + 8 unit (palier B) + spec users-admin et
+  worker adaptés palier C.
+- 3 specs e2e SuperTest : `password.e2e-spec.ts`,
+  `rate-limit.e2e-spec.ts`, `reset-password-admin.e2e-spec.ts`.
+
+---
+
 ### Lot 6.3 — Queue BullMQ + Redis pour emails async (mai 2026)
 
 #### Ajouté

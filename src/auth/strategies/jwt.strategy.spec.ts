@@ -15,7 +15,7 @@ describe('JwtStrategy', () => {
     );
   });
 
-  it('returns { userId, email } for a valid payload', () => {
+  it('returns { userId, email, mdpExpire:false, doitChangerMdp:false } pour un payload sans flags (Lot 6.4.A)', () => {
     const strategy = makeStrategy();
     const payload: JwtPayload = {
       sub: '42',
@@ -23,7 +23,26 @@ describe('JwtStrategy', () => {
       jti: '00000000-0000-4000-8000-000000000099',
     };
     const result = strategy.validate(payload);
-    expect(result).toEqual({ userId: '42', email: 'admin@miznas.local' });
+    expect(result).toEqual({
+      userId: '42',
+      email: 'admin@miznas.local',
+      mdpExpire: false,
+      doitChangerMdp: false,
+    });
+  });
+
+  it('propage les flags mdpExpire et dcm du payload (Lot 6.4.A)', () => {
+    const strategy = makeStrategy();
+    const payload: JwtPayload = {
+      sub: '42',
+      email: 'admin@miznas.local',
+      jti: '00000000-0000-4000-8000-000000000099',
+      mdpExpire: true,
+      dcm: true,
+    };
+    const result = strategy.validate(payload);
+    expect(result.mdpExpire).toBe(true);
+    expect(result.doitChangerMdp).toBe(true);
   });
 
   it('throws UnauthorizedException for malformed payload (missing sub)', () => {

@@ -112,7 +112,9 @@ export class UsersAdminController {
   @RequirePermissions('USER.GERER')
   @ApiOperation({
     summary:
-      "Générer un mot de passe temporaire (USER.GERER). Affiché UNE SEULE FOIS dans la réponse.",
+      'Générer un mot de passe temporaire (USER.GERER) et l\'envoyer par ' +
+      'email à l\'utilisateur (Lot 6.4.C — async via queue BullMQ). Le mot ' +
+      'de passe en clair n\'apparaît PAS dans la réponse API.',
   })
   @ApiOkResponse({ type: ResetPasswordResponseDto })
   resetPassword(
@@ -120,6 +122,33 @@ export class UsersAdminController {
     @CurrentUser() user: AuthUser,
   ): Promise<ResetPasswordResponseDto> {
     return this.svc.resetPassword(id, user);
+  }
+
+  /**
+   * Lot 6.4.C.2 — force `doit_changer_mdp = true` SANS reset du
+   * mdp lui-même. Utile au support pour obliger un user à changer
+   * son mdp à sa prochaine connexion (par exemple suite à une
+   * suspicion de compromission, sans casser la session courante
+   * tant qu'elle est valide). N'envoie PAS d'email.
+   *
+   * Cas d'usage smoke Playwright (Lot 6.4.C.2) : forcer le flag
+   * sur un user de test avant l'exécution du flow.
+   */
+  @Post(':id/forcer-changement-mdp')
+  @HttpCode(HttpStatus.OK)
+  @RequirePermissions('USER.GERER')
+  @ApiOperation({
+    summary:
+      'Force `doit_changer_mdp=true` sur un utilisateur (USER.GERER) — ' +
+      'le user devra changer son mdp à sa prochaine connexion. Ne reset ' +
+      'PAS le mdp existant (à utiliser seul ou avant un reset-password).',
+  })
+  @ApiOkResponse({ type: UserResponseDto })
+  forcerChangementMdp(
+    @Param('id') id: string,
+    @CurrentUser() user: AuthUser,
+  ): Promise<UserResponseDto> {
+    return this.svc.forcerChangementMdp(id, user);
   }
 
   @Post(':id/forcer-deconnexion')

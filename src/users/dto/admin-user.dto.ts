@@ -92,14 +92,19 @@ export class AttribuerRoleDto {
 }
 
 export class ResetPasswordResponseDto {
-  @ApiProperty({
-    description:
-      'Mot de passe temporaire généré, affiché UNE SEULE FOIS. ' +
-      "L'admin doit le communiquer au user de manière sécurisée.",
-  })
-  motDePasseTemporaire!: string;
+  /**
+   * Lot 6.4.C — breaking change : le mot de passe temporaire n'est
+   * plus retourné dans la réponse API. Il est généré côté serveur,
+   * envoyé par email à l'utilisateur (queue BullMQ Lot 6.3) et
+   * jamais stocké en clair (ni en base, ni en log applicatif).
+   * L'admin reçoit juste une confirmation que l'email a été publié.
+   */
+  @ApiProperty({ example: true })
+  success!: boolean;
 
-  @ApiProperty()
+  @ApiProperty({
+    example: 'Email de réinitialisation envoyé à user@miznas.local.',
+  })
   message!: string;
 }
 

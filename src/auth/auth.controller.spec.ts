@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import type { Request } from 'express';
 import { AuthController } from './auth.controller';
 import { AuthService, IssuedTokens } from './auth.service';
+import { LoginRateLimitGuard } from './guards/login-rate-limit.guard';
 import { User } from '../users/entities/user.entity';
 
 function makeReq(): Request {
@@ -40,7 +41,14 @@ describe('AuthController', () => {
     const moduleRef: TestingModule = await Test.createTestingModule({
       controllers: [AuthController],
       providers: [{ provide: AuthService, useValue: service }],
-    }).compile();
+    })
+      // Lot 6.4.B : bypass du LoginRateLimitGuard appliqué sur /auth/login.
+      // Le guard a ses propres tests unitaires (login-rate-limiter.service
+      // .spec.ts) et e2e (rate-limit.e2e-spec.ts) — ici on teste juste la
+      // délégation controller → service.
+      .overrideGuard(LoginRateLimitGuard)
+      .useValue({ canActivate: () => true })
+      .compile();
 
     controller = moduleRef.get(AuthController);
   });

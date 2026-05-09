@@ -78,6 +78,8 @@ const SUJETS: Record<TypeEvenement, string> = {
   DELEGATION_EXPIREE: '[MIZNAS] Délégation expirée',
   DELEGATION_REVOQUEE: '[MIZNAS] Délégation révoquée',
   AFFECTATION_CREEE: '[MIZNAS] Nouvelle affectation de périmètre',
+  RESET_PASSWORD_ADMIN:
+    '[MIZNAS] Votre mot de passe a été réinitialisé',
 };
 
 const TEMPLATES: Record<TypeEvenement, string> = {
@@ -89,6 +91,7 @@ const TEMPLATES: Record<TypeEvenement, string> = {
   DELEGATION_EXPIREE: 'delegation-expiree',
   DELEGATION_REVOQUEE: 'delegation-revoquee',
   AFFECTATION_CREEE: 'affectation-creee',
+  RESET_PASSWORD_ADMIN: 'reset-password-admin',
 };
 
 @Injectable()
@@ -411,7 +414,10 @@ export class NotificationsService {
    * Traite un job de la queue 'emails' :
    *  1. Charge la ligne email_log et la passe en EN_COURS (incrémente
    *     le compteur de tentatives).
-   *  2. Rend le template Handlebars avec les variables du payload.
+   *  2. Rend le template Handlebars avec les variables du payload
+   *     fusionnées avec les `secrets` éventuels du job (ex: mdp
+   *     temporaire d'un reset admin — Lot 6.4.C). Les secrets ne sont
+   *     PAS persistés dans email_log.
    *  3. Tente l'envoi SMTP via nodemailer (1 fois, sans retries
    *     internes — c'est BullMQ qui gère les retries via attemptsMade).
    *  4. En cas de succès → statut ENVOYE + envoyeLe.
@@ -424,7 +430,11 @@ export class NotificationsService {
    * `attemptsMade` est utilisé pour incrémenter le compteur tentatives
    * de manière cohérente avec les retries BullMQ (1 = 1ère exécution).
    */
-  async traiterJob(emailLogId: string, attemptsMade: number): Promise<void> {
+  async traiterJob(
+    emailLogId: string,
+    attemptsMade: number,
+    secrets: Record<string, string> = {},
+  ): Promise<void> {
     const log = await this.emailLogRepo.findOne({
       where: { id: emailLogId },
     });
@@ -442,8 +452,13 @@ export class NotificationsService {
       log.fkDestinataire !== null
         ? await this.userRepo.findOne({ where: { id: log.fkDestinataire } })
         : null;
+    // Lot 6.4.C : les `secrets` (mdp temporaire) sont fusionnés au
+    // dernier moment, juste avant le rendu Handlebars. Ils ne
+    // remontent JAMAIS dans email_log.payload (la propagation se fait
+    // exclusivement par le job BullMQ, éphémère).
     const variables: Record<string, unknown> = {
       ...log.payload,
+      ...secrets,
       destinataire: destinataire
         ? {
             prenom: destinataire.prenom,

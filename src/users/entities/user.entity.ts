@@ -65,6 +65,25 @@ export class User {
   })
   utilisateurModification!: string | null;
 
+  // Lot 6.4.A — Expiration mot de passe (default 90 jours).
+  // NULL = pas d'expiration (cas des users créés avant le Lot 6.4).
+  @Column({
+    name: 'date_expiration_mdp',
+    type: 'timestamp',
+    nullable: true,
+  })
+  dateExpirationMdp!: Date | null;
+
+  // Lot 6.4.A — Force change après reset admin ou pour la 1ère
+  // connexion. Tant que vrai, l'API bloque toutes les routes sauf
+  // PATCH /me/password (cf. PasswordExpiredGuard).
+  @Column({
+    name: 'doit_changer_mdp',
+    type: 'boolean',
+    default: false,
+  })
+  doitChangerMdp!: boolean;
+
   // Lot 4.3 — Préférences notifications email.
   @Column({
     name: 'notifications_email_actives',

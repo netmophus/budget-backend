@@ -38,7 +38,11 @@ export type TypeEvenement =
   | 'DELEGATION_CREEE'     // E5
   | 'DELEGATION_EXPIREE'   // E7
   | 'DELEGATION_REVOQUEE'  // E8
-  | 'AFFECTATION_CREEE';   // E9
+  | 'AFFECTATION_CREEE'    // E9
+  // Lot 6.4.C — reset password admin (mdp temporaire envoyé par email).
+  // Le mdp transite en clair dans le payload BullMQ + le mail SMTP, mais
+  // n'apparaît JAMAIS dans email_log.payload (cf. EmailJobData.secrets).
+  | 'RESET_PASSWORD_ADMIN'; // E10
 
 /**
  * email_log (Lot 4.3) — trace de chaque envoi d'email (réel ou

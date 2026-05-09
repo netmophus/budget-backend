@@ -6,6 +6,7 @@ import {
   HttpStatus,
   Post,
   Req,
+  UseGuards,
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
@@ -17,15 +18,21 @@ import {
 } from '@nestjs/swagger';
 import type { Request } from 'express';
 import { AuthService, CurrentUserView, IssuedTokens } from './auth.service';
+import { AllowExpiredPassword } from './decorators/allow-expired-password.decorator';
 import { CurrentUser } from './decorators/current-user.decorator';
 import type { AuthUser } from './decorators/current-user.decorator';
 import { Public } from './decorators/public.decorator';
+import { LoginRateLimitGuard } from './guards/login-rate-limit.guard';
 import { LoginDto } from './dto/login.dto';
 import { LogoutDto } from './dto/logout.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
 
 interface LoginResponse extends IssuedTokens {
   user: { id: string; email: string; nom: string; prenom: string };
+  // Lot 6.4.A — flags d'état mot de passe. Si l'un des 2 est vrai,
+  // le frontend doit rediriger vers /change-mdp avant tout accès.
+  mdpExpire: boolean;
+  doitChangerMdp: boolean;
 }
 
 @ApiTags('auth')
@@ -35,8 +42,13 @@ export class AuthController {
 
   @Public()
   @Post('login')
+  @UseGuards(LoginRateLimitGuard)
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Authentification par email + mot de passe.' })
+  @ApiOperation({
+    summary:
+      'Authentification par email + mot de passe. Rate-limité (Lot 6.4.B) ' +
+      'à 5 tentatives par minute par IP et 5 par 15 min par email.',
+  })
   @ApiOkResponse({ description: 'Tokens émis.' })
   @ApiUnauthorizedResponse({ description: 'Email ou mot de passe incorrect.' })
   async login(
@@ -45,12 +57,8 @@ export class AuthController {
   ): Promise<LoginResponse> {
     const ip = (req.ip ?? null) as string | null;
     const userAgent = (req.headers['user-agent'] ?? null) as string | null;
-    const { tokens, user } = await this.authService.login(
-      dto.email,
-      dto.motDePasse,
-      ip,
-      userAgent,
-    );
+    const { tokens, user, mdpExpire, doitChangerMdp } =
+      await this.authService.login(dto.email, dto.motDePasse, ip, userAgent);
     return {
       ...tokens,
       user: {
@@ -59,6 +67,8 @@ export class AuthController {
         nom: user.nom,
         prenom: user.prenom,
       },
+      mdpExpire,
+      doitChangerMdp,
     };
   }
 
@@ -84,6 +94,7 @@ export class AuthController {
 
   @Post('logout')
   @HttpCode(HttpStatus.NO_CONTENT)
+  @AllowExpiredPassword()
   @ApiBearerAuth()
   @ApiOperation({
     summary:
@@ -107,6 +118,7 @@ export class AuthController {
   }
 
   @Get('me')
+  @AllowExpiredPassword()
   @ApiBearerAuth()
   @ApiOperation({
     summary: 'Profil utilisateur courant : rôles, permissions, périmètres.',

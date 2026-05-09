@@ -61,7 +61,9 @@ describe('EmailWorker', () => {
 
     await worker.process(makeJob('42', 0));
 
-    expect(svc.traiterJob).toHaveBeenCalledWith('42', 0);
+    // Lot 6.4.C — le worker propage `secrets` (3e arg) même quand
+    // undefined dans job.data, pour signature uniforme.
+    expect(svc.traiterJob).toHaveBeenCalledWith('42', 0, undefined);
     expect(svc.marquerEchecDefinitif).not.toHaveBeenCalled();
   });
 
@@ -89,7 +91,7 @@ describe('EmailWorker', () => {
       'SMTP DOWN',
     );
 
-    expect(svc.traiterJob).toHaveBeenCalledWith('42', 2);
+    expect(svc.traiterJob).toHaveBeenCalledWith('42', 2, undefined);
     expect(svc.marquerEchecDefinitif).toHaveBeenCalledWith('42', 'SMTP DOWN');
   });
 
@@ -112,7 +114,7 @@ describe('EmailWorker', () => {
 
     await worker.process(makeJob('77', 5, 10));
 
-    expect(svc.traiterJob).toHaveBeenCalledWith('77', 5);
+    expect(svc.traiterJob).toHaveBeenCalledWith('77', 5, undefined);
   });
 
   it("erreur non-Error (ex: string) → message stringifié + bascule ECHEC en dernière tentative", async () => {
