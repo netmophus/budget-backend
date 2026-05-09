@@ -20,6 +20,14 @@ interface HttpExceptionResponseShape {
   message?: string | string[];
   error?: string;
   statusCode?: number;
+  /**
+   * Lot 6.4.A — code applicatif optionnel posé par certaines
+   * exceptions pour permettre au frontend de distinguer plusieurs
+   * sémantiques au sein d'un même code HTTP (ex: 403 MDP_TEMPORAIRE
+   * vs 403 MDP_EXPIRE vs 403 RBAC standard). Si présent, il
+   * remplace le code dérivé du status HTTP dans `errorCode`.
+   */
+  code?: string;
 }
 
 @Catch()
@@ -80,6 +88,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
       const exceptionResponse = exception.getResponse();
 
       let message: string;
+      let codeApplicatif: string | undefined;
       if (typeof exceptionResponse === 'string') {
         message = exceptionResponse;
       } else {
@@ -91,12 +100,17 @@ export class AllExceptionsFilter implements ExceptionFilter {
         } else {
           message = exception.message;
         }
+        codeApplicatif = shape.code;
       }
 
       return {
         statusCode,
         message,
-        errorCode: this.errorCodeForHttpStatus(statusCode),
+        // Lot 6.4.A — un `code` applicatif posé par l'exception prime
+        // sur le mapping HTTP générique (cf. PasswordExpiredGuard
+        // qui distingue MDP_TEMPORAIRE de MDP_EXPIRE).
+        errorCode:
+          codeApplicatif ?? this.errorCodeForHttpStatus(statusCode),
       };
     }
 
