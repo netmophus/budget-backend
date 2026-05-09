@@ -8,6 +8,10 @@ export interface JwtPayload {
   sub: string;
   email: string;
   jti: string;
+  // Lot 6.4.A — flags d'état mot de passe (optionnels pour compat
+  // descendante avec les JWT émis avant le Lot 6.4).
+  mdpExpire?: boolean;
+  dcm?: boolean; // doitChangerMdp (abrégé pour limiter la taille du JWT)
 }
 
 @Injectable()
@@ -28,6 +32,11 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
     if (!payload.sub || !payload.email) {
       throw new UnauthorizedException('Jeton invalide');
     }
-    return { userId: payload.sub, email: payload.email };
+    return {
+      userId: payload.sub,
+      email: payload.email,
+      mdpExpire: payload.mdpExpire ?? false,
+      doitChangerMdp: payload.dcm ?? false,
+    };
   }
 }

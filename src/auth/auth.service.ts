@@ -1,4 +1,9 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -12,12 +17,27 @@ import {
   MotifRevocation,
   RefreshToken,
 } from './entities/refresh-token.entity';
+import { validatePasswordPolicy } from './password-policy';
 
 export interface IssuedTokens {
   accessToken: string;
   refreshToken: string;
   expiresIn: number;
 }
+
+export interface PasswordFlags {
+  mdpExpire: boolean;
+  doitChangerMdp: boolean;
+}
+
+export interface LoginResult {
+  tokens: IssuedTokens;
+  user: User;
+  mdpExpire: boolean;
+  doitChangerMdp: boolean;
+}
+
+const MS_PAR_JOUR = 86_400_000;
 
 export interface CurrentUserRoleView {
   code: string;
@@ -57,6 +77,8 @@ export class AuthService {
   private readonly accessExpiresInSeconds: number;
   private readonly refreshExpiresInMs: number;
   private readonly bcryptRounds: number;
+  /** Lot 6.4.A — durée de validité d'un mdp standard (default 90 j). */
+  readonly mdpDureeValiditeJours: number;
 
   constructor(
     @InjectRepository(User)
@@ -78,6 +100,20 @@ export class AuthService {
       config.get<string>('BCRYPT_ROUNDS') ?? '12',
       10,
     );
+    this.mdpDureeValiditeJours = Number.parseInt(
+      config.get<string>('MDP_DUREE_VALIDITE_JOURS') ?? '90',
+      10,
+    );
+  }
+
+  /**
+   * Calcule la date d'expiration future à partir d'un nombre de jours.
+   * Default : `mdpDureeValiditeJours` (90 j). Utilisé par changerMdp,
+   * resetPassword admin (palier C, durée 7j), creer user.
+   */
+  nouvelleDateExpiration(joursDuree?: number): Date {
+    const jours = joursDuree ?? this.mdpDureeValiditeJours;
+    return new Date(Date.now() + jours * MS_PAR_JOUR);
   }
 
   hashPassword(motDePasse: string): Promise<string> {
@@ -102,7 +138,7 @@ export class AuthService {
     motDePasse: string,
     ip: string | null,
     userAgent: string | null,
-  ): Promise<{ tokens: IssuedTokens; user: User }> {
+  ): Promise<LoginResult> {
     const user = await this.validateUser(email, motDePasse);
     if (!user) {
       await this.auditService.log({
@@ -119,7 +155,19 @@ export class AuthService {
 
     user.dateDerniereConnexion = new Date();
     await this.userRepo.save(user);
-    const tokens = await this.issueTokens(user, ip, userAgent);
+
+    // Lot 6.4.A — calcul des flags d'état mot de passe.
+    // `instanceof Date` couvre null + undefined (cas des mocks de
+    // tests qui n'incluent pas la colonne) en une seule condition.
+    const mdpExpire =
+      user.dateExpirationMdp instanceof Date &&
+      user.dateExpirationMdp.getTime() < Date.now();
+    const doitChangerMdp = user.doitChangerMdp === true;
+
+    const tokens = await this.issueTokens(user, ip, userAgent, {
+      mdpExpire,
+      doitChangerMdp,
+    });
 
     await this.auditService.log({
       utilisateur: user.email,
@@ -129,9 +177,91 @@ export class AuthService {
       entiteCible: 'auth',
       idCible: user.id,
       statut: 'success',
+      commentaire:
+        mdpExpire || doitChangerMdp
+          ? `Connexion avec flags mdpExpire=${String(mdpExpire)} doitChangerMdp=${String(doitChangerMdp)}`
+          : null,
     });
 
-    return { tokens, user };
+    return { tokens, user, mdpExpire, doitChangerMdp };
+  }
+
+  /**
+   * Lot 6.4.A — Changement de mot de passe via PATCH /me/password.
+   * Réutilisable pour le changement volontaire et le changement
+   * forcé (mdp expiré ou doit_changer_mdp). Émet un nouveau couple
+   * de tokens sans flags pour que le frontend remplace ses tokens
+   * et débloque l'API.
+   */
+  async changerMdp(
+    userId: string,
+    ancienMdp: string,
+    nouveauMdp: string,
+    ip: string | null,
+    userAgent: string | null,
+  ): Promise<LoginResult> {
+    const user = await this.userRepo.findOne({ where: { id: userId } });
+    if (!user || !user.estActif) {
+      throw new NotFoundException('Utilisateur introuvable.');
+    }
+
+    // 1. Vérifier l'ancien mdp.
+    const ancienOk = await bcrypt.compare(ancienMdp, user.motDePasseHash);
+    if (!ancienOk) {
+      await this.auditService.log({
+        utilisateur: user.email,
+        ipSource: ip,
+        userAgent,
+        typeAction: 'PASSWORD_CHANGED',
+        entiteCible: 'user',
+        idCible: user.id,
+        statut: 'failure',
+        commentaire: 'Ancien mot de passe incorrect.',
+      });
+      throw new UnauthorizedException('Ancien mot de passe incorrect.');
+    }
+
+    // 2. Le nouveau doit être différent de l'ancien.
+    if (ancienMdp === nouveauMdp) {
+      throw new BadRequestException(
+        "Le nouveau mot de passe doit être différent de l'ancien.",
+      );
+    }
+
+    // 3. Politique partagée (défense en profondeur — le DTO valide
+    // déjà via @MotDePasseValide(), mais on re-valide en service
+    // pour les appels internes éventuels).
+    const policy = validatePasswordPolicy(nouveauMdp);
+    if (!policy.ok) {
+      throw new BadRequestException(policy.erreurs.join(' '));
+    }
+
+    // 4. Hash + UPDATE.
+    user.motDePasseHash = await bcrypt.hash(nouveauMdp, this.bcryptRounds);
+    user.dateExpirationMdp = this.nouvelleDateExpiration();
+    user.doitChangerMdp = false;
+    user.dateModification = new Date();
+    user.utilisateurModification = user.email;
+    await this.userRepo.save(user);
+
+    await this.auditService.log({
+      utilisateur: user.email,
+      ipSource: ip,
+      userAgent,
+      typeAction: 'PASSWORD_CHANGED',
+      entiteCible: 'user',
+      idCible: user.id,
+      statut: 'success',
+    });
+
+    // 5. Émettre nouveaux tokens sans flags pour que le frontend
+    // remplace ses tokens et débloque l'API.
+    const tokens = await this.issueTokens(user, ip, userAgent, {
+      mdpExpire: false,
+      doitChangerMdp: false,
+    });
+
+    return { tokens, user, mdpExpire: false, doitChangerMdp: false };
   }
 
   async refresh(
@@ -265,13 +395,19 @@ export class AuthService {
     user: User,
     ip: string | null,
     userAgent: string | null,
+    flags: PasswordFlags = { mdpExpire: false, doitChangerMdp: false },
   ): Promise<IssuedTokens> {
     const jti = randomUUID();
-    const accessToken = await this.jwtService.signAsync({
+    const payload: Record<string, unknown> = {
       sub: user.id,
       email: user.email,
       jti,
-    });
+    };
+    // Lot 6.4.A — flags optionnels, omis si false pour limiter la
+    // taille du JWT et garder compat descendante.
+    if (flags.mdpExpire) payload.mdpExpire = true;
+    if (flags.doitChangerMdp) payload.dcm = true;
+    const accessToken = await this.jwtService.signAsync(payload);
 
     const refreshTokenClear = randomUUID();
     const tokenHash = this.hashRefreshToken(refreshTokenClear);

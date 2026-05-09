@@ -11,6 +11,7 @@ import { AuditModule } from './audit/audit.module';
 import { AuditInterceptor } from './audit/interceptors/audit.interceptor';
 import { AuthModule } from './auth/auth.module';
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
+import { PasswordExpiredGuard } from './auth/guards/password-expired.guard';
 import { PermissionsGuard } from './auth/guards/permissions.guard';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 import { DelegationsModule } from './delegations/delegations.module';
@@ -165,8 +166,10 @@ import { UsersModule } from './users/users.module';
   providers: [
     AppService,
     // Ordre important : authentification d'abord (req.user posé), puis
-    // autorisation par permissions sur la base de req.user.userId.
+    // contrôle expiration mdp (Lot 6.4.A — bloque si mdpExpire/dcm
+    // sauf whitelist), puis autorisation par permissions.
     { provide: APP_GUARD, useClass: JwtAuthGuard },
+    { provide: APP_GUARD, useClass: PasswordExpiredGuard },
     { provide: APP_GUARD, useClass: PermissionsGuard },
     // Audit : intercepteur global, ne s'active que sur les endpoints @Auditable.
     { provide: APP_INTERCEPTOR, useClass: AuditInterceptor },
