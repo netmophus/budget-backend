@@ -13,8 +13,10 @@ import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { RefreshToken } from './entities/refresh-token.entity';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
+import { LoginRateLimitGuard } from './guards/login-rate-limit.guard';
 import { PasswordExpiredGuard } from './guards/password-expired.guard';
 import { PermissionsGuard } from './guards/permissions.guard';
+import { LoginRateLimiterService } from './login-rate-limiter.service';
 import { MePasswordController } from './me-password.controller';
 import { PermissionsService } from './permissions.service';
 import { JwtStrategy } from './strategies/jwt.strategy';
@@ -59,6 +61,8 @@ import { JwtStrategy } from './strategies/jwt.strategy';
     PermissionsService,
     PermissionsGuard,
     PasswordExpiredGuard,
+    LoginRateLimiterService,
+    LoginRateLimitGuard,
   ],
   exports: [
     AuthService,

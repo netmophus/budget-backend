@@ -6,6 +6,7 @@ import {
   HttpStatus,
   Post,
   Req,
+  UseGuards,
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
@@ -21,6 +22,7 @@ import { AllowExpiredPassword } from './decorators/allow-expired-password.decora
 import { CurrentUser } from './decorators/current-user.decorator';
 import type { AuthUser } from './decorators/current-user.decorator';
 import { Public } from './decorators/public.decorator';
+import { LoginRateLimitGuard } from './guards/login-rate-limit.guard';
 import { LoginDto } from './dto/login.dto';
 import { LogoutDto } from './dto/logout.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
@@ -40,8 +42,13 @@ export class AuthController {
 
   @Public()
   @Post('login')
+  @UseGuards(LoginRateLimitGuard)
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Authentification par email + mot de passe.' })
+  @ApiOperation({
+    summary:
+      'Authentification par email + mot de passe. Rate-limité (Lot 6.4.B) ' +
+      'à 5 tentatives par minute par IP et 5 par 15 min par email.',
+  })
   @ApiOkResponse({ description: 'Tokens émis.' })
   @ApiUnauthorizedResponse({ description: 'Email ou mot de passe incorrect.' })
   async login(
