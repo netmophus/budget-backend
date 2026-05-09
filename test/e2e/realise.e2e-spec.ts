@@ -142,6 +142,34 @@ describe('E2E.2 — Saisie réalisé end-to-end', () => {
     expect(ids).not.toContain(realiseId);
   });
 
+  it('SAISISSEUR (adj.retail) tente DELETE → 403 (REALISE.SUPPRIMER manquant)', async () => {
+    // Crée une nouvelle ligne avec adj.retail puis tente DELETE avec lui-même.
+    const created = await request(app.getHttpServer())
+      .post('/api/v1/realise')
+      .set(bearer(adjSession))
+      .send({
+        fkCentreResponsabilite,
+        fkCompte,
+        fkLigneMetier,
+        fkTemps,
+        fkDevise,
+        montant: 1234567,
+      })
+      .expect(201);
+    const tempId = created.body.id;
+
+    await request(app.getHttpServer())
+      .delete(`/api/v1/realise/${tempId}`)
+      .set(bearer(adjSession))
+      .expect(403);
+
+    // Cleanup admin.
+    await request(app.getHttpServer())
+      .delete(`/api/v1/realise/${tempId}`)
+      .set(bearer(adminSession))
+      .expect(200);
+  });
+
   it('audit_log : 3 entrées sur ce flux (SAISIR x2 + SUPPRIMER x1)', async () => {
     const ds = app.get<DataSource>(getDataSourceToken());
     const rows = (await ds.query(
