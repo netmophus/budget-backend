@@ -6,6 +6,7 @@
  * exactement aux 6 valeurs de l'enum `categorie`.
  */
 import 'reflect-metadata';
+import type { DataSource } from 'typeorm';
 import { AppDataSource } from '../data-source';
 import type { CategorieSegment } from '../referentiels/segment/entities/dim-segment.entity';
 
@@ -24,24 +25,27 @@ export const SEGMENTS_INITIAUX: readonly SegmentSeedRow[] = [
   { codeSegment: 'SECTEUR_PUBLIC', libelle: 'Secteur public et collectivités', categorie: 'secteur_public' },
 ];
 
-async function seedSegments(): Promise<void> {
-  await AppDataSource.initialize();
+export async function seedSegments(ds: DataSource = AppDataSource): Promise<void> {
+  const ownsConnection = !ds.isInitialized;
+  if (ownsConnection) {
+    await ds.initialize();
+  }
   try {
     const force = process.argv.slice(2).includes('--force');
     if (force) {
       console.log('[seed:segments] --force : purge de dim_segment');
-      await AppDataSource.query(`DELETE FROM dim_segment`);
+      await ds.query(`DELETE FROM dim_segment`);
     }
 
     const today = new Date().toISOString().slice(0, 10);
     for (const s of SEGMENTS_INITIAUX) {
-      const existing = (await AppDataSource.query(
+      const existing = (await ds.query(
         `SELECT id FROM dim_segment WHERE code_segment = $1 AND version_courante = true`,
         [s.codeSegment],
       )) as Array<{ id: string }>;
       if (existing.length > 0) continue;
 
-      await AppDataSource.query(
+      await ds.query(
         `INSERT INTO dim_segment
           ("code_segment","libelle","categorie",
            "date_debut_validite","date_fin_validite",
@@ -51,7 +55,7 @@ async function seedSegments(): Promise<void> {
       );
     }
 
-    const stats = await AppDataSource.query(
+    const stats = await ds.query(
       `SELECT
          COUNT(*)::int AS total,
          COUNT(*) FILTER (WHERE version_courante = true)::int AS courants
@@ -62,7 +66,9 @@ async function seedSegments(): Promise<void> {
       `[seed:segments] total=${r0.total} courants=${r0.courants} (attendu : ${SEGMENTS_INITIAUX.length} / ${SEGMENTS_INITIAUX.length})`,
     );
   } finally {
-    await AppDataSource.destroy();
+    if (ownsConnection) {
+      await ds.destroy();
+    }
   }
 }
 
