@@ -21,6 +21,14 @@ export interface EmailJobData {
   emailLogId: string;
 }
 
+export interface QueueStats {
+  waiting: number;
+  active: number;
+  completed: number;
+  failed: number;
+  delayed: number;
+}
+
 export const EMAIL_QUEUE_NAME = 'emails';
 export const EMAIL_JOB_NAME = 'envoi';
 
@@ -41,5 +49,42 @@ export class EmailQueueProducer {
         removeOnFail: 1_000,
       },
     );
+  }
+
+  /**
+   * Ping Redis via la connexion ioredis sous-jacente à la queue.
+   * Utilisé par le healthcheck — ne throw jamais (retourne false en
+   * cas d'erreur) pour permettre un statut 'degraded' plutôt que
+   * 'down hard' au niveau de l'app.
+   */
+  async pingRedis(): Promise<boolean> {
+    try {
+      const client = await this.queue.client;
+      const pong = await client.ping();
+      return pong === 'PONG';
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Compteurs BullMQ par état (waiting / active / completed / failed
+   * / delayed). Utilisé par l'endpoint admin queue stats.
+   */
+  async getQueueStats(): Promise<QueueStats> {
+    const counts = await this.queue.getJobCounts(
+      'waiting',
+      'active',
+      'completed',
+      'failed',
+      'delayed',
+    );
+    return {
+      waiting: counts.waiting ?? 0,
+      active: counts.active ?? 0,
+      completed: counts.completed ?? 0,
+      failed: counts.failed ?? 0,
+      delayed: counts.delayed ?? 0,
+    };
   }
 }

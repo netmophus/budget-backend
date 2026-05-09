@@ -45,6 +45,10 @@ import {
   PreferencesNotificationsDto,
   StatistiquesEmailDto,
 } from './dto/notifications.dto';
+import {
+  EmailQueueProducer,
+  type QueueStats,
+} from './email-queue.producer';
 import { NotificationsService } from './notifications.service';
 
 @ApiTags('notifications')
@@ -55,6 +59,7 @@ export class NotificationsController {
     private readonly notifs: NotificationsService,
     @InjectRepository(User)
     private readonly userRepo: Repository<User>,
+    private readonly emailQueue: EmailQueueProducer,
   ) {}
 
   // ─── Admin email-log ────────────────────────────────────────────
@@ -75,6 +80,23 @@ export class NotificationsController {
   @ApiOkResponse({ type: StatistiquesEmailDto })
   async stats(): Promise<StatistiquesEmailDto> {
     return this.notifs.statistiques();
+  }
+
+  /**
+   * Lot 6.3.C — visibilité opérationnelle de la queue BullMQ
+   * 'emails'. Permet à un admin de voir s'il y a des jobs coincés
+   * (waiting trop élevé = Redis débordé ou worker arrêté ; failed
+   * trop élevé = SMTP en panne durable).
+   */
+  @Get('admin/email-log/queue/stats')
+  @RequirePermissions('USER.GERER')
+  @ApiOperation({
+    summary:
+      "Compteurs BullMQ de la queue 'emails' (waiting / active / " +
+      'completed / failed / delayed). Source : queue.getJobCounts().',
+  })
+  async queueStats(): Promise<QueueStats> {
+    return this.emailQueue.getQueueStats();
   }
 
   @Post('admin/email-log/:id/rejouer')
