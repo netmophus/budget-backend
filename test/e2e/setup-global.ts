@@ -17,6 +17,7 @@
 import 'reflect-metadata';
 import { PostgreSqlContainer, StartedPostgreSqlContainer } from '@testcontainers/postgresql';
 import * as path from 'path';
+import { GenericContainer, type StartedTestContainer } from 'testcontainers';
 import { DataSource } from 'typeorm';
 
 import { seedAuth } from '../../src/seeds/auth-seed';
@@ -48,24 +49,34 @@ function migrationTimestamp(m: { name?: string; constructor?: { name: string } }
 declare global {
   // eslint-disable-next-line no-var
   var __E2E_PG_CONTAINER__: StartedPostgreSqlContainer | undefined;
+  // eslint-disable-next-line no-var
+  var __E2E_REDIS_CONTAINER__: StartedTestContainer | undefined;
 }
 
 export default async function globalSetup(): Promise<void> {
   const t0 = Date.now();
   // eslint-disable-next-line no-console
-  console.log('[e2e:setup] démarrage container Postgres 18 (testcontainers)');
+  console.log(
+    '[e2e:setup] démarrage containers Postgres 18 + Redis 7 (testcontainers)',
+  );
 
-  const container = await new PostgreSqlContainer('postgres:18-alpine')
-    .withDatabase('miznas_e2e')
-    .withUsername('miznas')
-    .withPassword('miznas')
-    .start();
+  // Démarrage des 2 containers en parallèle (pas de dépendance entre eux).
+  const [container, redisContainer] = await Promise.all([
+    new PostgreSqlContainer('postgres:18-alpine')
+      .withDatabase('miznas_e2e')
+      .withUsername('miznas')
+      .withPassword('miznas')
+      .start(),
+    new GenericContainer('redis:7-alpine').withExposedPorts(6379).start(),
+  ]);
 
   const host = container.getHost();
   const port = container.getMappedPort(5432);
   const user = container.getUsername();
   const password = container.getPassword();
   const database = container.getDatabase();
+  const redisHost = redisContainer.getHost();
+  const redisPort = redisContainer.getMappedPort(6379);
 
   // Variables d'env exposées à toutes les suites Jest. ConfigService
   // (NestJS) lira ces valeurs au bootstrap de l'app dans helpers/app.ts.
@@ -84,6 +95,9 @@ export default async function globalSetup(): Promise<void> {
   process.env.EMAIL_DRY_RUN = 'true';
   process.env.SMTP_FROM = process.env.SMTP_FROM ?? 'miznas-e2e@local';
   process.env.APP_BASE_URL = process.env.APP_BASE_URL ?? 'http://localhost:5173';
+  // Lot 6.3 — connexion Redis pour BullMQ (queue 'emails').
+  process.env.REDIS_HOST = redisHost;
+  process.env.REDIS_PORT = String(redisPort);
 
   // DataSource dédié au bootstrap (pas le AppDataSource singleton).
   // Glob non-récursif sur src/migrations/ pour exclure src/migrations/__tests__/.
@@ -160,10 +174,11 @@ export default async function globalSetup(): Promise<void> {
   await ds.destroy();
 
   globalThis.__E2E_PG_CONTAINER__ = container;
+  globalThis.__E2E_REDIS_CONTAINER__ = redisContainer;
 
   const dt = ((Date.now() - t0) / 1000).toFixed(1);
   // eslint-disable-next-line no-console
   console.log(
-    `[e2e:setup] prêt en ${dt}s (host=${host}:${port} db=${database})`,
+    `[e2e:setup] prêt en ${dt}s (pg=${host}:${port}/${database} redis=${redisHost}:${redisPort})`,
   );
 }

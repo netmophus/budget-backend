@@ -1,0 +1,27 @@
+# Lot 6.3 — Redis local pour BullMQ (queue 'emails').
+#
+# USAGE (dev local) :
+#   docker compose -f docker-compose.dev.yml up -d
+#   docker compose -f docker-compose.dev.yml down
+#
+# Pour la PROD : ne pas utiliser ce fichier. Brancher un Redis
+# managé (AWS ElastiCache, GCP Memorystore, Redis Cloud, etc.)
+# via les vars d'env REDIS_HOST / REDIS_PORT / REDIS_PASSWORD.
+services:
+  redis:
+    image: redis:7-alpine
+    container_name: miznas-redis-dev
+    ports:
+      - '6379:6379'
+    restart: unless-stopped
+    command: ['redis-server', '--appendonly', 'yes']
+    volumes:
+      - miznas-redis-data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+volumes:
+  miznas-redis-data:

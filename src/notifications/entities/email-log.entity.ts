@@ -9,7 +9,21 @@ import {
 
 import { User } from '../../users/entities/user.entity';
 
-export type StatutEmail = 'EN_ATTENTE' | 'ENVOYE' | 'ECHEC' | 'SUPPRIME';
+/**
+ * Statuts d'un envoi d'email :
+ *  - EN_ATTENTE : job publié dans la queue BullMQ, en attente du worker (Lot 6.3)
+ *  - EN_COURS   : worker a pris le job, envoi SMTP en cours (Lot 6.3)
+ *  - ENVOYE     : envoi SMTP réussi
+ *  - ECHEC      : toutes les retries BullMQ ont échoué (terminal)
+ *  - SUPPRIME   : email non envoyé volontairement (dry-run global, ou
+ *                 préférence user désactivée). Trace conservée pour audit.
+ */
+export type StatutEmail =
+  | 'EN_ATTENTE'
+  | 'EN_COURS'
+  | 'ENVOYE'
+  | 'ECHEC'
+  | 'SUPPRIME';
 
 /**
  * Événements supportés par le module notifications (Lot 4.3).

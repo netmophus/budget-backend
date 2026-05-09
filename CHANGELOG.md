@@ -6,6 +6,80 @@ en interne pour BSIC ; pas de release publique).
 
 ---
 
+## [Non publié]
+
+### Lot 6.3 — Queue BullMQ + Redis pour emails async (mai 2026)
+
+#### Ajouté
+- Dépendances : `bullmq`, `@nestjs/bullmq`, `ioredis`.
+- `docker-compose.dev.yml` : Redis 7-alpine pour le dev local sur
+  `:6379` avec volume persistant.
+- `BullModule.forRootAsync` dans `AppModule` (vars
+  `REDIS_HOST`/`REDIS_PORT`/`REDIS_PASSWORD`).
+- `BullModule.registerQueue('emails')` dans `NotificationsModule`.
+- `EmailQueueProducer.publier(emailLogId)` — publie un job avec
+  attempts=3, backoff exponentiel 2s/4s/8s, removeOnComplete=100,
+  removeOnFail=1000.
+- `EmailQueueProducer.pingRedis()` — utilisé par le healthcheck.
+- `EmailQueueProducer.getQueueStats()` — utilisé par l'endpoint
+  admin de monitoring queue.
+- `EmailWorker` (`@Processor('emails')`) — consume la queue,
+  délègue à `NotificationsService.traiterJob()`, bascule en ECHEC
+  via `marquerEchecDefinitif` quand la dernière tentative BullMQ
+  échoue.
+- Statut `EN_COURS` ajouté à `email_log.statut` (migration
+  `1779200000170-AjoutStatutEnCoursEmailLog`).
+- `GET /api/v1/admin/email-log/queue/stats` (`USER.GERER`) —
+  compteurs BullMQ (waiting/active/completed/failed/delayed).
+- Refactor `GET /api/v1/health` : retourne `status: 'degraded'`
+  + payload `redis.status: 'down'` si Redis injoignable. L'app
+  reste répondante (HTTP 200) — décision produit "MIZNAS reste
+  utilisable même sans emails".
+- Setup global e2e (`test/e2e/setup-global.ts`) démarre Postgres
+  + Redis via testcontainers en parallèle.
+- `test/e2e/emails.e2e-spec.ts` — flux SENT (SMTP réussi) +
+  FAILED (retries → ECHEC).
+- `src/notifications/email.worker.spec.ts` — 6 tests unitaires
+  Worker.
+- Documentation `docs/lot-6/6.3-bullmq-redis.md` (architecture,
+  config, debug).
+
+#### Modifié
+- `NotificationsService.envoyer()` ne fait plus SMTP synchronement.
+  Il crée la trace `email_log` en `EN_ATTENTE` puis publie dans la
+  queue. Retour immédiat. Les retries 1s/3s/10s synchrones internes
+  sont supprimés (remplacés par les retries BullMQ).
+- `NotificationsService.rejouer(emailLogId)` re-publie un job au
+  lieu de re-tenter SMTP synchronement.
+- `notifications.service.spec.ts` adapté : 3 tests SMTP synchrones
+  remplacés par des tests de publication queue (mock
+  `EmailQueueProducer`).
+
+#### Supprimé
+- Boucle de retries SMTP synchrones internes dans
+  `NotificationsService.envoyer()`. Les WARN
+  `[NotificationsService] Tentative x/3 échouée ... ECONNREFUSED /
+  SMTP DOWN` qui polluaient les logs Vitest ont disparu.
+
+#### Décisions
+- **Statuts en français** (`EN_ATTENTE/EN_COURS/ENVOYE/ECHEC/
+  SUPPRIME`) au lieu d'EN, conformément à la convention i18n FR
+  du projet.
+- **Worker in-process** (NestJS `@Processor` standard) — dette
+  tracée, à isoler en process dédié au Lot 7+ pour scale
+  indépendant.
+- **Pas de code audit `EMAIL_ECHEC_DEFINITIF`.** La trace est dans
+  `email_log`.
+- **Healthcheck Redis = degraded, pas down hard.** L'app reste
+  utilisable même sans emails.
+
+#### Tests
+- Backend unit/integration : **1100 verts** (1094 + 6 worker).
+- Backend e2e : **31 verts** (29 du Lot 6.2.A + 2 emails).
+- Aucune régression sur les tests existants.
+
+---
+
 ## [v0.5.0-mvp] — 2026-05 — MVP fonctionnel + démarrage industrialisation
 
 Tag de release marquant la transition entre la livraison du MVP
