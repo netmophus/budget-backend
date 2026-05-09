@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { BullModule } from '@nestjs/bullmq';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { EventEmitterModule } from '@nestjs/event-emitter';
@@ -103,6 +104,19 @@ import { UsersModule } from './users/users.module';
       delimiter: '.',
       maxListeners: 20,
       verboseMemoryLeak: true,
+    }),
+    // Lot 6.3 — BullMQ + Redis pour la queue 'emails' (envoi async
+    // des notifications). La connexion Redis est partagée par toutes
+    // les queues qui s'enregistreront via BullModule.registerQueue().
+    BullModule.forRootAsync({
+      inject: [ConfigService],
+      useFactory: (config: ConfigService) => ({
+        connection: {
+          host: config.get<string>('REDIS_HOST', 'localhost'),
+          port: Number(config.get<string>('REDIS_PORT', '6379')),
+          password: config.get<string>('REDIS_PASSWORD') || undefined,
+        },
+      }),
     }),
     HealthModule,
     UsersModule,
