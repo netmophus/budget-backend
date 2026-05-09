@@ -378,6 +378,39 @@ export class UsersAdminService {
     };
   }
 
+  /**
+   * Lot 6.4.C.2 — force `doit_changer_mdp = true` sans reset du mdp.
+   * Le user actuel garde son mdp courant et sa session active, mais
+   * sera obligé de changer son mdp via PATCH /me/password à sa
+   * prochaine connexion (PasswordExpiredGuard du Lot 6.4.A bloque
+   * toutes les autres routes tant que le flag est posé).
+   */
+  async forcerChangementMdp(
+    id: string,
+    currentUser: AuthCaller,
+  ): Promise<UserResponseDto> {
+    const u = await this.userRepo.findOne({ where: { id } });
+    if (!u) throw new NotFoundException(`User ${id} introuvable.`);
+    u.doitChangerMdp = true;
+    u.dateModification = new Date();
+    u.utilisateurModification = currentUser.email;
+    const saved = await this.userRepo.save(u);
+    await this.auditService.log({
+      utilisateur: currentUser.email,
+      typeAction: 'RESET_PASSWORD_USER',
+      entiteCible: 'user',
+      idCible: String(u.id),
+      statut: 'success',
+      payloadApres: {
+        email: u.email,
+        doitChangerMdp: true,
+        operation: 'forcer-changement-mdp',
+      },
+      commentaire: `Forcer changement mdp pour ${u.email} (sans reset du hash).`,
+    });
+    return toUserResponse(saved);
+  }
+
   // ─── Forcer déconnexion ────────────────────────────────────
 
   async forcerDeconnexion(
