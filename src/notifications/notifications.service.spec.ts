@@ -21,6 +21,7 @@ import { RolePermission } from '../roles/entities/role-permission.entity';
 import { User } from '../users/entities/user.entity';
 import { UserRole } from '../users/entities/user-role.entity';
 import { EmailLog, type TypeEvenement } from './entities/email-log.entity';
+import type { EmailQueueProducer } from './email-queue.producer';
 import { NotificationsService } from './notifications.service';
 
 // ─── Mock nodemailer ────────────────────────────────────────────────
@@ -118,6 +119,16 @@ function makePermsMock(
   } as unknown as PermissionsService;
 }
 
+/**
+ * Mock EmailQueueProducer (Lot 6.3). Le service ne fait plus SMTP
+ * synchronement — on vérifie juste que `publier()` est appelé avec
+ * l'id du email_log nouvellement créé.
+ */
+function makeQueueMock(): EmailQueueProducer & { publier: jest.Mock } {
+  return { publier: jest.fn().mockResolvedValue(undefined) } as unknown as
+    EmailQueueProducer & { publier: jest.Mock };
+}
+
 describe('NotificationsService', () => {
   let ds: DataSource;
   let service: NotificationsService;
@@ -146,6 +157,7 @@ describe('NotificationsService', () => {
         ds.getRepository(User),
         cfg,
         makePermsMock(),
+        makeQueueMock(),
       );
       const u = await seedUser(ds, 'a@miznas.local');
       const r = await service.envoyer('BUDGET_SOUMIS', u, {
@@ -157,46 +169,57 @@ describe('NotificationsService', () => {
       expect(sendMailMock).not.toHaveBeenCalled();
     });
 
-    it('mode réel : appel sendMail OK → statut=ENVOYE', async () => {
-      sendMailMock.mockResolvedValue({});
+    it('mode réel : crée la ligne EN_ATTENTE et publie dans la queue', async () => {
+      // Lot 6.3 — refactor async : le service ne fait plus SMTP
+      // synchronement. Il crée juste la ligne email_log statut
+      // EN_ATTENTE et publie dans la queue. Le worker (testé
+      // séparément au palier 6.3.B) fera l'envoi SMTP réel.
       const cfg = makeConfig({ EMAIL_DRY_RUN: 'false' });
+      const queue = makeQueueMock();
       service = new NotificationsService(
         ds.getRepository(EmailLog),
         ds.getRepository(User),
         cfg,
         makePermsMock(),
+        queue,
       );
       const u = await seedUser(ds, 'a@miznas.local');
       const r = await service.envoyer('BUDGET_SOUMIS', u, {
         codeVersion: 'V1',
         auteurEmail: 'b@miznas.local',
       });
-      expect(r.envoye).toBe(true);
-      expect(r.emailLog.statut).toBe('ENVOYE');
-      expect(r.emailLog.tentatives).toBe(1);
-      expect(sendMailMock).toHaveBeenCalledTimes(1);
+      expect(r.envoye).toBe(false); // pas encore traité — le worker le fera
+      expect(r.emailLog.statut).toBe('EN_ATTENTE');
+      expect(r.emailLog.tentatives).toBe(0);
+      expect(queue.publier).toHaveBeenCalledTimes(1);
+      expect(queue.publier).toHaveBeenCalledWith(r.emailLog.id);
+      // Plus aucun appel SMTP synchrone côté service.
+      expect(sendMailMock).not.toHaveBeenCalled();
     });
 
-    it('échec SMTP simulé → 3 tentatives → ECHEC + dernier_message_erreur', async () => {
-      sendMailMock.mockRejectedValue(new Error('ECONNREFUSED 1025'));
+    it('publication queue : un seul appel publier (les retries sont délégués à BullMQ)', async () => {
+      // Lot 6.3 — le retry x3 SMTP synchrone est remplacé par les
+      // retries automatiques de BullMQ (configurés dans
+      // EmailQueueProducer : attempts=3, backoff exponential). Le
+      // service publie une seule fois ; la robustesse vient de la
+      // queue. Test des 3 retries → ECHEC : déplacé au worker spec
+      // (palier 6.3.B).
       const cfg = makeConfig({ EMAIL_DRY_RUN: 'false' });
+      const queue = makeQueueMock();
       service = new NotificationsService(
         ds.getRepository(EmailLog),
         ds.getRepository(User),
         cfg,
         makePermsMock(),
+        queue,
       );
       const u = await seedUser(ds, 'a@miznas.local');
-      const r = await service.envoyer('BUDGET_SOUMIS', u, {
+      await service.envoyer('BUDGET_SOUMIS', u, {
         codeVersion: 'V1',
         auteurEmail: 'b@miznas.local',
       });
-      expect(r.envoye).toBe(false);
-      expect(r.emailLog.statut).toBe('ECHEC');
-      expect(r.emailLog.tentatives).toBe(3);
-      expect(r.emailLog.dernierMessageErreur).toMatch(/ECONNREFUSED/);
-      expect(sendMailMock).toHaveBeenCalledTimes(3);
-    }, 30000);
+      expect(queue.publier).toHaveBeenCalledTimes(1);
+    });
 
     it('préférence notifications_email_actives=false → SUPPRIME', async () => {
       const cfg = makeConfig({ EMAIL_DRY_RUN: 'false' });
@@ -205,6 +228,7 @@ describe('NotificationsService', () => {
         ds.getRepository(User),
         cfg,
         makePermsMock(),
+        makeQueueMock(),
       );
       const u = await seedUser(ds, 'a@miznas.local', {
         notificationsEmailActives: false,
@@ -228,6 +252,7 @@ describe('NotificationsService', () => {
         ds.getRepository(User),
         cfg,
         makePermsMock(),
+        makeQueueMock(),
       );
       const u = await seedUser(ds, 'a@miznas.local', {
         notificationsEmailTypes: ['BUDGET_PUBLIE'],
@@ -252,6 +277,7 @@ describe('NotificationsService', () => {
         ds.getRepository(User),
         makeConfig({ EMAIL_DRY_RUN: 'true' }),
         makePermsMock(),
+        makeQueueMock(),
       );
     });
 
@@ -267,6 +293,7 @@ describe('NotificationsService', () => {
           [valid.id]: ['BUDGET.VALIDER'],
           [auteur.id]: ['BUDGET.VALIDER'], // auteur exclu malgré la perm
         }),
+        makeQueueMock(),
       );
       const r = await service.resoudreDestinataires('BUDGET_SOUMIS', {
         budgetVersionId: '99',
@@ -289,6 +316,7 @@ describe('NotificationsService', () => {
         ds.getRepository(User),
         makeConfig({ EMAIL_DRY_RUN: 'true' }),
         makePermsMock({ [pub.id]: ['BUDGET.PUBLIER'] }),
+        makeQueueMock(),
       );
       const r = await service.resoudreDestinataires('BUDGET_VALIDE', {
         budgetVersionId: '88',
@@ -329,6 +357,7 @@ describe('NotificationsService', () => {
         ds.getRepository(User),
         makeConfig({ EMAIL_DRY_RUN: 'true' }),
         makePermsMock({ [sais.id]: ['BUDGET.SAISIR'] }),
+        makeQueueMock(),
       );
       const r = await service.resoudreDestinataires('BUDGET_PUBLIE', {
         budgetVersionId: '66',
@@ -378,29 +407,44 @@ describe('NotificationsService', () => {
   // ─── rejouer() ────────────────────────────────────────────────────
 
   describe('rejouer', () => {
-    it('rejoue un ECHEC → si succès SMTP, statut passe à ENVOYE', async () => {
+    it('rejoue une ligne ECHEC → re-publie dans la queue + statut redevient EN_ATTENTE', async () => {
+      // Lot 6.3 — refactor async : rejouer ne fait plus SMTP
+      // synchronement. Il remet la ligne email_log à statut
+      // EN_ATTENTE (compteur tentatives reset) et republie un job
+      // dans la queue. Le worker fera l'envoi SMTP. Le test du
+      // succès SMTP final est couvert par le worker spec (6.3.B).
       const cfg = makeConfig({ EMAIL_DRY_RUN: 'false' });
       const u = await seedUser(ds, 'a@miznas.local');
+      const queue = makeQueueMock();
       service = new NotificationsService(
         ds.getRepository(EmailLog),
         ds.getRepository(User),
         cfg,
         makePermsMock(),
+        queue,
       );
-      // 1ère tentative : échec
-      sendMailMock.mockRejectedValue(new Error('SMTP DOWN'));
-      const r1 = await service.envoyer('BUDGET_SOUMIS', u, {
-        codeVersion: 'V42',
-        auteurEmail: 'b@miznas.local',
-      });
-      expect(r1.emailLog.statut).toBe('ECHEC');
-      // 2e tentative : succès
-      sendMailMock.mockReset();
-      sendMailMock.mockResolvedValue({});
-      const r2 = await service.rejouer(r1.emailLog.id);
-      expect(r2.envoye).toBe(true);
-      expect(r2.emailLog.statut).toBe('ENVOYE');
-    }, 30000);
+      // Pose une ligne email_log directement en statut ECHEC pour
+      // simuler une exécution antérieure du worker qui a fail.
+      const log = await ds.getRepository(EmailLog).save(
+        ds.getRepository(EmailLog).create({
+          evenement: 'BUDGET_SOUMIS',
+          fkDestinataire: u.id,
+          destinataireEmail: u.email,
+          sujet: '[MIZNAS] test',
+          template: 'budget-soumis',
+          payload: { codeVersion: 'V42', auteurEmail: 'b@miznas.local' },
+          statut: 'ECHEC',
+          tentatives: 3,
+          dernierMessageErreur: 'SMTP DOWN',
+        }),
+      );
+      const r2 = await service.rejouer(log.id);
+      expect(r2.envoye).toBe(false); // worker fera l'envoi async
+      expect(r2.emailLog.statut).toBe('EN_ATTENTE');
+      expect(r2.emailLog.tentatives).toBe(0);
+      expect(r2.emailLog.dernierMessageErreur).toBeNull();
+      expect(queue.publier).toHaveBeenCalledWith(log.id);
+    });
   });
 
   // ─── statistiques ────────────────────────────────────────────────
@@ -413,6 +457,7 @@ describe('NotificationsService', () => {
         ds.getRepository(User),
         makeConfig({ EMAIL_DRY_RUN: 'true' }),
         makePermsMock(),
+        makeQueueMock(),
       );
       // 3 envois SUPPRIME (dry-run)
       const events: TypeEvenement[] = [
