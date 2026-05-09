@@ -405,6 +405,94 @@ export class NotificationsService {
     return this.emailLogRepo.save(log);
   }
 
+  // ─── Traitement async (Lot 6.3 — appelé par EmailWorker) ────────
+
+  /**
+   * Traite un job de la queue 'emails' :
+   *  1. Charge la ligne email_log et la passe en EN_COURS (incrémente
+   *     le compteur de tentatives).
+   *  2. Rend le template Handlebars avec les variables du payload.
+   *  3. Tente l'envoi SMTP via nodemailer (1 fois, sans retries
+   *     internes — c'est BullMQ qui gère les retries via attemptsMade).
+   *  4. En cas de succès → statut ENVOYE + envoyeLe.
+   *  5. En cas d'échec → laisse en EN_COURS (avec dernierMessageErreur
+   *     pour debug) et `throw` pour que BullMQ relance ou bascule en
+   *     failed list. La transition vers ECHEC définitif est faite par
+   *     `marquerEchecDefinitif()` quand le worker détecte la dernière
+   *     tentative.
+   *
+   * `attemptsMade` est utilisé pour incrémenter le compteur tentatives
+   * de manière cohérente avec les retries BullMQ (1 = 1ère exécution).
+   */
+  async traiterJob(emailLogId: string, attemptsMade: number): Promise<void> {
+    const log = await this.emailLogRepo.findOne({
+      where: { id: emailLogId },
+    });
+    if (!log) {
+      throw new NotFoundException(
+        `email_log ${emailLogId} introuvable (job orphelin).`,
+      );
+    }
+
+    log.statut = 'EN_COURS';
+    log.tentatives = attemptsMade + 1;
+    await this.emailLogRepo.save(log);
+
+    const destinataire =
+      log.fkDestinataire !== null
+        ? await this.userRepo.findOne({ where: { id: log.fkDestinataire } })
+        : null;
+    const variables: Record<string, unknown> = {
+      ...log.payload,
+      destinataire: destinataire
+        ? {
+            prenom: destinataire.prenom,
+            nom: destinataire.nom,
+            email: destinataire.email,
+          }
+        : null,
+      app_base_url: this.getAppBaseUrl(),
+      annee: new Date().getFullYear(),
+    };
+    const html = this.rendreTemplate(log.template, variables);
+
+    try {
+      await this.getTransporter().sendMail({
+        from: this.config.get<string>('SMTP_FROM', 'miznas@bsic.local'),
+        to: log.destinataireEmail,
+        subject: log.sujet,
+        html,
+      });
+      log.statut = 'ENVOYE';
+      log.envoyeLe = new Date();
+      log.dernierMessageErreur = null;
+      await this.emailLogRepo.save(log);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      log.dernierMessageErreur = message;
+      // On ne passe PAS en ECHEC ici — c'est `marquerEchecDefinitif`
+      // appelé par le worker qui le fait quand toutes les retries
+      // BullMQ sont exhausted. Tant qu'on est dans la fenêtre de
+      // retry, le statut reste EN_COURS pour que la trace soit lisible.
+      await this.emailLogRepo.save(log);
+      throw err;
+    }
+  }
+
+  /**
+   * Bascule définitivement la ligne email_log en ECHEC. Appelé par le
+   * worker quand BullMQ a exhausted tous ses retries.
+   */
+  async marquerEchecDefinitif(
+    emailLogId: string,
+    erreur: string,
+  ): Promise<void> {
+    await this.emailLogRepo.update(
+      { id: emailLogId },
+      { statut: 'ECHEC', dernierMessageErreur: erreur },
+    );
+  }
+
   // ─── Rejouer (admin) ────────────────────────────────────────────
 
   async rejouer(emailLogId: string): Promise<EnvoyerResult> {
