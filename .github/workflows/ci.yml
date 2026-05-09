@@ -131,11 +131,15 @@ jobs:
 
   test-e2e:
     # Lot 6.2.A — tests e2e SuperTest avec Postgres 18 testcontainer.
+    # Lot 6.3 — Redis 7-alpine ajouté en testcontainer (queue BullMQ).
+    # Les 2 containers sont gérés dans test/e2e/setup-global.ts via
+    # testcontainers — démarrage parallèle pour limiter le surcoût.
     # Ne tourne qu'au push sur main pour ne pas ralentir le feedback
-    # loop des PR (les e2e prennent ~10-15s avec setup container).
+    # loop des PR (e2e prend ~30-40s avec les 2 containers).
     # Les runners GitHub Actions ubuntu-latest ont Docker pré-installé,
-    # donc testcontainers fonctionne nativement.
-    name: e2e (testcontainers Postgres)
+    # donc testcontainers fonctionne nativement (pas besoin de
+    # services: postgres / redis dans la déclaration du job).
+    name: e2e (testcontainers Postgres + Redis)
     if: github.event_name == 'push'
     needs: setup
     runs-on: ubuntu-latest
