@@ -128,3 +128,30 @@ jobs:
       - run: npm ci
       - name: Vérifier alignement migrations ↔ TypeAction
         run: node scripts/check-audit-codes-coherence.js
+
+  test-e2e:
+    # Lot 6.2.A — tests e2e SuperTest avec Postgres 18 testcontainer.
+    # Ne tourne qu'au push sur main pour ne pas ralentir le feedback
+    # loop des PR (les e2e prennent ~10-15s avec setup container).
+    # Les runners GitHub Actions ubuntu-latest ont Docker pré-installé,
+    # donc testcontainers fonctionne nativement.
+    name: e2e (testcontainers Postgres)
+    if: github.event_name == 'push'
+    needs: setup
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Lancer les tests e2e
+        env:
+          # JWT_SECRET injecté pour le bootstrap NestJS (sinon throw au
+          # démarrage de AuthModule). Valeur fixe acceptable en CI car
+          # la DB testcontainer est éphémère.
+          JWT_SECRET: ci-e2e-jwt-secret-must-be-at-least-64-bytes-long-for-the-strategy-xxxxxx
+          NODE_ENV: test
+        run: npm run test:e2e

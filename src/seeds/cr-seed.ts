@@ -19,6 +19,7 @@
  * peuvent avoir changé).
  */
 import 'reflect-metadata';
+import type { DataSource } from 'typeorm';
 import { AppDataSource } from '../data-source';
 import type { TypeCr } from '../referentiels/centre-responsabilite/entities/dim-centre-responsabilite.entity';
 
@@ -76,20 +77,23 @@ export const CRS_INITIAUX: readonly CrSeedRow[] = [
   },
 ];
 
-async function seedCrs(): Promise<void> {
-  await AppDataSource.initialize();
+export async function seedCrs(ds: DataSource = AppDataSource): Promise<void> {
+  const ownsConnection = !ds.isInitialized;
+  if (ownsConnection) {
+    await ds.initialize();
+  }
   try {
     const force = process.argv.slice(2).includes('--force');
     if (force) {
       console.log('[seed:cr] --force : purge de dim_centre_responsabilite');
-      await AppDataSource.query(`DELETE FROM dim_centre_responsabilite`);
+      await ds.query(`DELETE FROM dim_centre_responsabilite`);
     }
 
     const today = new Date().toISOString().slice(0, 10);
 
     for (const cr of CRS_INITIAUX) {
       // Idempotence : sauter si version courante existe.
-      const existing = (await AppDataSource.query(
+      const existing = (await ds.query(
         `SELECT id FROM dim_centre_responsabilite
          WHERE code_cr = $1 AND version_courante = true`,
         [cr.codeCr],
@@ -99,7 +103,7 @@ async function seedCrs(): Promise<void> {
       }
 
       // Résoudre dynamiquement la FK structure parente.
-      const parentRows = (await AppDataSource.query(
+      const parentRows = (await ds.query(
         `SELECT id FROM dim_structure
          WHERE code_structure = $1 AND version_courante = true`,
         [cr.parentCodeStructure],
@@ -111,7 +115,7 @@ async function seedCrs(): Promise<void> {
       }
       const fkStructure = String(parentRows[0]!.id);
 
-      await AppDataSource.query(
+      await ds.query(
         `INSERT INTO dim_centre_responsabilite
            ("code_cr","libelle","libelle_court","type_cr","fk_structure",
             "date_debut_validite","date_fin_validite","version_courante",
@@ -128,7 +132,7 @@ async function seedCrs(): Promise<void> {
       );
     }
 
-    const stats = await AppDataSource.query(
+    const stats = await ds.query(
       `SELECT COUNT(*)::int AS total,
               COUNT(*) FILTER (WHERE version_courante = true)::int AS courantes
        FROM dim_centre_responsabilite`,
@@ -138,7 +142,9 @@ async function seedCrs(): Promise<void> {
       `[seed:cr] total=${row.total} courantes=${row.courantes} (attendu : 6 / 6)`,
     );
   } finally {
-    await AppDataSource.destroy();
+    if (ownsConnection) {
+      await ds.destroy();
+    }
   }
 }
 

@@ -15,6 +15,7 @@
  * disponible (purge `dim_devise` avant régénération).
  */
 import 'reflect-metadata';
+import type { DataSource } from 'typeorm';
 import { AppDataSource } from '../data-source';
 
 export interface DeviseSeedRow {
@@ -77,19 +78,22 @@ export const DEVISES_INITIALES: readonly DeviseSeedRow[] = [
   },
 ];
 
-async function seedDevises(): Promise<void> {
-  await AppDataSource.initialize();
+export async function seedDevises(ds: DataSource = AppDataSource): Promise<void> {
+  const ownsConnection = !ds.isInitialized;
+  if (ownsConnection) {
+    await ds.initialize();
+  }
   try {
     const force = process.argv.slice(2).includes('--force');
     if (force) {
       console.log(
         '[seed:devises] --force : purge de dim_devise avant régénération',
       );
-      await AppDataSource.query(`DELETE FROM dim_devise`);
+      await ds.query(`DELETE FROM dim_devise`);
     }
 
     for (const d of DEVISES_INITIALES) {
-      await AppDataSource.query(
+      await ds.query(
         `INSERT INTO dim_devise
           ("code_iso","libelle","symbole","nb_decimales",
            "est_devise_pivot","est_active","utilisateur_creation")
@@ -99,7 +103,7 @@ async function seedDevises(): Promise<void> {
       );
     }
 
-    const stats = await AppDataSource.query(
+    const stats = await ds.query(
       `SELECT
          (SELECT COUNT(*)::int FROM dim_devise) AS total,
          (SELECT COUNT(*)::int FROM dim_devise WHERE est_devise_pivot = true) AS pivots`,
@@ -109,7 +113,9 @@ async function seedDevises(): Promise<void> {
       `[seed:devises] total=${row.total} pivots=${row.pivots} (attendu : 7 / 1)`,
     );
   } finally {
-    await AppDataSource.destroy();
+    if (ownsConnection) {
+      await ds.destroy();
+    }
   }
 }
 

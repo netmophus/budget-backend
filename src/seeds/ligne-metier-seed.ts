@@ -8,6 +8,7 @@
  * Référence : `docs/modele-donnees.md` §3.5
  */
 import 'reflect-metadata';
+import type { DataSource } from 'typeorm';
 import { AppDataSource } from '../data-source';
 
 export interface LigneMetierSeedRow {
@@ -52,23 +53,26 @@ export const LIGNES_METIER_INITIALES: readonly LigneMetierSeedRow[] = [
   row('SUPPORT_RH', 'Ressources humaines', 2, 'SUPPORT'),
 ];
 
-async function seedLignesMetier(): Promise<void> {
-  await AppDataSource.initialize();
+export async function seedLignesMetier(ds: DataSource = AppDataSource): Promise<void> {
+  const ownsConnection = !ds.isInitialized;
+  if (ownsConnection) {
+    await ds.initialize();
+  }
   try {
     const force = process.argv.slice(2).includes('--force');
     if (force) {
       console.log('[seed:lignes-metier] --force : purge de dim_ligne_metier');
-      await AppDataSource.query(
+      await ds.query(
         `UPDATE dim_ligne_metier SET fk_ligne_metier_parent = NULL`,
       );
-      await AppDataSource.query(`DELETE FROM dim_ligne_metier`);
+      await ds.query(`DELETE FROM dim_ligne_metier`);
     }
 
     const today = new Date().toISOString().slice(0, 10);
     const idByCode = new Map<string, string>();
 
     for (const l of LIGNES_METIER_INITIALES) {
-      const existing = (await AppDataSource.query(
+      const existing = (await ds.query(
         `SELECT id FROM dim_ligne_metier WHERE code_ligne_metier = $1 AND version_courante = true`,
         [l.codeLigneMetier],
       )) as Array<{ id: string }>;
@@ -88,7 +92,7 @@ async function seedLignesMetier(): Promise<void> {
         parentId = cached;
       }
 
-      await AppDataSource.query(
+      await ds.query(
         `INSERT INTO dim_ligne_metier
           ("code_ligne_metier","libelle","fk_ligne_metier_parent","niveau",
            "date_debut_validite","date_fin_validite",
@@ -96,14 +100,14 @@ async function seedLignesMetier(): Promise<void> {
          VALUES ($1,$2,$3,$4,$5,NULL,true,true,'system')`,
         [l.codeLigneMetier, l.libelle, parentId, l.niveau, today],
       );
-      const inserted = (await AppDataSource.query(
+      const inserted = (await ds.query(
         `SELECT id FROM dim_ligne_metier WHERE code_ligne_metier = $1 AND version_courante = true`,
         [l.codeLigneMetier],
       )) as Array<{ id: string }>;
       idByCode.set(l.codeLigneMetier, String(inserted[0]!.id));
     }
 
-    const stats = await AppDataSource.query(
+    const stats = await ds.query(
       `SELECT
          COUNT(*)::int AS total,
          COUNT(*) FILTER (WHERE version_courante = true)::int AS courants,
@@ -115,7 +119,9 @@ async function seedLignesMetier(): Promise<void> {
       `[seed:lignes-metier] total=${r0.total} courants=${r0.courants} racines=${r0.racines} (attendu : ${LIGNES_METIER_INITIALES.length} / ${LIGNES_METIER_INITIALES.length} / 4)`,
     );
   } finally {
-    await AppDataSource.destroy();
+    if (ownsConnection) {
+      await ds.destroy();
+    }
   }
 }
 

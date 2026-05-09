@@ -9,6 +9,7 @@
  * Référence : `docs/modele-donnees.md` §3.6
  */
 import 'reflect-metadata';
+import type { DataSource } from 'typeorm';
 import { AppDataSource } from '../data-source';
 import type { TypeProduit } from '../referentiels/produit/entities/dim-produit.entity';
 
@@ -103,23 +104,26 @@ export const PRODUITS_INITIAUX: readonly ProduitSeedRow[] = [
   ),
 ];
 
-async function seedProduits(): Promise<void> {
-  await AppDataSource.initialize();
+export async function seedProduits(ds: DataSource = AppDataSource): Promise<void> {
+  const ownsConnection = !ds.isInitialized;
+  if (ownsConnection) {
+    await ds.initialize();
+  }
   try {
     const force = process.argv.slice(2).includes('--force');
     if (force) {
       console.log('[seed:produits] --force : purge de dim_produit');
-      await AppDataSource.query(
+      await ds.query(
         `UPDATE dim_produit SET fk_produit_parent = NULL`,
       );
-      await AppDataSource.query(`DELETE FROM dim_produit`);
+      await ds.query(`DELETE FROM dim_produit`);
     }
 
     const today = new Date().toISOString().slice(0, 10);
     const idByCode = new Map<string, string>();
 
     for (const p of PRODUITS_INITIAUX) {
-      const existing = (await AppDataSource.query(
+      const existing = (await ds.query(
         `SELECT id FROM dim_produit WHERE code_produit = $1 AND version_courante = true`,
         [p.codeProduit],
       )) as Array<{ id: string }>;
@@ -139,7 +143,7 @@ async function seedProduits(): Promise<void> {
         parentId = cached;
       }
 
-      await AppDataSource.query(
+      await ds.query(
         `INSERT INTO dim_produit
           ("code_produit","libelle","type_produit","fk_produit_parent","niveau",
            "est_porteur_interets","date_debut_validite","date_fin_validite",
@@ -155,14 +159,14 @@ async function seedProduits(): Promise<void> {
           today,
         ],
       );
-      const inserted = (await AppDataSource.query(
+      const inserted = (await ds.query(
         `SELECT id FROM dim_produit WHERE code_produit = $1 AND version_courante = true`,
         [p.codeProduit],
       )) as Array<{ id: string }>;
       idByCode.set(p.codeProduit, String(inserted[0]!.id));
     }
 
-    const stats = await AppDataSource.query(
+    const stats = await ds.query(
       `SELECT
          COUNT(*)::int AS total,
          COUNT(*) FILTER (WHERE version_courante = true)::int AS courants,
@@ -183,7 +187,9 @@ async function seedProduits(): Promise<void> {
       `[seed:produits] total=${r0.total} courants=${r0.courants} racines=${r0.racines} porteurs_interets=${r0.porteurs} (attendu : ${PRODUITS_INITIAUX.length} / ${PRODUITS_INITIAUX.length} / ${racinesAttendues})`,
     );
   } finally {
-    await AppDataSource.destroy();
+    if (ownsConnection) {
+      await ds.destroy();
+    }
   }
 }
 
