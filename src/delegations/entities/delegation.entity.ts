@@ -89,6 +89,20 @@ export class Delegation {
   })
   utilisateurCreation!: string;
 
+  /**
+   * Lot 6.5.B — date du dernier envoi du rappel J-3 (cron quotidien
+   * 06:00). NULL = jamais notifié pour cette délégation. Le cron
+   * filtre `derniere_notification_j3 IS NULL AND date_fin = today + 3
+   * jours AND actif = true` pour idempotencer les exécutions
+   * multiples le même jour.
+   */
+  @Column({
+    name: 'derniere_notification_j3',
+    type: 'timestamp',
+    nullable: true,
+  })
+  derniereNotificationJ3!: Date | null;
+
   @Column({ name: 'date_modification', type: 'timestamp', nullable: true })
   dateModification!: Date | null;
 

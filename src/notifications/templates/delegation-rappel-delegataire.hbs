@@ -1,0 +1,20 @@
+<p>Bonjour {{destinataire.prenom}} {{destinataire.nom}},</p>
+
+<p>La délégation que <strong>{{nomDelegant}}</strong> vous a accordée <strong>expire dans 3 jours</strong>.</p>
+
+<table cellpadding="0" cellspacing="0" style="margin:12px 0; font-size:14px;">
+<tr><td style="padding:4px 12px 4px 0; color:#656d76;">Délégant&nbsp;:</td>
+<td><strong>{{nomDelegant}}</strong></td></tr>
+<tr><td style="padding:4px 12px 4px 0; color:#656d76;">Permissions reçues&nbsp;:</td>
+<td><strong>{{#each permissionsDeleguees}}{{this}}{{#unless @last}}, {{/unless}}{{/each}}</strong></td></tr>
+<tr><td style="padding:4px 12px 4px 0; color:#656d76;">Date d'expiration&nbsp;:</td>
+<td><strong>{{dateFin}}</strong></td></tr>
+</table>
+
+<p style="background:#fff8c5; border-left:3px solid #9a6700; padding:8px 12px; margin:12px 0; font-size:13px;">
+<strong>Pensez à finaliser vos saisies / validations / publications</strong> avant la date d'expiration. Au-delà, vous perdrez l'accès aux périmètres délégués sauf nouvelle délégation accordée par {{nomDelegant}}.
+</p>
+
+<p style="margin:20px 0;">
+<a href="{{app_base_url}}/mes-delegations" style="background:#0969da; color:#ffffff; padding:8px 16px; border-radius:6px; text-decoration:none; display:inline-block;">Voir mes délégations</a>
+</p>
