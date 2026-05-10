@@ -80,6 +80,12 @@ const SUJETS: Record<TypeEvenement, string> = {
   AFFECTATION_CREEE: '[MIZNAS] Nouvelle affectation de périmètre',
   RESET_PASSWORD_ADMIN:
     '[MIZNAS] Votre mot de passe a été réinitialisé',
+  RESET_PASSWORD_SELF_SERVICE:
+    '[MIZNAS] Réinitialisation de votre mot de passe',
+  DELEGATION_RAPPEL_J3_DELEGANT:
+    '[MIZNAS] Votre délégation expire dans 3 jours',
+  DELEGATION_RAPPEL_J3_DELEGATAIRE:
+    '[MIZNAS] Délégation reçue : expiration dans 3 jours',
 };
 
 const TEMPLATES: Record<TypeEvenement, string> = {
@@ -92,6 +98,9 @@ const TEMPLATES: Record<TypeEvenement, string> = {
   DELEGATION_REVOQUEE: 'delegation-revoquee',
   AFFECTATION_CREEE: 'affectation-creee',
   RESET_PASSWORD_ADMIN: 'reset-password-admin',
+  RESET_PASSWORD_SELF_SERVICE: 'reset-password-self-service',
+  DELEGATION_RAPPEL_J3_DELEGANT: 'delegation-rappel-delegant',
+  DELEGATION_RAPPEL_J3_DELEGATAIRE: 'delegation-rappel-delegataire',
 };
 
 @Injectable()
