@@ -108,6 +108,46 @@ describe('LoginRateLimiterService', () => {
     }
   });
 
+  it('Lot 6.5.A — autorise 3 forgot-password consécutifs, bloque le 4ème (limite IP)', () => {
+    const svc = makeService();
+    for (let i = 0; i < 3; i++) {
+      const r = svc.enregistrerEtVerifierForgot('192.168.0.10');
+      expect(r.bloque).toBe(false);
+    }
+    const quatrieme = svc.enregistrerEtVerifierForgot('192.168.0.10');
+    expect(quatrieme.bloque).toBe(true);
+    expect(quatrieme.motif).toBe('IP');
+    // Fenêtre 15 min = jusqu'à 900s.
+    expect(quatrieme.retryAfterSeconds).toBeGreaterThan(0);
+    expect(quatrieme.retryAfterSeconds).toBeLessThanOrEqual(15 * 60);
+  });
+
+  it('Lot 6.5.A — IP forgot A bloquée ne bloque pas IP forgot B', () => {
+    const svc = makeService();
+    for (let i = 0; i < 3; i++) svc.enregistrerEtVerifierForgot('1.1.1.1');
+    expect(svc.enregistrerEtVerifierForgot('1.1.1.1').bloque).toBe(true);
+    expect(svc.enregistrerEtVerifierForgot('2.2.2.2').bloque).toBe(false);
+  });
+
+  it("Lot 6.5.A — compteur forgot indépendant du compteur login (pas de cross-pollution)", () => {
+    const svc = makeService();
+    // Saturer le forgot pour 1.1.1.1
+    for (let i = 0; i < 3; i++) svc.enregistrerEtVerifierForgot('1.1.1.1');
+    expect(svc.enregistrerEtVerifierForgot('1.1.1.1').bloque).toBe(true);
+    // Le login depuis la même IP doit toujours marcher (jusqu'à 5x).
+    for (let i = 0; i < 5; i++) {
+      const r = svc.enregistrerEtVerifier('1.1.1.1', `u${i}@b.c`);
+      expect(r.bloque).toBe(false);
+    }
+  });
+
+  it('Lot 6.5.A — LOGIN_RATE_LIMIT_DISABLED=true bypass aussi les forgot', () => {
+    const svc = makeService({ LOGIN_RATE_LIMIT_DISABLED: 'true' });
+    for (let i = 0; i < 100; i++) {
+      expect(svc.enregistrerEtVerifierForgot('1.1.1.1').bloque).toBe(false);
+    }
+  });
+
   it('reset() vide les 2 maps', () => {
     const svc = makeService();
     for (let i = 0; i < 5; i++) {
