@@ -8,6 +8,100 @@ en interne pour BSIC ; pas de release publique).
 
 ## [Non publié]
 
+### Lot 6.5 — Notifications résiduelles (mai 2026)
+
+#### Ajouté
+
+**Palier 6.5.A — Forgot password self-service**
+- Migration `1779200000200-CreerPasswordResetTokens` : table
+  `password_reset_token` (id bigint, fk_user, token varchar(64) =
+  hash SHA-256, date_expiration, utilise, 4 colonnes audit) +
+  index unique sur token + index sur fk_user et date_expiration.
+- Entity `PasswordResetToken` + ajout au `TypeOrmModule.forFeature`
+  d'AuthModule.
+- Endpoint `POST /auth/forgot-password` (public, anti-énumération) :
+  réponse identique pour email connu/inconnu, INSERT token + email
+  publié dans la queue uniquement si email connu actif.
+- Endpoint `POST /auth/reset-password` (public, validation token +
+  policy mdp) : pas de tokens JWT auto-émis, le user doit se
+  reconnecter normalement après. Codes erreurs distincts
+  `INVALID_TOKEN` (400, token absent ou déjà utilisé) vs
+  `EXPIRED_TOKEN` (410, token expiré).
+- `LoginRateLimiterService` étendu : méthode
+  `enregistrerEtVerifierForgot(ip)` avec compteur dédié
+  (3 tentatives / 15 min / IP). Désactivable via la même env var
+  `LOGIN_RATE_LIMIT_DISABLED`.
+- `ForgotPasswordRateLimitGuard` (nouveau) appliqué uniquement sur
+  `POST /auth/forgot-password`. Audit `LOGIN_RATE_LIMITED` avec
+  `entiteCible='forgot-password'`.
+- Template `reset-password-self-service.hbs` (lien `{{lien_reset}}`,
+  expiration `{{expiration_minutes}}`).
+- `PasswordResetCleanupCronService` : cron `0 3 * * *` quotidien +
+  rattrapage `OnApplicationBootstrap`. Supprime les tokens dont
+  `date_expiration < now() - 30 jours` ; audit
+  `NETTOYAGE_RESET_TOKENS` avec count.
+
+**Palier 6.5.B — Rappel J-3 délégation**
+- Migration `1779200000210-AjouterNotificationJ3Delegations` :
+  ajoute la colonne `derniere_notification_j3` (timestamp NULL) sur
+  `delegations` (idempotente via information_schema).
+- Entity `Delegation` étendue avec `derniereNotificationJ3`.
+- `DelegationsRappelService.notifierJ3()` : SELECT delegations
+  matchées (date_fin = today + 3 jours AND actif AND
+  derniere_notification_j3 IS NULL), publie 2 emails par délégation
+  (délégant + délégataire) en respectant les opt-out user (toggle
+  global + filtre liste blanche → email_log SUPPRIME), UPDATE
+  derniere_notification_j3, audit `DELEGATION_RAPPEL_J3` (1 entrée
+  par délégation).
+- `DelegationsRappelCronService` : cron `0 6 * * *` quotidien +
+  rattrapage `OnApplicationBootstrap`.
+- 2 templates `delegation-rappel-delegant.hbs` et
+  `delegation-rappel-delegataire.hbs` avec liens `/admin/delegations`
+  et `/mes-delegations`.
+
+**Migration 1779200000220-AjouterCodesAuditLot65** : 5 nouveaux codes
+audit FR métier (DEMANDE_RESET_MDP_USER, DEMANDE_RESET_MDP_INCONNU,
+RESET_MDP_USER_VALIDE, NETTOYAGE_RESET_TOKENS, DELEGATION_RAPPEL_J3) +
+alignement TypeAction TypeScript.
+
+#### Décisions / Sécurité
+
+- **Token reset stocké en hash SHA-256** (jamais en clair en base).
+  Le clair n'existe que dans le mail envoyé via la queue BullMQ
+  (transit éphémère via Redis, pattern `EmailJobData.secrets` du
+  Lot 6.4.C).
+- **Réponse forgot-password identique pour email connu/inconnu**
+  (anti-énumération de comptes). Audit séparé
+  `DEMANDE_RESET_MDP_USER` vs `DEMANDE_RESET_MDP_INCONNU` côté
+  serveur pour la détection de scan.
+- **Rate limit forgot par IP uniquement** (pas par email) — limiter
+  par email permettrait à un attaquant de découvrir les emails
+  valides en observant le statut 429.
+- **Pas d'auto-login après reset** — le user doit se reconnecter
+  normalement (mécanique standard, attendue par la majorité des
+  apps web).
+- **Cron J-3 respecte les opt-out user** (notif transverse non
+  critique). Forgot password ignore les opt-out (transactionnel
+  critique — un user qui a opt-out doit pouvoir reset son mdp).
+- **Idempotence J-3** garantie par `derniere_notification_j3 IS
+  NULL` + UPDATE après publication. Le bootstrap rattrapage ne
+  re-notifie pas si la nuit précédente est passée.
+
+#### Tests
+
+- Unit : 21 nouveaux (11 PasswordResetService + 4 LoginRateLimiter
+  forgot + 6 DelegationsRappelService).
+- e2e : 12 nouveaux (8 forgot-password + 4 delegations-rappel-j3).
+- Total backend : **1151 unit verts (+20 nets)** + e2e à confirmer
+  en CI.
+
+#### Documentation
+
+- `docs/lot-6/6.5-notifications-residuelles.md` — flux complet,
+  invariants sécurité, dette, codes audit.
+
+---
+
 ### Lot 6.4 — Sécurisation des mots de passe (mai 2026)
 
 #### Ajouté
