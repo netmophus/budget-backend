@@ -74,7 +74,17 @@ export type TypeAction =
   // pour cohérence avec les codes auth existants (LOGIN, LOGIN_FAILED,
   // RESET_PASSWORD_USER). Seedés via migration 1779200000190.
   | 'PASSWORD_CHANGED'
-  | 'LOGIN_RATE_LIMITED';
+  | 'LOGIN_RATE_LIMITED'
+  // Lot 6.5 — Notifications résiduelles. Codes en FR métier (cohérent
+  // avec RESET_PASSWORD_USER admin du Lot Administration). Seedés via
+  // migration 1779200000220.
+  // 6.5.A — forgot password self-service.
+  | 'DEMANDE_RESET_MDP_USER'
+  | 'DEMANDE_RESET_MDP_INCONNU'
+  | 'RESET_MDP_USER_VALIDE'
+  | 'NETTOYAGE_RESET_TOKENS'
+  // 6.5.B — rappel J-3 délégation.
+  | 'DELEGATION_RAPPEL_J3';
 
 export type AuditStatut = 'success' | 'failure';
 
