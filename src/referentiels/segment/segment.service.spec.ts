@@ -11,10 +11,7 @@ import { DataType, IMemoryDb, newDb } from 'pg-mem';
 import { DataSource, Repository } from 'typeorm';
 
 import { SegmentService } from './segment.service';
-import {
-  CategorieSegment,
-  DimSegment,
-} from './entities/dim-segment.entity';
+import { CategorieSegment, DimSegment } from './entities/dim-segment.entity';
 
 function buildMemDb(): IMemoryDb {
   const db = newDb({ autoCreateForeignKeyIndices: true });
@@ -169,7 +166,9 @@ describe('SegmentService', () => {
     });
 
     it('changing libelle on TODAY version → ecrasement_intra_jour', async () => {
-      await dataSource.query(`DELETE FROM dim_segment WHERE code_segment = 'PME'`);
+      await dataSource.query(
+        `DELETE FROM dim_segment WHERE code_segment = 'PME'`,
+      );
       await rawInsert(dataSource, {
         codeSegment: 'PME',
         categorie: 'pme',

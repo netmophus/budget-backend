@@ -63,7 +63,9 @@ describe('RolesService', () => {
     expect(result).toHaveLength(1);
     expect(result[0].codeRole).toBe('ADMIN');
     expect(result[0].permissions).toHaveLength(2);
-    expect(result[0].permissions[0]).toMatchObject({ codePermission: 'USER.LIRE' });
+    expect(result[0].permissions[0]).toMatchObject({
+      codePermission: 'USER.LIRE',
+    });
   });
 
   it('findOne throws NotFound when missing', async () => {

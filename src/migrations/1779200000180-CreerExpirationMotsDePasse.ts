@@ -17,9 +17,7 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
  * Idempotent : check via information_schema pour ne pas re-ajouter
  * les colonnes (pattern Lot 4.3 / migration 130).
  */
-export class CreerExpirationMotsDePasse1779200000180
-  implements MigrationInterface
-{
+export class CreerExpirationMotsDePasse1779200000180 implements MigrationInterface {
   name = 'CreerExpirationMotsDePasse1779200000180';
 
   public async up(q: QueryRunner): Promise<void> {

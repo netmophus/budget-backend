@@ -329,7 +329,9 @@ describe('Référentiels secondaires (e2e)', () => {
 
   beforeEach(async () => {
     await dataSource.query('DELETE FROM audit_log');
-    await dataSource.query('UPDATE dim_structure SET fk_structure_parent = NULL');
+    await dataSource.query(
+      'UPDATE dim_structure SET fk_structure_parent = NULL',
+    );
     await dataSource.query('DELETE FROM dim_structure');
     await dataSource.query('DELETE FROM ref_type_structure');
     await dataSource.query('DELETE FROM ref_categorie_segment');
@@ -434,7 +436,7 @@ describe('Référentiels secondaires (e2e)', () => {
       expect(r.body.message).toMatch(/référencée/);
     });
 
-    it("ADMIN : DELETE valeur custom non-référencée → 204", async () => {
+    it('ADMIN : DELETE valeur custom non-référencée → 204', async () => {
       const c = await request(app.getHttpServer())
         .post('/api/v1/configuration/type-structure')
         .set('Authorization', `Bearer ${adminToken}`)
@@ -494,7 +496,7 @@ describe('Référentiels secondaires (e2e)', () => {
         .expect(422);
     });
 
-    it("GET par-code/agence → retourne la valeur", async () => {
+    it('GET par-code/agence → retourne la valeur', async () => {
       const r = await request(app.getHttpServer())
         .get('/api/v1/configuration/type-structure/par-code/agence')
         .set('Authorization', `Bearer ${lecteurToken}`)

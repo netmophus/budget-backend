@@ -35,10 +35,10 @@ export class PasswordExpiredGuard implements CanActivate {
   canActivate(context: ExecutionContext): boolean {
     // Routes publiques (login, refresh) : on ne bloque pas — le user
     // n'a même pas encore de JWT.
-    const isPublic = this.reflector.getAllAndOverride<boolean>(
-      IS_PUBLIC_KEY,
-      [context.getHandler(), context.getClass()],
-    );
+    const isPublic = this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, [
+      context.getHandler(),
+      context.getClass(),
+    ]);
     if (isPublic) return true;
 
     // Routes whitelistées explicitement (PATCH /me/password etc.).
@@ -48,7 +48,9 @@ export class PasswordExpiredGuard implements CanActivate {
     );
     if (allowExpired) return true;
 
-    const req = context.switchToHttp().getRequest<Request & { user?: AuthUser }>();
+    const req = context
+      .switchToHttp()
+      .getRequest<Request & { user?: AuthUser }>();
     const user = req.user;
     // Pas de JWT (ne devrait pas arriver, JwtAuthGuard a précédé) →
     // on laisse passer, le JwtAuthGuard a déjà rejeté.
@@ -59,7 +61,7 @@ export class PasswordExpiredGuard implements CanActivate {
         statusCode: 403,
         code: 'MDP_TEMPORAIRE',
         message:
-          "Mot de passe temporaire — vous devez le changer via " +
+          'Mot de passe temporaire — vous devez le changer via ' +
           'PATCH /me/password avant tout autre accès.',
       });
     }

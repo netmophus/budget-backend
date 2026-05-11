@@ -190,9 +190,7 @@ export class BaseRefSecondaireService<T extends RefSecondaireWithId> {
     if (newValue === false) {
       const referenced = await this.isReferenced(entity.code);
       if (referenced) {
-        const cl = this.consumerLabel
-          ? ` ${this.consumerLabel}`
-          : '';
+        const cl = this.consumerLabel ? ` ${this.consumerLabel}` : '';
         warning =
           `La valeur '${entity.code}' est utilisée par des lignes${cl}. ` +
           `Les saisies existantes restent intactes, mais la valeur ne pourra ` +

@@ -113,7 +113,9 @@ describe('StructureService', () => {
   beforeEach(async () => {
     // Casser la FK auto-référente avant le DELETE — sinon RESTRICT
     // bloque la suppression des parents par les enfants.
-    await dataSource.query('UPDATE dim_structure SET fk_structure_parent = NULL');
+    await dataSource.query(
+      'UPDATE dim_structure SET fk_structure_parent = NULL',
+    );
     await dataSource.query('DELETE FROM dim_structure');
   });
 
@@ -271,12 +273,7 @@ describe('StructureService', () => {
     it('findDescendants returns all descendants recursively (iterative impl)', async () => {
       const descendants = await service.findDescendants(socId);
       const codes = descendants.map((d) => d.codeStructure).sort();
-      expect(codes).toEqual([
-        'AG_PLATEAU',
-        'BR_CIV',
-        'DIR_CORP',
-        'DIR_RETAIL',
-      ]);
+      expect(codes).toEqual(['AG_PLATEAU', 'BR_CIV', 'DIR_CORP', 'DIR_RETAIL']);
     });
 
     it('findAncestors walks up to the root', async () => {
@@ -465,8 +462,12 @@ describe('StructureService', () => {
 
       const history = await service.findHistory('AG');
       expect(history).toHaveLength(2);
-      expect(history.find((h) => h.libelle === 'Original')?.versionCourante).toBe(false);
-      expect(history.find((h) => h.libelle === 'Renommée')?.versionCourante).toBe(true);
+      expect(
+        history.find((h) => h.libelle === 'Original')?.versionCourante,
+      ).toBe(false);
+      expect(
+        history.find((h) => h.libelle === 'Renommée')?.versionCourante,
+      ).toBe(true);
     });
 
     it('changing only estActif=false stays in-place (still 1 row, versionCourante=true)', async () => {
@@ -511,7 +512,9 @@ describe('StructureService', () => {
      */
     it('PATCH on a version created TODAY → in-place overwrite (still 1 row, modeMaj=ecrasement_intra_jour)', async () => {
       // Remplacer AG par une version créée aujourd'hui.
-      await dataSource.query("DELETE FROM dim_structure WHERE code_structure = 'AG'");
+      await dataSource.query(
+        "DELETE FROM dim_structure WHERE code_structure = 'AG'",
+      );
       const parents = (await dataSource.query(
         `SELECT id FROM dim_structure WHERE code_structure = 'P'`,
       )) as Array<{ id: string }>;

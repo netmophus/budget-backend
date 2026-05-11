@@ -63,8 +63,18 @@ interface LigneBrute {
 }
 
 const MOIS_LIBELLES_FR = [
-  'Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin',
-  'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre',
+  'Janvier',
+  'Février',
+  'Mars',
+  'Avril',
+  'Mai',
+  'Juin',
+  'Juillet',
+  'Août',
+  'Septembre',
+  'Octobre',
+  'Novembre',
+  'Décembre',
 ];
 
 function classeToNature(classe: string): NatureCompte {
@@ -128,9 +138,8 @@ export class AnalyseEcartsService {
     let crIdsFinal: string[] | null;
     if (crAutorises === null) {
       // Pas de restriction du user → on prend ce que le filtre demande
-      crIdsFinal = filtres.crIds && filtres.crIds.length > 0
-        ? filtres.crIds
-        : null;
+      crIdsFinal =
+        filtres.crIds && filtres.crIds.length > 0 ? filtres.crIds : null;
     } else {
       // Restriction périmètre obligatoire
       if (filtres.crIds && filtres.crIds.length > 0) {
@@ -141,7 +150,11 @@ export class AnalyseEcartsService {
       if (crIdsFinal.length === 0) {
         // Aucun CR accessible → réponse vide
         return {
-          filtres: this.normaliserFiltres(filtres, seuilAttention, seuilCritique),
+          filtres: this.normaliserFiltres(
+            filtres,
+            seuilAttention,
+            seuilCritique,
+          ),
           kpi: {
             nbEcartsTotal: 0,
             nbEcartsCritique: 0,

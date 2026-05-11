@@ -196,7 +196,9 @@ describe('PermissionsService', () => {
     });
 
     it("mode 'any': returns false if none match", async () => {
-      expect(await service.hasPermission('1', ['USER.GERER'], 'any')).toBe(false);
+      expect(await service.hasPermission('1', ['USER.GERER'], 'any')).toBe(
+        false,
+      );
     });
 
     it("mode 'all': returns true only if every code is possessed", async () => {
@@ -252,7 +254,7 @@ describe('PermissionsService', () => {
       expect(deleguees.every((d) => d.delegation_id === '99')).toBe(true);
     });
 
-    it("interroge la table delegations avec dateRef quand fourni", async () => {
+    it('interroge la table delegations avec dateRef quand fourni', async () => {
       await service.getPermissionsEffectivesAvecContexte('1', '2027-06-15');
       expect(userRoleRepo.manager.query).toHaveBeenCalledWith(
         expect.stringContaining('FROM delegations'),
@@ -286,15 +288,15 @@ describe('PermissionsService', () => {
       userRepo.findOne.mockResolvedValue({ id: '1', estActif: true } as User);
     });
 
-    it('retourne delegation_id si la permission vient uniquement d\'une délégation', async () => {
+    it("retourne delegation_id si la permission vient uniquement d'une délégation", async () => {
       // Pas de natifs ; 1 délégation portant SAISIE → BUDGET.SAISIR
       userRoleRepo.createQueryBuilder.mockReturnValue(makeQb([]));
       userRoleRepo.manager.query.mockResolvedValue([
         { id: '42', permissions: ['SAISIE'] },
       ]);
-      expect(
-        await service.getDelegationContextPour('1', 'BUDGET.SAISIR'),
-      ).toBe('42');
+      expect(await service.getDelegationContextPour('1', 'BUDGET.SAISIR')).toBe(
+        '42',
+      );
     });
 
     it('retourne null si la permission est native', async () => {
@@ -328,7 +330,7 @@ describe('PermissionsService', () => {
       ).toBeNull();
     });
 
-    it('retourne null si la permission n\'est ni native ni déléguée', async () => {
+    it("retourne null si la permission n'est ni native ni déléguée", async () => {
       userRoleRepo.createQueryBuilder.mockReturnValue(makeQb([]));
       userRoleRepo.manager.query.mockResolvedValue([]);
       expect(

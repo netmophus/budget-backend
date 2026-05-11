@@ -114,7 +114,7 @@ describe('E2E.7 — Flux complet emails async (queue + worker)', () => {
     expect(sendMailMock).toHaveBeenCalled();
   });
 
-  it("FAILED : SMTP rejette, après attempts épuisés email_log passe en ECHEC", async () => {
+  it('FAILED : SMTP rejette, après attempts épuisés email_log passe en ECHEC', async () => {
     sendMailMock.mockRejectedValue(new Error('SMTP DOWN test'));
 
     const log = await emailLogRepo.save(

@@ -8,7 +8,10 @@
  *  - lister/getById : filtrage type='reforecast' / statutPublication
  *  - getComparaison : origine REALISE/EXTRAPOLATION/MANUEL
  */
-import { NotFoundException, UnprocessableEntityException } from '@nestjs/common';
+import {
+  NotFoundException,
+  UnprocessableEntityException,
+} from '@nestjs/common';
 import { DataType, IMemoryDb, newDb } from 'pg-mem';
 import { DataSource } from 'typeorm';
 
@@ -58,12 +61,24 @@ async function createDataSource(): Promise<DataSource> {
     type: 'postgres',
     entities: [
       AuditLog,
-      User, UserRole, UserPerimetre,
-      Role, Permission, RolePermission,
-      DimStructure, DimCentreResponsabilite, DimCompte,
-      DimLigneMetier, DimDevise, DimProduit, DimSegment,
-      DimTemps, DimVersion, DimScenario,
-      FaitBudget, FaitRealise,
+      User,
+      UserRole,
+      UserPerimetre,
+      Role,
+      Permission,
+      RolePermission,
+      DimStructure,
+      DimCentreResponsabilite,
+      DimCompte,
+      DimLigneMetier,
+      DimDevise,
+      DimProduit,
+      DimSegment,
+      DimTemps,
+      DimVersion,
+      DimScenario,
+      FaitBudget,
+      FaitRealise,
     ],
     synchronize: true,
   }) as DataSource;
@@ -99,7 +114,9 @@ async function seed(ds: DataSource): Promise<SeedIds> {
         date_debut_validite, version_courante, est_actif, utilisateur_creation)
      VALUES ('S1','Struct1','filiale',1,'2026-01-01',true,true,'system')`,
   );
-  const struct = (await ds.query(`SELECT id FROM dim_structure`)) as Array<{ id: string }>;
+  const struct = (await ds.query(`SELECT id FROM dim_structure`)) as Array<{
+    id: string;
+  }>;
   await ds.query(
     `INSERT INTO dim_centre_responsabilite
        (code_cr, libelle, type_cr, fk_structure, date_debut_validite,
@@ -129,26 +146,34 @@ async function seed(ds: DataSource): Promise<SeedIds> {
         version_courante, est_actif, utilisateur_creation)
      VALUES ('RETAIL','Retail',1,'2026-01-01',true,true,'system')`,
   );
-  const lm = (await ds.query(`SELECT id FROM dim_ligne_metier`)) as Array<{ id: string }>;
+  const lm = (await ds.query(`SELECT id FROM dim_ligne_metier`)) as Array<{
+    id: string;
+  }>;
   await ds.query(
     `INSERT INTO dim_devise (code_iso, libelle, symbole, nb_decimales,
        est_devise_pivot, est_active, utilisateur_creation)
      VALUES ('XOF','F CFA','F CFA',0,true,true,'system')`,
   );
-  const dev = (await ds.query(`SELECT id FROM dim_devise`)) as Array<{ id: string }>;
+  const dev = (await ds.query(`SELECT id FROM dim_devise`)) as Array<{
+    id: string;
+  }>;
   await ds.query(
     `INSERT INTO dim_produit (code_produit, libelle, type_produit, niveau,
        est_porteur_interets, date_debut_validite, version_courante,
        est_actif, utilisateur_creation)
      VALUES ('P1','Produit','autre',1,false,'2026-01-01',true,true,'system')`,
   );
-  const prod = (await ds.query(`SELECT id FROM dim_produit`)) as Array<{ id: string }>;
+  const prod = (await ds.query(`SELECT id FROM dim_produit`)) as Array<{
+    id: string;
+  }>;
   await ds.query(
     `INSERT INTO dim_segment (code_segment, libelle, categorie,
        date_debut_validite, version_courante, est_actif, utilisateur_creation)
      VALUES ('SEG','Segment','particulier','2026-01-01',true,true,'system')`,
   );
-  const seg = (await ds.query(`SELECT id FROM dim_segment`)) as Array<{ id: string }>;
+  const seg = (await ds.query(`SELECT id FROM dim_segment`)) as Array<{
+    id: string;
+  }>;
 
   // Version source publiée + scenario
   await ds.query(
@@ -157,13 +182,17 @@ async function seed(ds: DataSource): Promise<SeedIds> {
         statut_publication, utilisateur_creation)
      VALUES ('BI_2027','Budget initial 2027','budget_initial',2027,'gele','ACTIVE','system')`,
   );
-  const ver = (await ds.query(`SELECT id FROM dim_version`)) as Array<{ id: string }>;
+  const ver = (await ds.query(`SELECT id FROM dim_version`)) as Array<{
+    id: string;
+  }>;
   await ds.query(
     `INSERT INTO dim_scenario
        (code_scenario, libelle, type_scenario, statut, exercice_fiscal, utilisateur_creation)
      VALUES ('OPT_2027','Optimiste','central','actif',2027,'system')`,
   );
-  const sce = (await ds.query(`SELECT id FROM dim_scenario`)) as Array<{ id: string }>;
+  const sce = (await ds.query(`SELECT id FROM dim_scenario`)) as Array<{
+    id: string;
+  }>;
 
   // 12 mois 2027 (1er du mois)
   for (let m = 1; m <= 12; m++) {
@@ -289,7 +318,15 @@ describe('ReforecastService.lancer', () => {
     ids = await seed(ds);
     // Budget initial : 1000 par mois sur compte 611, 12 mois, CR_A
     for (let m = 0; m < 12; m++) {
-      await insertBudget(ds, ids, ids.versionSourceId, ids.compteCharge, m, ids.cr1, 1000);
+      await insertBudget(
+        ds,
+        ids,
+        ids.versionSourceId,
+        ids.compteCharge,
+        m,
+        ids.cr1,
+        1000,
+      );
     }
     // Réalisé T1 (m=0,1,2) sur compte 611, CR_A : 800, 900, 1100
     await insertRealise(ds, ids, ids.compteCharge, 0, ids.cr1, 800);
@@ -315,7 +352,10 @@ describe('ReforecastService.lancer', () => {
 
   it('MOYENNE_TRIMESTRE : T1=réalisé, T2-T4=moyenne du T1', async () => {
     const { service } = buildService(ds);
-    const r = await service.lancer(dto({ methodeExtrapolation: 'MOYENNE_TRIMESTRE' }), USER);
+    const r = await service.lancer(
+      dto({ methodeExtrapolation: 'MOYENNE_TRIMESTRE' }),
+      USER,
+    );
     expect(r.id).toBeDefined();
     expect(r.statut).toBe('ouvert');
     expect(r.statutPublication).toBe('ACTIVE');
@@ -344,7 +384,10 @@ describe('ReforecastService.lancer', () => {
 
   it('BUDGET_INITIAL : T2-T4 reprend le budget source intact', async () => {
     const { service } = buildService(ds);
-    const r = await service.lancer(dto({ methodeExtrapolation: 'BUDGET_INITIAL' }), USER);
+    const r = await service.lancer(
+      dto({ methodeExtrapolation: 'BUDGET_INITIAL' }),
+      USER,
+    );
     const rows = (await ds.query(
       `SELECT t.mois, fb.montant_fcfa::float AS m
          FROM fait_budget fb
@@ -363,7 +406,10 @@ describe('ReforecastService.lancer', () => {
 
   it('MANUELLE : T2-T4 = 0', async () => {
     const { service } = buildService(ds);
-    const r = await service.lancer(dto({ methodeExtrapolation: 'MANUELLE' }), USER);
+    const r = await service.lancer(
+      dto({ methodeExtrapolation: 'MANUELLE' }),
+      USER,
+    );
     const rows = (await ds.query(
       `SELECT t.mois, fb.montant_fcfa::float AS m
          FROM fait_budget fb
@@ -383,7 +429,10 @@ describe('ReforecastService.lancer', () => {
       ids.temps[0]!,
     ]);
     const { service } = buildService(ds);
-    const r = await service.lancer(dto({ methodeExtrapolation: 'BUDGET_INITIAL' }), USER);
+    const r = await service.lancer(
+      dto({ methodeExtrapolation: 'BUDGET_INITIAL' }),
+      USER,
+    );
     const rows = (await ds.query(
       `SELECT t.mois, fb.montant_fcfa::float AS m
          FROM fait_budget fb
@@ -396,7 +445,7 @@ describe('ReforecastService.lancer', () => {
     expect(rows[1]!.m).toBe(900); // réalisé existe
   });
 
-  it("rejette si version source non publiée (gele)", async () => {
+  it('rejette si version source non publiée (gele)', async () => {
     await ds.query(
       `UPDATE dim_version SET statut = 'ouvert' WHERE id = $1::bigint`,
       [ids.versionSourceId],
@@ -407,14 +456,14 @@ describe('ReforecastService.lancer', () => {
     );
   });
 
-  it("rejette si version source introuvable", async () => {
+  it('rejette si version source introuvable', async () => {
     const { service } = buildService(ds);
     await expect(
       service.lancer(dto({ fkVersionSource: '999999' }), USER),
     ).rejects.toBeInstanceOf(NotFoundException);
   });
 
-  it("rejette si scénario source introuvable", async () => {
+  it('rejette si scénario source introuvable', async () => {
     const { service } = buildService(ds);
     await expect(
       service.lancer(dto({ fkScenarioSource: '999999' }), USER),
@@ -446,7 +495,10 @@ describe('ReforecastService.lancer', () => {
       `SELECT type_action, payload_apres FROM audit_log
         WHERE id_cible = $1::text AND type_action = 'LANCER_REFORECAST'`,
       [r.id],
-    )) as Array<{ type_action: string; payload_apres: Record<string, unknown> }>;
+    )) as Array<{
+      type_action: string;
+      payload_apres: Record<string, unknown>;
+    }>;
     expect(audits).toHaveLength(1);
     const payload = audits[0]!.payload_apres;
     expect(payload.methodeExtrapolation).toBe('MOYENNE_TRIMESTRE');
@@ -549,7 +601,10 @@ describe('ReforecastService.lancer', () => {
     }
     const { service } = buildService(ds);
     const t0 = Date.now();
-    const r = await service.lancer(dto({ methodeExtrapolation: 'BUDGET_INITIAL' }), USER);
+    const r = await service.lancer(
+      dto({ methodeExtrapolation: 'BUDGET_INITIAL' }),
+      USER,
+    );
     const elapsed = Date.now() - t0;
     expect(r.id).toBeDefined();
     const cnt = (await ds.query(
@@ -575,7 +630,15 @@ describe('ReforecastService.lister + getById + getEntityById', () => {
     ds = await createDataSource();
     ids = await seed(ds);
     for (let m = 0; m < 12; m++) {
-      await insertBudget(ds, ids, ids.versionSourceId, ids.compteCharge, m, ids.cr1, 1000);
+      await insertBudget(
+        ds,
+        ids,
+        ids.versionSourceId,
+        ids.compteCharge,
+        m,
+        ids.cr1,
+        1000,
+      );
     }
     await insertRealise(ds, ids, ids.compteCharge, 0, ids.cr1, 800);
     await insertRealise(ds, ids, ids.compteCharge, 1, ids.cr1, 900);
@@ -697,7 +760,15 @@ describe('ReforecastService.getComparaison', () => {
     ds = await createDataSource();
     ids = await seed(ds);
     for (let m = 0; m < 12; m++) {
-      await insertBudget(ds, ids, ids.versionSourceId, ids.compteCharge, m, ids.cr1, 1000);
+      await insertBudget(
+        ds,
+        ids,
+        ids.versionSourceId,
+        ids.compteCharge,
+        m,
+        ids.cr1,
+        1000,
+      );
     }
     await insertRealise(ds, ids, ids.compteCharge, 0, ids.cr1, 800);
     await insertRealise(ds, ids, ids.compteCharge, 1, ids.cr1, 900);
@@ -726,9 +797,9 @@ describe('ReforecastService.getComparaison', () => {
     // 3 lignes REALISE (T1)
     expect(cmp.lignes.filter((l) => l.origine === 'REALISE')).toHaveLength(3);
     // 9 lignes EXTRAPOLATION (T2-T4)
-    expect(cmp.lignes.filter((l) => l.origine === 'EXTRAPOLATION')).toHaveLength(
-      9,
-    );
+    expect(
+      cmp.lignes.filter((l) => l.origine === 'EXTRAPOLATION'),
+    ).toHaveLength(9);
     // Ligne mois 1 : source=1000, reforecast=800 (réalisé), écart=-200
     const m1 = cmp.lignes.find((l) => l.mois === 1)!;
     expect(m1.montantSource).toBe(1000);

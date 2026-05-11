@@ -47,9 +47,18 @@ export function bearer(session: AuthSession): { Authorization: string } {
 export const PERSONAS = {
   ADMIN: { email: 'admin@miznas.local', motDePasse: 'ChangeMe!2026' },
   LECTEUR: { email: 'lecteur@miznas.local', motDePasse: 'Lecteur!2026' },
-  ADJ_RETAIL: { email: 'adj.retail@miznas.local', motDePasse: 'MiznasTest!2026' },
-  DIR_RETAIL: { email: 'dir.retail@miznas.local', motDePasse: 'MiznasTest!2026' },
-  DIR_CORPORATE: { email: 'dir.corporate@miznas.local', motDePasse: 'MiznasTest!2026' },
+  ADJ_RETAIL: {
+    email: 'adj.retail@miznas.local',
+    motDePasse: 'MiznasTest!2026',
+  },
+  DIR_RETAIL: {
+    email: 'dir.retail@miznas.local',
+    motDePasse: 'MiznasTest!2026',
+  },
+  DIR_CORPORATE: {
+    email: 'dir.corporate@miznas.local',
+    motDePasse: 'MiznasTest!2026',
+  },
   CONTROLEUR_GESTION: {
     email: 'controleur.gestion@miznas.local',
     motDePasse: 'MiznasTest!2026',

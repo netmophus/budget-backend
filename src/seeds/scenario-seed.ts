@@ -21,7 +21,8 @@ export const SCENARIOS_INITIAUX: readonly ScenarioSeedRow[] = [
     codeScenario: 'CENTRAL',
     libelle: 'Scénario central',
     typeScenario: 'central',
-    commentaire: 'Hypothèses macro de référence (taux directeur BCEAO, croissance UEMOA)',
+    commentaire:
+      'Hypothèses macro de référence (taux directeur BCEAO, croissance UEMOA)',
   },
   {
     codeScenario: 'ALTERNATIF_HAUT',
@@ -37,7 +38,9 @@ export const SCENARIOS_INITIAUX: readonly ScenarioSeedRow[] = [
   },
 ];
 
-export async function seedScenarios(ds: DataSource = AppDataSource): Promise<void> {
+export async function seedScenarios(
+  ds: DataSource = AppDataSource,
+): Promise<void> {
   const ownsConnection = !ds.isInitialized;
   if (ownsConnection) {
     await ds.initialize();

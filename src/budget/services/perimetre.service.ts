@@ -196,9 +196,7 @@ export class PerimetreService {
           continue;
         }
         // Vérification version_courante en lot.
-        const placeholders = p.cibleCrIds
-          .map((_, i) => `$${i + 1}`)
-          .join(',');
+        const placeholders = p.cibleCrIds.map((_, i) => `$${i + 1}`).join(',');
         const valides = await this.userRoleRepo.manager.query<
           Array<{ id: string }>
         >(
@@ -212,7 +210,7 @@ export class PerimetreService {
     return Array.from(setIds);
   }
 
-/* getPerimetresActifsPourUser déplacé dans UserPerimetreService.lister
+  /* getPerimetresActifsPourUser déplacé dans UserPerimetreService.lister
    (Lot 4.1) — évite un import croisé UsersModule ↔ BudgetModule. */
 
   /**
@@ -286,12 +284,8 @@ export class PerimetreService {
    * Retour `[]` si la structure cible est introuvable / non courante
    * / désactivée (warning loggué).
    */
-  private async descendantsStructure(
-    structureId: string,
-  ): Promise<string[]> {
-    const racine = await this.userRoleRepo.manager.query<
-      Array<{ id: string }>
-    >(
+  private async descendantsStructure(structureId: string): Promise<string[]> {
+    const racine = await this.userRoleRepo.manager.query<Array<{ id: string }>>(
       `SELECT id FROM dim_structure
         WHERE id = $1 AND version_courante = true AND est_actif = true`,
       [structureId],
@@ -338,9 +332,7 @@ export class PerimetreService {
     const idsStruct = await this.descendantsStructure(structureId);
     if (idsStruct.length === 0) return [];
     const placeholders = idsStruct.map((_, i) => `$${i + 1}`).join(',');
-    const rows = await this.userRoleRepo.manager.query<
-      Array<{ id: string }>
-    >(
+    const rows = await this.userRoleRepo.manager.query<Array<{ id: string }>>(
       `SELECT id FROM dim_centre_responsabilite
         WHERE fk_structure IN (${placeholders})
           AND version_courante = true

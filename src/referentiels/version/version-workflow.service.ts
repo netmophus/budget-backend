@@ -77,10 +77,7 @@ function codeAudit(
  * 5.3 — l'écrasement est définitif).
  */
 function assertReforecastNonObsolete(v: DimVersion): void {
-  if (
-    v.typeVersion === 'reforecast' &&
-    v.statutPublication === 'OBSOLETE'
-  ) {
+  if (v.typeVersion === 'reforecast' && v.statutPublication === 'OBSOLETE') {
     throw new ConflictException(
       'Ce reforecast est OBSOLETE (remplacé par un nouveau reforecast). ' +
         "Aucune transition de workflow n'est possible.",
@@ -109,10 +106,11 @@ export class VersionWorkflowService {
     // Lot 4.2-fix.A : si l'action passe par une délégation, on
     // l'enregistre dans le payload audit (priorité NATIF appliquée
     // par PermissionsService.getDelegationContextPour).
-    const viaDelegationId = await this.permissionsService.getDelegationContextPour(
-      user.userId,
-      'BUDGET.SOUMETTRE',
-    );
+    const viaDelegationId =
+      await this.permissionsService.getDelegationContextPour(
+        user.userId,
+        'BUDGET.SOUMETTRE',
+      );
     return this.dataSource.transaction(async (manager) => {
       const repo = manager.getRepository(DimVersion);
       const v = await repo.findOne({ where: { id: versionId } });
@@ -197,10 +195,11 @@ export class VersionWorkflowService {
     dto: ValiderVersionDto,
     user: AuthCaller,
   ): Promise<VersionResponseDto> {
-    const viaDelegationId = await this.permissionsService.getDelegationContextPour(
-      user.userId,
-      'BUDGET.VALIDER',
-    );
+    const viaDelegationId =
+      await this.permissionsService.getDelegationContextPour(
+        user.userId,
+        'BUDGET.VALIDER',
+      );
     return this.dataSource.transaction(async (manager) => {
       const repo = manager.getRepository(DimVersion);
       const v = await repo.findOne({ where: { id: versionId } });
@@ -259,10 +258,11 @@ export class VersionWorkflowService {
     user: AuthCaller,
   ): Promise<VersionResponseDto> {
     // Rejet utilise BUDGET.VALIDER (cf. controller).
-    const viaDelegationId = await this.permissionsService.getDelegationContextPour(
-      user.userId,
-      'BUDGET.VALIDER',
-    );
+    const viaDelegationId =
+      await this.permissionsService.getDelegationContextPour(
+        user.userId,
+        'BUDGET.VALIDER',
+      );
     return this.dataSource.transaction(async (manager) => {
       const repo = manager.getRepository(DimVersion);
       const v = await repo.findOne({ where: { id: versionId } });
@@ -326,10 +326,11 @@ export class VersionWorkflowService {
     dto: PublierVersionDto,
     user: AuthCaller,
   ): Promise<VersionResponseDto> {
-    const viaDelegationId = await this.permissionsService.getDelegationContextPour(
-      user.userId,
-      'BUDGET.PUBLIER',
-    );
+    const viaDelegationId =
+      await this.permissionsService.getDelegationContextPour(
+        user.userId,
+        'BUDGET.PUBLIER',
+      );
     return this.dataSource.transaction(async (manager) => {
       const repo = manager.getRepository(DimVersion);
       const v = await repo.findOne({ where: { id: versionId } });

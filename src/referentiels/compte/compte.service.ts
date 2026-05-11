@@ -25,10 +25,7 @@ import { DataSource, ILike, IsNull, Repository } from 'typeorm';
 
 import { Scd2Service } from '../../common/services/scd2.service';
 import { CreateCompteDto } from './dto/create-compte.dto';
-import {
-  CompteResponseDto,
-  ParentCompteDto,
-} from './dto/compte-response.dto';
+import { CompteResponseDto, ParentCompteDto } from './dto/compte-response.dto';
 import { ListComptesQueryDto } from './dto/list-comptes-query.dto';
 import { PaginatedComptesDto } from './dto/paginated-comptes.dto';
 import { UpdateCompteDto } from './dto/update-compte.dto';

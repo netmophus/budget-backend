@@ -18,9 +18,7 @@ describe('scd2-helpers', () => {
       expect(sql).toMatch(
         /"version_courante"\s+boolean\s+NOT NULL\s+DEFAULT\s+true/,
       );
-      expect(sql).toMatch(
-        /"est_actif"\s+boolean\s+NOT NULL\s+DEFAULT\s+true/,
-      );
+      expect(sql).toMatch(/"est_actif"\s+boolean\s+NOT NULL\s+DEFAULT\s+true/);
     });
 
     it('defaults date_creation to CURRENT_TIMESTAMP and date_modification is nullable', () => {

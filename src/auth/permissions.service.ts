@@ -131,19 +131,20 @@ export class PermissionsService {
     }));
 
     // Permissions issues de délégations actives à dateRef
-    const delegations = (await this.userRoleRepo.manager.query<
-      Array<{
-        id: string;
-        permissions: string[];
-      }>
-    >(
-      `SELECT id, permissions FROM delegations
+    const delegations =
+      (await this.userRoleRepo.manager.query<
+        Array<{
+          id: string;
+          permissions: string[];
+        }>
+      >(
+        `SELECT id, permissions FROM delegations
         WHERE fk_delegataire = $1
           AND actif = true
           AND date_debut <= $2
           AND date_fin >= $2`,
-      [userId, today],
-    )) ?? [];
+        [userId, today],
+      )) ?? [];
 
     for (const d of delegations) {
       for (const verb of d.permissions) {

@@ -105,9 +105,7 @@ export class DelegationsService {
 
     // Règle 1 : délégant ≠ délégataire
     if (fkDelegant === fkDelegataire) {
-      throw new BadRequestException(
-        `Impossible de se déléguer à soi-même.`,
-      );
+      throw new BadRequestException(`Impossible de se déléguer à soi-même.`);
     }
 
     // Vérifier l'existence du délégataire
@@ -128,9 +126,8 @@ export class DelegationsService {
     }
 
     // Règle 5 : permissions sous-jacentes
-    const effectivePerms = await this.permissionsService.getEffectivePermissions(
-      fkDelegant,
-    );
+    const effectivePerms =
+      await this.permissionsService.getEffectivePermissions(fkDelegant);
     const possessedCodes = new Set(
       effectivePerms.map((p) => p.code_permission),
     );
@@ -395,8 +392,10 @@ export class DelegationsService {
       qb.andWhere('d.actif = :actif', { actif: options.actif });
     }
     if (options.dateRef) {
-      qb.andWhere('d.dateDebut <= :d', { d: options.dateRef })
-        .andWhere('d.dateFin >= :d', { d: options.dateRef });
+      qb.andWhere('d.dateDebut <= :d', { d: options.dateRef }).andWhere(
+        'd.dateFin >= :d',
+        { d: options.dateRef },
+      );
     }
     qb.orderBy('d.dateCreation', 'DESC');
     const rows = await qb.getMany();
@@ -405,7 +404,10 @@ export class DelegationsService {
 
   async listerEmises(
     userId: string,
-    options: { actif?: boolean; statut?: 'ACTIVE' | 'REVOQUEE' | 'EXPIREE' } = {},
+    options: {
+      actif?: boolean;
+      statut?: 'ACTIVE' | 'REVOQUEE' | 'EXPIREE';
+    } = {},
   ): Promise<DelegationResponseDto[]> {
     const qb = this.delegRepo
       .createQueryBuilder('d')
@@ -417,7 +419,9 @@ export class DelegationsService {
     let rows = await qb.getMany();
     if (options.statut) {
       const today = new Date().toISOString().slice(0, 10);
-      rows = rows.filter((r) => this.calculerStatut(r, today) === options.statut);
+      rows = rows.filter(
+        (r) => this.calculerStatut(r, today) === options.statut,
+      );
     }
     return Promise.all(rows.map((r) => this.toResponse(r)));
   }
@@ -445,7 +449,9 @@ export class DelegationsService {
     let rows = await qb.getMany();
     if (filters.statut) {
       const today = new Date().toISOString().slice(0, 10);
-      rows = rows.filter((r) => this.calculerStatut(r, today) === filters.statut);
+      rows = rows.filter(
+        (r) => this.calculerStatut(r, today) === filters.statut,
+      );
     }
     return Promise.all(rows.map((r) => this.toResponse(r)));
   }
@@ -564,9 +570,7 @@ export class DelegationsService {
   async getPermissionsRecues(
     userId: string,
     dateRef?: string,
-  ): Promise<
-    Array<{ permission: PermissionDelegable; delegationId: string }>
-  > {
+  ): Promise<Array<{ permission: PermissionDelegable; delegationId: string }>> {
     const today = dateRef ?? new Date().toISOString().slice(0, 10);
     const rows = await this.delegRepo
       .createQueryBuilder('d')
@@ -575,7 +579,10 @@ export class DelegationsService {
       .andWhere('d.dateDebut <= :today', { today })
       .andWhere('d.dateFin >= :today', { today })
       .getMany();
-    const out: Array<{ permission: PermissionDelegable; delegationId: string }> = [];
+    const out: Array<{
+      permission: PermissionDelegable;
+      delegationId: string;
+    }> = [];
     for (const d of rows) {
       for (const p of d.permissions) {
         out.push({ permission: p, delegationId: String(d.id) });

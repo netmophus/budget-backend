@@ -16,11 +16,7 @@ import { Between, LessThanOrEqual, MoreThanOrEqual, Repository } from 'typeorm';
 import { AuditLogResponseDto } from './dto/audit-log-response.dto';
 import { ListAuditLogsQueryDto } from './dto/list-audit-logs-query.dto';
 import { PaginatedAuditLogsDto } from './dto/paginated-audit-logs.dto';
-import {
-  AuditLog,
-  AuditStatut,
-  TypeAction,
-} from './entities/audit-log.entity';
+import { AuditLog, AuditStatut, TypeAction } from './entities/audit-log.entity';
 
 export interface AuditLogEntry {
   utilisateur: string;

@@ -50,9 +50,7 @@ describe('RealiseController', () => {
   });
 
   it('GET /realise/grille rejette 400 si paramètres manquants', () => {
-    expect(() =>
-      controller.getGrille('', '', ''),
-    ).toThrow(BadRequestException);
+    expect(() => controller.getGrille('', '', '')).toThrow(BadRequestException);
   });
 
   it('GET /realise/grille appelle le service avec les params', async () => {
@@ -82,11 +80,7 @@ describe('RealiseController', () => {
   it('PATCH /realise/:id délègue à svc.modifier', async () => {
     svc.modifier.mockResolvedValue({} as never);
     await controller.modifier('42', { montant: 500 } as never, auteur);
-    expect(svc.modifier).toHaveBeenCalledWith(
-      '42',
-      { montant: 500 },
-      auteur,
-    );
+    expect(svc.modifier).toHaveBeenCalledWith('42', { montant: 500 }, auteur);
   });
 
   it('DELETE /realise/:id délègue à svc.supprimer + retourne {supprime:true}', async () => {
@@ -98,10 +92,7 @@ describe('RealiseController', () => {
 
   it('POST /realise/valider délègue ids au service', async () => {
     svc.valider.mockResolvedValue({ nbValidees: 3 });
-    const r = await controller.valider(
-      { ids: ['1', '2', '3'] },
-      auteur,
-    );
+    const r = await controller.valider({ ids: ['1', '2', '3'] }, auteur);
     expect(r.nbValidees).toBe(3);
     expect(svc.valider).toHaveBeenCalledWith(['1', '2', '3'], auteur);
   });
@@ -119,9 +110,9 @@ describe('RealiseController', () => {
       mimetype: 'text/csv',
       size: 20 * 1024 * 1024,
     };
-    await expect(
-      controller.importer(tooBig as never, auteur),
-    ).rejects.toThrow(/trop volumineux/);
+    await expect(controller.importer(tooBig as never, auteur)).rejects.toThrow(
+      /trop volumineux/,
+    );
   });
 
   it('POST /realise/import délègue au service avec file + user', async () => {

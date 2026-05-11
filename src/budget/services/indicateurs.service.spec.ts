@@ -273,7 +273,7 @@ describe('IndicateursService — lecture (mv simulée)', () => {
     expect(res.coefExploitation).toBeNull();
   });
 
-  it('Coefficient > 100% reste valide (caller décidera de l\'alerte)', async () => {
+  it("Coefficient > 100% reste valide (caller décidera de l'alerte)", async () => {
     await seed(dataSource, {
       fkVersion: '10',
       fkScenario: '100',
@@ -344,7 +344,7 @@ describe('IndicateursService — lecture (mv simulée)', () => {
       fkScenario: '100',
       fkCentre: '200',
       codeCr: 'BR_CIV',
-      libelleCr: 'Côte d\'Ivoire',
+      libelleCr: "Côte d'Ivoire",
       totalClasse7: 100,
       totalClasse6: 60,
       total67: 20,
@@ -369,7 +369,7 @@ describe('IndicateursService — lecture (mv simulée)', () => {
     const civ = res.find((r) => r.codeCr === 'BR_CIV')!;
     expect(civ.pnb).toBe(80); // 100-20
     expect(civ.coefExploitation).toBe(50); // 40/80 ×100
-    expect(civ.libelleCr).toBe('Côte d\'Ivoire');
+    expect(civ.libelleCr).toBe("Côte d'Ivoire");
   });
 
   it('getIndicateursParCr : filtré par périmètre', async () => {
@@ -520,8 +520,7 @@ describe('IndicateursService — refreshIndicateurs', () => {
       queries.some(
         (q) =>
           /^REFRESH MATERIALIZED VIEW "mv_indicateurs_budget"$/i.test(q) ||
-          q ===
-            'REFRESH MATERIALIZED VIEW "mv_indicateurs_budget"',
+          q === 'REFRESH MATERIALIZED VIEW "mv_indicateurs_budget"',
       ),
     ).toBe(true);
     expect(res.nbLignes).toBe(0);

@@ -8,9 +8,7 @@ import {
 const CHECK_NAME = 'ck_dim_structure_type';
 const RECREATE_CHECK = `"type_structure" IN ('entite_juridique','branche','direction','departement','agence')`;
 
-export class AddFkDimStructureTypeStructure1779100000010
-  implements MigrationInterface
-{
+export class AddFkDimStructureTypeStructure1779100000010 implements MigrationInterface {
   name = 'AddFkDimStructureTypeStructure1779100000010';
 
   public async up(q: QueryRunner): Promise<void> {

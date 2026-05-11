@@ -70,7 +70,11 @@ export class UserPerimetresController {
     @Body() dto: CreerAffectationPerimetreDto,
     @CurrentUser() auteur: AuthUser,
   ): Promise<AffectationPerimetreResponseDto> {
-    const created = await this.perimetresService.creer(userId, dto, auteur.email);
+    const created = await this.perimetresService.creer(
+      userId,
+      dto,
+      auteur.email,
+    );
     return {
       id: String(created.id),
       cibleType: created.cibleType,
@@ -111,7 +115,7 @@ export class UserPerimetresController {
   @RequirePermissions('USER.LIRE')
   @ApiOperation({
     summary:
-      'Liste les affectations d\'un utilisateur (filtres actif / origine / dateRef).',
+      "Liste les affectations d'un utilisateur (filtres actif / origine / dateRef).",
   })
   @ApiOkResponse({ type: AffectationPerimetreResponseDto, isArray: true })
   async lister(
@@ -126,7 +130,7 @@ export class UserPerimetresController {
   @Get('me/perimetres')
   @ApiOperation({
     summary:
-      'Liste les affectations actives de l\'utilisateur connecté à la date du jour.',
+      "Liste les affectations actives de l'utilisateur connecté à la date du jour.",
   })
   @ApiOkResponse({ type: AffectationPerimetreResponseDto, isArray: true })
   async mesPerimetres(

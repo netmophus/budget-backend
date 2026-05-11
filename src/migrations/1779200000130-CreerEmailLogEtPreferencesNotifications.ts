@@ -25,9 +25,7 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
  * Idempotence : CREATE TABLE/COLUMN IF NOT EXISTS partout, vérification
  * par information_schema pour les colonnes user.
  */
-export class CreerEmailLogEtPreferencesNotifications1779200000130
-  implements MigrationInterface
-{
+export class CreerEmailLogEtPreferencesNotifications1779200000130 implements MigrationInterface {
   name = 'CreerEmailLogEtPreferencesNotifications1779200000130';
 
   public async up(q: QueryRunner): Promise<void> {

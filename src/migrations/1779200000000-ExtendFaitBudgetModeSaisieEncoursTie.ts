@@ -21,9 +21,7 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
  * Cf. `docs/modele-donnees.md` §4.1 (mode ENCOURS_TIE) et la décision
  * Q7 de la simulation budget Lot 3.
  */
-export class ExtendFaitBudgetModeSaisieEncoursTie1779200000000
-  implements MigrationInterface
-{
+export class ExtendFaitBudgetModeSaisieEncoursTie1779200000000 implements MigrationInterface {
   name = 'ExtendFaitBudgetModeSaisieEncoursTie1779200000000';
 
   public async up(q: QueryRunner): Promise<void> {

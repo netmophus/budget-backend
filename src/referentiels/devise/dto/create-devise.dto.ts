@@ -12,7 +12,10 @@ import {
 } from 'class-validator';
 
 export class CreateDeviseDto {
-  @ApiProperty({ example: 'JPY', description: 'Code ISO 4217 (3 lettres majuscules).' })
+  @ApiProperty({
+    example: 'JPY',
+    description: 'Code ISO 4217 (3 lettres majuscules).',
+  })
   @IsString()
   @Length(3, 3)
   @Matches(/^[A-Z]{3}$/, { message: 'codeIso doit être 3 lettres majuscules' })

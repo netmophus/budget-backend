@@ -11,9 +11,7 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
  * Idempotente : check via information_schema avant ALTER (pattern
  * Lot 6.4.A migration 180).
  */
-export class AjouterNotificationJ3Delegations1779200000210
-  implements MigrationInterface
-{
+export class AjouterNotificationJ3Delegations1779200000210 implements MigrationInterface {
   name = 'AjouterNotificationJ3Delegations1779200000210';
 
   public async up(q: QueryRunner): Promise<void> {

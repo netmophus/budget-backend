@@ -133,7 +133,9 @@ export class LigneMetierController {
   @Post()
   @RequirePermissions('REFERENTIEL.GERER')
   @Auditable({ typeAction: 'CREATE', entiteCible: 'dim_ligne_metier' })
-  @ApiOperation({ summary: 'Crée une nouvelle ligne métier (REFERENTIEL.GERER).' })
+  @ApiOperation({
+    summary: 'Crée une nouvelle ligne métier (REFERENTIEL.GERER).',
+  })
   @ApiCreatedResponse({ type: LigneMetierResponseDto })
   @ApiConflictResponse({ description: 'codeLigneMetier déjà existant.' })
   @ApiUnprocessableEntityResponse({

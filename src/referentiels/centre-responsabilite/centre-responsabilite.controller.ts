@@ -69,7 +69,9 @@ export class CentreResponsabiliteController {
 
   @Get('par-structure/:codeStructure')
   @RequirePermissions('REFERENTIEL.LIRE')
-  @ApiOperation({ summary: 'Liste les CR rattachés à une structure (courante).' })
+  @ApiOperation({
+    summary: 'Liste les CR rattachés à une structure (courante).',
+  })
   @ApiOkResponse({ type: [CrResponseDto] })
   findByStructure(
     @Param('codeStructure') codeStructure: string,
@@ -94,9 +96,12 @@ export class CentreResponsabiliteController {
   })
   @ApiOperation({ summary: 'Crée un nouveau CR (REFERENTIEL.GERER).' })
   @ApiCreatedResponse({ type: CrResponseDto })
-  @ApiConflictResponse({ description: 'codeCr déjà existant en version courante.' })
+  @ApiConflictResponse({
+    description: 'codeCr déjà existant en version courante.',
+  })
   @ApiUnprocessableEntityResponse({
-    description: 'Structure parente inexistante / archivée, ou ni fkStructure ni codeStructure fourni.',
+    description:
+      'Structure parente inexistante / archivée, ou ni fkStructure ni codeStructure fourni.',
   })
   @ApiBadRequestResponse({ description: 'Validation DTO invalide.' })
   create(
@@ -111,8 +116,7 @@ export class CentreResponsabiliteController {
   @Auditable({
     typeAction: 'UPDATE',
     entiteCible: 'dim_centre_responsabilite',
-    extractIdCible: (req) =>
-      (req.params as { codeCr?: string }).codeCr ?? null,
+    extractIdCible: (req) => (req.params as { codeCr?: string }).codeCr ?? null,
   })
   @ApiOperation({
     summary:
@@ -135,10 +139,11 @@ export class CentreResponsabiliteController {
   @Auditable({
     typeAction: 'DELETE',
     entiteCible: 'dim_centre_responsabilite',
-    extractIdCible: (req) =>
-      (req.params as { codeCr?: string }).codeCr ?? null,
+    extractIdCible: (req) => (req.params as { codeCr?: string }).codeCr ?? null,
   })
-  @ApiOperation({ summary: 'Désactive (soft-close) la version courante du CR.' })
+  @ApiOperation({
+    summary: 'Désactive (soft-close) la version courante du CR.',
+  })
   @ApiNoContentResponse()
   @ApiNotFoundResponse()
   async desactiver(

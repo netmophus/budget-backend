@@ -43,7 +43,9 @@ export class ListSegmentsQueryDto {
   @IsIn(CATEGORIE_VALUES as readonly string[])
   categorie?: CategorieSegment;
 
-  @ApiPropertyOptional({ description: 'Filtre LIKE %libelle% case-insensitive.' })
+  @ApiPropertyOptional({
+    description: 'Filtre LIKE %libelle% case-insensitive.',
+  })
   @IsOptional()
   @IsString()
   @MaxLength(200)

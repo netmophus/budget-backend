@@ -35,7 +35,9 @@ describe('Migration 055 — AjoutReforecastTrimestriel', () => {
       expect(SQL).toContain(`"${c}"`);
     }
     // Default ACTIVE pour statut_publication
-    expect(SQL).toMatch(/"statut_publication"\s+varchar\(20\)\s+NOT NULL\s+DEFAULT\s+'ACTIVE'/i);
+    expect(SQL).toMatch(
+      /"statut_publication"\s+varchar\(20\)\s+NOT NULL\s+DEFAULT\s+'ACTIVE'/i,
+    );
   });
 
   it('ajoute les 4 CHECK constraints attendus', () => {

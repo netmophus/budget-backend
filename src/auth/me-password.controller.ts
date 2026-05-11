@@ -50,9 +50,9 @@ export class MePasswordController {
   @AllowExpiredPassword()
   @ApiOperation({
     summary:
-      'Change le mot de passe de l\'utilisateur courant. Politique : ' +
+      "Change le mot de passe de l'utilisateur courant. Politique : " +
       '≥12 chars + maj + minuscule + chiffre + caractère spécial. ' +
-      'Émet un nouveau couple access/refresh sans flags d\'expiration.',
+      "Émet un nouveau couple access/refresh sans flags d'expiration.",
   })
   @ApiOkResponse({ description: 'Mot de passe changé + nouveaux tokens.' })
   @ApiUnauthorizedResponse({ description: 'Ancien mot de passe incorrect.' })

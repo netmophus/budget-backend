@@ -75,9 +75,7 @@ export class LoginRateLimiterService {
     );
     if (emailTimes.length >= LIMITE) {
       const oldest = emailTimes[0]!;
-      const retryAfter = Math.ceil(
-        (FENETRE_EMAIL_MS - (now - oldest)) / 1000,
-      );
+      const retryAfter = Math.ceil((FENETRE_EMAIL_MS - (now - oldest)) / 1000);
       return { bloque: true, motif: 'EMAIL', retryAfterSeconds: retryAfter };
     }
 

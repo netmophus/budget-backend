@@ -53,12 +53,24 @@ async function createDataSource(): Promise<DataSource> {
     type: 'postgres',
     entities: [
       AuditLog,
-      User, UserRole, UserPerimetre,
-      Role, Permission, RolePermission,
-      DimStructure, DimCentreResponsabilite, DimCompte,
-      DimLigneMetier, DimDevise, DimProduit, DimSegment,
-      DimTemps, DimVersion, DimScenario,
-      FaitBudget, FaitRealise,
+      User,
+      UserRole,
+      UserPerimetre,
+      Role,
+      Permission,
+      RolePermission,
+      DimStructure,
+      DimCentreResponsabilite,
+      DimCompte,
+      DimLigneMetier,
+      DimDevise,
+      DimProduit,
+      DimSegment,
+      DimTemps,
+      DimVersion,
+      DimScenario,
+      FaitBudget,
+      FaitRealise,
     ],
     synchronize: true,
   }) as DataSource;
@@ -379,8 +391,22 @@ describe('AnalyseEcartsService', () => {
   // ─── Calcul écart nominal ─────────────────────────────────
 
   it('calcule un écart -200K (réalisé < budget) avec ecartPct -4 sur classe 7', async () => {
-    await insertBudget(ds, ids, ids.compteProduit, ids.temps3, ids.cr1, 5_000_000);
-    await insertRealise(ds, ids, ids.compteProduit, ids.temps3, ids.cr1, 4_800_000);
+    await insertBudget(
+      ds,
+      ids,
+      ids.compteProduit,
+      ids.temps3,
+      ids.cr1,
+      5_000_000,
+    );
+    await insertRealise(
+      ds,
+      ids,
+      ids.compteProduit,
+      ids.temps3,
+      ids.cr1,
+      4_800_000,
+    );
 
     const r = await svc.getBudgetVsRealise(filtres(), admin());
     expect(r.lignes).toHaveLength(1);
@@ -397,28 +423,77 @@ describe('AnalyseEcartsService', () => {
   // ─── Niveaux d'alerte ─────────────────────────────────────
 
   it('niveau NORMAL quand |ecartPct| < seuilAttention (5)', async () => {
-    await insertBudget(ds, ids, ids.compteCharge, ids.temps1, ids.cr1, 1_000_000);
-    await insertRealise(ds, ids, ids.compteCharge, ids.temps1, ids.cr1, 1_030_000); // +3%
+    await insertBudget(
+      ds,
+      ids,
+      ids.compteCharge,
+      ids.temps1,
+      ids.cr1,
+      1_000_000,
+    );
+    await insertRealise(
+      ds,
+      ids,
+      ids.compteCharge,
+      ids.temps1,
+      ids.cr1,
+      1_030_000,
+    ); // +3%
     const r = await svc.getBudgetVsRealise(filtres(), admin());
     expect(r.lignes[0]!.niveauAlerte).toBe('NORMAL');
   });
 
   it('niveau ATTENTION quand seuilAttention <= |ecartPct| < seuilCritique', async () => {
-    await insertBudget(ds, ids, ids.compteCharge, ids.temps1, ids.cr1, 1_000_000);
-    await insertRealise(ds, ids, ids.compteCharge, ids.temps1, ids.cr1, 1_070_000); // +7%
+    await insertBudget(
+      ds,
+      ids,
+      ids.compteCharge,
+      ids.temps1,
+      ids.cr1,
+      1_000_000,
+    );
+    await insertRealise(
+      ds,
+      ids,
+      ids.compteCharge,
+      ids.temps1,
+      ids.cr1,
+      1_070_000,
+    ); // +7%
     const r = await svc.getBudgetVsRealise(filtres(), admin());
     expect(r.lignes[0]!.niveauAlerte).toBe('ATTENTION');
   });
 
   it('niveau CRITIQUE quand |ecartPct| >= seuilCritique', async () => {
-    await insertBudget(ds, ids, ids.compteCharge, ids.temps1, ids.cr1, 1_000_000);
-    await insertRealise(ds, ids, ids.compteCharge, ids.temps1, ids.cr1, 1_150_000); // +15%
+    await insertBudget(
+      ds,
+      ids,
+      ids.compteCharge,
+      ids.temps1,
+      ids.cr1,
+      1_000_000,
+    );
+    await insertRealise(
+      ds,
+      ids,
+      ids.compteCharge,
+      ids.temps1,
+      ids.cr1,
+      1_150_000,
+    ); // +15%
     const r = await svc.getBudgetVsRealise(filtres(), admin());
     expect(r.lignes[0]!.niveauAlerte).toBe('CRITIQUE');
   });
 
   it('niveau MANQUANT quand fait_realise absent', async () => {
-    await insertBudget(ds, ids, ids.compteCharge, ids.temps1, ids.cr1, 1_000_000);
+    await insertBudget(
+      ds,
+      ids,
+      ids.compteCharge,
+      ids.temps1,
+      ids.cr1,
+      1_000_000,
+    );
     const r = await svc.getBudgetVsRealise(filtres(), admin());
     expect(r.lignes).toHaveLength(1);
     expect(r.lignes[0]!.niveauAlerte).toBe('MANQUANT');
@@ -430,32 +505,88 @@ describe('AnalyseEcartsService', () => {
   // ─── Sens favorable / défavorable ─────────────────────────
 
   it('classe 6 (CHARGE) : réalisé > budget → DEFAVORABLE', async () => {
-    await insertBudget(ds, ids, ids.compteCharge, ids.temps1, ids.cr1, 1_000_000);
-    await insertRealise(ds, ids, ids.compteCharge, ids.temps1, ids.cr1, 1_500_000);
+    await insertBudget(
+      ds,
+      ids,
+      ids.compteCharge,
+      ids.temps1,
+      ids.cr1,
+      1_000_000,
+    );
+    await insertRealise(
+      ds,
+      ids,
+      ids.compteCharge,
+      ids.temps1,
+      ids.cr1,
+      1_500_000,
+    );
     const r = await svc.getBudgetVsRealise(filtres(), admin());
     expect(r.lignes[0]!.natureCompte).toBe('CHARGE');
     expect(r.lignes[0]!.sensEcart).toBe('DEFAVORABLE');
   });
 
   it('classe 7 (PRODUIT) : réalisé > budget → FAVORABLE', async () => {
-    await insertBudget(ds, ids, ids.compteProduit, ids.temps1, ids.cr1, 1_000_000);
-    await insertRealise(ds, ids, ids.compteProduit, ids.temps1, ids.cr1, 1_500_000);
+    await insertBudget(
+      ds,
+      ids,
+      ids.compteProduit,
+      ids.temps1,
+      ids.cr1,
+      1_000_000,
+    );
+    await insertRealise(
+      ds,
+      ids,
+      ids.compteProduit,
+      ids.temps1,
+      ids.cr1,
+      1_500_000,
+    );
     const r = await svc.getBudgetVsRealise(filtres(), admin());
     expect(r.lignes[0]!.natureCompte).toBe('PRODUIT');
     expect(r.lignes[0]!.sensEcart).toBe('FAVORABLE');
   });
 
   it('classe 5 (BILAN) : ecart non nul → NEUTRE', async () => {
-    await insertBudget(ds, ids, ids.compteBilan, ids.temps1, ids.cr1, 1_000_000);
-    await insertRealise(ds, ids, ids.compteBilan, ids.temps1, ids.cr1, 1_500_000);
+    await insertBudget(
+      ds,
+      ids,
+      ids.compteBilan,
+      ids.temps1,
+      ids.cr1,
+      1_000_000,
+    );
+    await insertRealise(
+      ds,
+      ids,
+      ids.compteBilan,
+      ids.temps1,
+      ids.cr1,
+      1_500_000,
+    );
     const r = await svc.getBudgetVsRealise(filtres(), admin());
     expect(r.lignes[0]!.natureCompte).toBe('BILAN');
     expect(r.lignes[0]!.sensEcart).toBe('NEUTRE');
   });
 
   it('ecart=0 → NEUTRE peu importe la classe', async () => {
-    await insertBudget(ds, ids, ids.compteCharge, ids.temps1, ids.cr1, 1_000_000);
-    await insertRealise(ds, ids, ids.compteCharge, ids.temps1, ids.cr1, 1_000_000);
+    await insertBudget(
+      ds,
+      ids,
+      ids.compteCharge,
+      ids.temps1,
+      ids.cr1,
+      1_000_000,
+    );
+    await insertRealise(
+      ds,
+      ids,
+      ids.compteCharge,
+      ids.temps1,
+      ids.cr1,
+      1_000_000,
+    );
     const r = await svc.getBudgetVsRealise(filtres(), admin());
     expect(r.lignes[0]!.sensEcart).toBe('NEUTRE');
     expect(r.lignes[0]!.ecart).toBe(0);
@@ -464,9 +595,22 @@ describe('AnalyseEcartsService', () => {
   // ─── Realise statut IMPORTE ignoré ────────────────────────
 
   it('fait_realise statut=IMPORTE ignoré (seul VALIDE est comptabilisé)', async () => {
-    await insertBudget(ds, ids, ids.compteCharge, ids.temps1, ids.cr1, 1_000_000);
+    await insertBudget(
+      ds,
+      ids,
+      ids.compteCharge,
+      ids.temps1,
+      ids.cr1,
+      1_000_000,
+    );
     await insertRealise(
-      ds, ids, ids.compteCharge, ids.temps1, ids.cr1, 999_999, 'IMPORTE',
+      ds,
+      ids,
+      ids.compteCharge,
+      ids.temps1,
+      ids.cr1,
+      999_999,
+      'IMPORTE',
     );
     const r = await svc.getBudgetVsRealise(filtres(), admin());
     // La ligne est MANQUANT car le réalisé IMPORTE n'est pas pris
@@ -478,11 +622,39 @@ describe('AnalyseEcartsService', () => {
 
   it('KPI : 1 CRITIQUE + 1 ATTENTION + 1 MANQUANT + sommes', async () => {
     // CR1 / charge / janvier : +15% → CRITIQUE défavorable
-    await insertBudget(ds, ids, ids.compteCharge, ids.temps1, ids.cr1, 1_000_000);
-    await insertRealise(ds, ids, ids.compteCharge, ids.temps1, ids.cr1, 1_150_000);
+    await insertBudget(
+      ds,
+      ids,
+      ids.compteCharge,
+      ids.temps1,
+      ids.cr1,
+      1_000_000,
+    );
+    await insertRealise(
+      ds,
+      ids,
+      ids.compteCharge,
+      ids.temps1,
+      ids.cr1,
+      1_150_000,
+    );
     // CR1 / produit / février : +7% → ATTENTION favorable
-    await insertBudget(ds, ids, ids.compteProduit, ids.temps2, ids.cr1, 1_000_000);
-    await insertRealise(ds, ids, ids.compteProduit, ids.temps2, ids.cr1, 1_070_000);
+    await insertBudget(
+      ds,
+      ids,
+      ids.compteProduit,
+      ids.temps2,
+      ids.cr1,
+      1_000_000,
+    );
+    await insertRealise(
+      ds,
+      ids,
+      ids.compteProduit,
+      ids.temps2,
+      ids.cr1,
+      1_070_000,
+    );
     // CR1 / charge / mars : MANQUANT
     await insertBudget(ds, ids, ids.compteCharge, ids.temps3, ids.cr1, 500_000);
 
@@ -499,24 +671,66 @@ describe('AnalyseEcartsService', () => {
 
   // ─── Filtrage périmètre ───────────────────────────────────
 
-  it("filtrage périmètre user_perimetres : SAI ne voit pas CR_PLATEAU", async () => {
-    await insertBudget(ds, ids, ids.compteCharge, ids.temps1, ids.cr1, 1_000_000);
-    await insertBudget(ds, ids, ids.compteCharge, ids.temps1, ids.cr2, 5_000_000);
+  it('filtrage périmètre user_perimetres : SAI ne voit pas CR_PLATEAU', async () => {
+    await insertBudget(
+      ds,
+      ids,
+      ids.compteCharge,
+      ids.temps1,
+      ids.cr1,
+      1_000_000,
+    );
+    await insertBudget(
+      ds,
+      ids,
+      ids.compteCharge,
+      ids.temps1,
+      ids.cr2,
+      5_000_000,
+    );
     const r = await svc.getBudgetVsRealise(filtres(), sai());
     expect(r.lignes).toHaveLength(1);
     expect(r.lignes[0]!.codeCr).toBe('CR_BANDABARI');
   });
 
-  it("admin global voit les 2 CR", async () => {
-    await insertBudget(ds, ids, ids.compteCharge, ids.temps1, ids.cr1, 1_000_000);
-    await insertBudget(ds, ids, ids.compteCharge, ids.temps1, ids.cr2, 5_000_000);
+  it('admin global voit les 2 CR', async () => {
+    await insertBudget(
+      ds,
+      ids,
+      ids.compteCharge,
+      ids.temps1,
+      ids.cr1,
+      1_000_000,
+    );
+    await insertBudget(
+      ds,
+      ids,
+      ids.compteCharge,
+      ids.temps1,
+      ids.cr2,
+      5_000_000,
+    );
     const r = await svc.getBudgetVsRealise(filtres(), admin());
     expect(r.lignes).toHaveLength(2);
   });
 
-  it("filtres.crIds explicite : intersection avec périmètre user", async () => {
-    await insertBudget(ds, ids, ids.compteCharge, ids.temps1, ids.cr1, 1_000_000);
-    await insertBudget(ds, ids, ids.compteCharge, ids.temps1, ids.cr2, 5_000_000);
+  it('filtres.crIds explicite : intersection avec périmètre user', async () => {
+    await insertBudget(
+      ds,
+      ids,
+      ids.compteCharge,
+      ids.temps1,
+      ids.cr1,
+      1_000_000,
+    );
+    await insertBudget(
+      ds,
+      ids,
+      ids.compteCharge,
+      ids.temps1,
+      ids.cr2,
+      5_000_000,
+    );
     // SAI demande explicitement CR_PLATEAU (hors périmètre) → résultat vide
     const r = await svc.getBudgetVsRealise(
       filtres({ crIds: [ids.cr2] }),
@@ -527,11 +741,39 @@ describe('AnalyseEcartsService', () => {
 
   // ─── Tri ──────────────────────────────────────────────────
 
-  it("tri par défaut : ecart_abs décroissant", async () => {
-    await insertBudget(ds, ids, ids.compteCharge, ids.temps1, ids.cr1, 1_000_000);
-    await insertRealise(ds, ids, ids.compteCharge, ids.temps1, ids.cr1, 1_050_000); // 50K
-    await insertBudget(ds, ids, ids.compteProduit, ids.temps2, ids.cr1, 1_000_000);
-    await insertRealise(ds, ids, ids.compteProduit, ids.temps2, ids.cr1, 1_300_000); // 300K
+  it('tri par défaut : ecart_abs décroissant', async () => {
+    await insertBudget(
+      ds,
+      ids,
+      ids.compteCharge,
+      ids.temps1,
+      ids.cr1,
+      1_000_000,
+    );
+    await insertRealise(
+      ds,
+      ids,
+      ids.compteCharge,
+      ids.temps1,
+      ids.cr1,
+      1_050_000,
+    ); // 50K
+    await insertBudget(
+      ds,
+      ids,
+      ids.compteProduit,
+      ids.temps2,
+      ids.cr1,
+      1_000_000,
+    );
+    await insertRealise(
+      ds,
+      ids,
+      ids.compteProduit,
+      ids.temps2,
+      ids.cr1,
+      1_300_000,
+    ); // 300K
     const r = await svc.getBudgetVsRealise(filtres(), admin());
     expect(r.lignes[0]!.ecartAbs).toBe(300_000);
     expect(r.lignes[1]!.ecartAbs).toBe(50_000);
@@ -539,9 +781,23 @@ describe('AnalyseEcartsService', () => {
 
   // ─── Seuils paramétrables ─────────────────────────────────
 
-  it("seuils paramétrables (3/7) : un écart de 6% devient ATTENTION", async () => {
-    await insertBudget(ds, ids, ids.compteCharge, ids.temps1, ids.cr1, 1_000_000);
-    await insertRealise(ds, ids, ids.compteCharge, ids.temps1, ids.cr1, 1_060_000); // 6%
+  it('seuils paramétrables (3/7) : un écart de 6% devient ATTENTION', async () => {
+    await insertBudget(
+      ds,
+      ids,
+      ids.compteCharge,
+      ids.temps1,
+      ids.cr1,
+      1_000_000,
+    );
+    await insertRealise(
+      ds,
+      ids,
+      ids.compteCharge,
+      ids.temps1,
+      ids.cr1,
+      1_060_000,
+    ); // 6%
     const r = await svc.getBudgetVsRealise(
       {
         ...filtres(),

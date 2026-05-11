@@ -223,9 +223,7 @@ describe('Scenario (e2e)', () => {
       `SELECT type_action, statut FROM audit_log WHERE entite_cible = 'dim_scenario'`,
     )) as Array<{ type_action: string; statut: string }>;
     expect(
-      audits.find(
-        (a) => a.type_action === 'CREATE' && a.statut === 'success',
-      ),
+      audits.find((a) => a.type_action === 'CREATE' && a.statut === 'success'),
     ).toBeDefined();
   });
 

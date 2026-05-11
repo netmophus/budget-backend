@@ -154,9 +154,9 @@ describe('BudgetSaisieService — helpers de validation', () => {
     const r = (await ds.query(
       `SELECT id FROM dim_compte WHERE code_compte='6'`,
     )) as Array<{ id: string }>;
-    await expect(
-      service.assertCompteFeuille(String(r[0]!.id)),
-    ).rejects.toThrow(/Saisie sur compte agrégé interdite/);
+    await expect(service.assertCompteFeuille(String(r[0]!.id))).rejects.toThrow(
+      /Saisie sur compte agrégé interdite/,
+    );
   });
 
   it('assertCompteFeuille : compte inexistant → NotFoundException', async () => {
@@ -206,7 +206,7 @@ describe('BudgetSaisieService — helpers de validation', () => {
     );
   });
 
-  it("assertCrAutorise : crAutorises=[] (aucun CR autorisé) → ForbiddenException", () => {
+  it('assertCrAutorise : crAutorises=[] (aucun CR autorisé) → ForbiddenException', () => {
     expect(() => service.assertCrAutorise('42', [])).toThrow(
       /n'avez pas accès/,
     );
@@ -378,11 +378,14 @@ describe('BudgetSaisieService — grille from-scratch (Lot 3.4-bis)', () => {
        VALUES ('MEDIAN_2027','Médian 2027','central','actif',2027,'system')`,
     );
 
-    async function id(table: string, col: string, code: string): Promise<string> {
-      const r = (await ds.query(
-        `SELECT id FROM ${table} WHERE ${col} = $1`,
-        [code],
-      )) as Array<{ id: string | number }>;
+    async function id(
+      table: string,
+      col: string,
+      code: string,
+    ): Promise<string> {
+      const r = (await ds.query(`SELECT id FROM ${table} WHERE ${col} = $1`, [
+        code,
+      ])) as Array<{ id: string | number }>;
       return String(r[0]!.id);
     }
     ids = {
@@ -390,7 +393,11 @@ describe('BudgetSaisieService — grille from-scratch (Lot 3.4-bis)', () => {
       versionId: await id('dim_version', 'code_version', 'BUDGET_INITIAL_2027'),
       scenarioId: await id('dim_scenario', 'code_scenario', 'MEDIAN_2027'),
       crId: await id('dim_centre_responsabilite', 'code_cr', 'CR_TEST'),
-      ligneMetierId: await id('dim_ligne_metier', 'code_ligne_metier', 'RETAIL'),
+      ligneMetierId: await id(
+        'dim_ligne_metier',
+        'code_ligne_metier',
+        'RETAIL',
+      ),
     };
   });
 
@@ -405,7 +412,7 @@ describe('BudgetSaisieService — grille from-scratch (Lot 3.4-bis)', () => {
     return String(r[0]!.id);
   }
 
-  it("GET grille from-scratch : 3 comptes feuilles classe 6 retournés (CR vierge)", async () => {
+  it('GET grille from-scratch : 3 comptes feuilles classe 6 retournés (CR vierge)', async () => {
     const userId = await adminUserId();
     const result = await service.getGrilleSaisie(
       {
@@ -484,7 +491,7 @@ describe('BudgetSaisieService — grille from-scratch (Lot 3.4-bis)', () => {
       return String(userId);
     }
 
-    it("VALIDATEUR sur un CR hors périmètre peut GET la grille (consultation read-only)", async () => {
+    it('VALIDATEUR sur un CR hors périmètre peut GET la grille (consultation read-only)', async () => {
       const userId = await creerValidateurHorsPerimetre();
       // Avant le fix, ce GET levait ForbiddenException via
       // assertCrAutorise. Désormais la consultation est autorisée
@@ -522,7 +529,11 @@ describe('BudgetSaisieService — grille from-scratch (Lot 3.4-bis)', () => {
                 compteId: String(c611Id),
                 ligneMetierId: ids.ligneMetierId,
                 cellules: [
-                  { mois: '2027-01-01', montant: 1_000_000, modeSaisie: 'MONTANT' },
+                  {
+                    mois: '2027-01-01',
+                    montant: 1_000_000,
+                    modeSaisie: 'MONTANT',
+                  },
                 ],
               },
             ],
@@ -551,7 +562,7 @@ describe('BudgetSaisieService — grille from-scratch (Lot 3.4-bis)', () => {
     ).rejects.toThrow(/ligneMetierId/);
   });
 
-  it("POST grille from-scratch : INSERT 1 cellule sur compte 611100 (sans ligneId)", async () => {
+  it('POST grille from-scratch : INSERT 1 cellule sur compte 611100 (sans ligneId)', async () => {
     const userId = await adminUserId();
     const compteId = (
       (await ds.query(
@@ -568,7 +579,11 @@ describe('BudgetSaisieService — grille from-scratch (Lot 3.4-bis)', () => {
             compteId: String(compteId),
             ligneMetierId: ids.ligneMetierId,
             cellules: [
-              { mois: '2027-01-01', montant: 10_200_000, modeSaisie: 'MONTANT' },
+              {
+                mois: '2027-01-01',
+                montant: 10_200_000,
+                modeSaisie: 'MONTANT',
+              },
             ],
           },
         ],
@@ -594,7 +609,7 @@ describe('BudgetSaisieService — grille from-scratch (Lot 3.4-bis)', () => {
     expect(rows[0]!.mode_saisie).toBe('MONTANT');
   });
 
-  it('POST grille from-scratch : montant=0 sans ligneId → ignorée (pas d\'INSERT)', async () => {
+  it("POST grille from-scratch : montant=0 sans ligneId → ignorée (pas d'INSERT)", async () => {
     const userId = await adminUserId();
     const compteId = (
       (await ds.query(
@@ -647,7 +662,11 @@ describe('BudgetSaisieService — grille from-scratch (Lot 3.4-bis)', () => {
             ligneMetierId: ids.ligneMetierId,
             // 611100 a déjà une ligne (test précédent) — on la modifie
             cellules: [
-              { mois: '2027-01-01', montant: 12_000_000, modeSaisie: 'MONTANT' },
+              {
+                mois: '2027-01-01',
+                montant: 12_000_000,
+                modeSaisie: 'MONTANT',
+              },
             ],
           },
           {

@@ -8,10 +8,7 @@
  *  - expirerAutomatiquement (6 cas)
  *  - Audit (CREER/REVOQUER/EXPIRER_DELEGATION)
  */
-import {
-  BadRequestException,
-  ForbiddenException,
-} from '@nestjs/common';
+import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import { DataType, IMemoryDb, newDb } from 'pg-mem';
 import { DataSource } from 'typeorm';
 
@@ -84,9 +81,10 @@ async function seed(ds: DataSource): Promise<SeedIds> {
        ('delegataire@miznas.local','h','Delegataire','Y', true, 'system'),
        ('tiers@miznas.local','h','Tiers','Z', true, 'system')`,
   );
-  const users = (await ds.query(
-    `SELECT email, id FROM "user"`,
-  )) as Array<{ email: string; id: string }>;
+  const users = (await ds.query(`SELECT email, id FROM "user"`)) as Array<{
+    email: string;
+    id: string;
+  }>;
   const map = new Map(users.map((u) => [u.email, String(u.id)]));
   const delegantId = map.get('delegant@miznas.local')!;
   const delegataireId = map.get('delegataire@miznas.local')!;
@@ -124,7 +122,9 @@ function makePermissionsServiceMock(
   permsParUser: Record<string, string[]>,
 ): PermissionsService {
   return {
-    getEffectivePermissions: async (userId: string): Promise<EffectivePermission[]> => {
+    getEffectivePermissions: async (
+      userId: string,
+    ): Promise<EffectivePermission[]> => {
       const codes = permsParUser[userId] ?? [];
       return codes.map((c) => ({
         code_permission: c,
@@ -252,10 +252,10 @@ describe('DelegationsService', () => {
 
   it('ANTI-CHAÎNAGE STRICT : rejet si périmètre source origine=DELEGATION', async () => {
     await expect(
-      service.creer(
-        baseDto(ids.delegataireId, ids.perimetreDelegueId),
-        { userId: ids.delegantId, email: 'delegant@miznas.local' },
-      ),
+      service.creer(baseDto(ids.delegataireId, ids.perimetreDelegueId), {
+        userId: ids.delegantId,
+        email: 'delegant@miznas.local',
+      }),
     ).rejects.toThrow(/chaîne de délégation est interdite/);
   });
 
@@ -271,14 +271,14 @@ describe('DelegationsService', () => {
       [ids.tiersId],
     )) as Array<{ id: string }>;
     await expect(
-      service.creer(
-        baseDto(ids.delegataireId, String(tiersPerim[0]!.id)),
-        { userId: ids.delegantId, email: 'delegant@miznas.local' },
-      ),
+      service.creer(baseDto(ids.delegataireId, String(tiersPerim[0]!.id)), {
+        userId: ids.delegantId,
+        email: 'delegant@miznas.local',
+      }),
     ).rejects.toThrow(/n'appartient pas/);
   });
 
-  it("rejet : permission non possédée par le délégant", async () => {
+  it('rejet : permission non possédée par le délégant', async () => {
     // Délégant n'a que BUDGET.SAISIR (mock vide pour les autres)
     const permsRestreints = makePermissionsServiceMock({
       [ids.delegantId]: ['BUDGET.SAISIR'],
@@ -308,10 +308,10 @@ describe('DelegationsService', () => {
       [ids.perimetreNatifId],
     );
     await expect(
-      service.creer(
-        baseDto(ids.delegataireId, ids.perimetreNatifId),
-        { userId: ids.delegantId, email: 'delegant@miznas.local' },
-      ),
+      service.creer(baseDto(ids.delegataireId, ids.perimetreNatifId), {
+        userId: ids.delegantId,
+        email: 'delegant@miznas.local',
+      }),
     ).rejects.toThrow(/inactif/);
   });
 
@@ -324,12 +324,12 @@ describe('DelegationsService', () => {
     ).rejects.toThrow(/Délégataire/);
   });
 
-  it("rejet : périmètres demandés introuvables", async () => {
+  it('rejet : périmètres demandés introuvables', async () => {
     await expect(
-      service.creer(
-        baseDto(ids.delegataireId, '999999'),
-        { userId: ids.delegantId, email: 'delegant@miznas.local' },
-      ),
+      service.creer(baseDto(ids.delegataireId, '999999'), {
+        userId: ids.delegantId,
+        email: 'delegant@miznas.local',
+      }),
     ).rejects.toThrow(/introuvables/);
   });
 
@@ -374,10 +374,10 @@ describe('DelegationsService', () => {
   });
 
   it('audit_log CREER_DELEGATION contient le payload riche', async () => {
-    await service.creer(
-      baseDto(ids.delegataireId, ids.perimetreNatifId),
-      { userId: ids.delegantId, email: 'delegant@miznas.local' },
-    );
+    await service.creer(baseDto(ids.delegataireId, ids.perimetreNatifId), {
+      userId: ids.delegantId,
+      email: 'delegant@miznas.local',
+    });
     const audits = (await ds.query(
       `SELECT payload_apres FROM audit_log WHERE type_action = 'CREER_DELEGATION'`,
     )) as Array<{ payload_apres: { permissions: string[]; motif: string } }>;
@@ -480,10 +480,10 @@ describe('DelegationsService', () => {
   // ─── Listing ─────────────────────────────────────────────────────
 
   it('listerEnTantQueDelegataire retourne les délégations reçues', async () => {
-    await service.creer(
-      baseDto(ids.delegataireId, ids.perimetreNatifId),
-      { userId: ids.delegantId, email: 'delegant@miznas.local' },
-    );
+    await service.creer(baseDto(ids.delegataireId, ids.perimetreNatifId), {
+      userId: ids.delegantId,
+      email: 'delegant@miznas.local',
+    });
     const recues = await service.listerEnTantQueDelegataire(ids.delegataireId);
     expect(recues).toHaveLength(1);
     expect(recues[0]!.fkDelegataire).toBe(ids.delegataireId);
@@ -491,10 +491,10 @@ describe('DelegationsService', () => {
   });
 
   it('listerEmises retourne les délégations émises', async () => {
-    await service.creer(
-      baseDto(ids.delegataireId, ids.perimetreNatifId),
-      { userId: ids.delegantId, email: 'delegant@miznas.local' },
-    );
+    await service.creer(baseDto(ids.delegataireId, ids.perimetreNatifId), {
+      userId: ids.delegantId,
+      email: 'delegant@miznas.local',
+    });
     const emises = await service.listerEmises(ids.delegantId);
     expect(emises).toHaveLength(1);
     expect(emises[0]!.fkDelegant).toBe(ids.delegantId);
@@ -608,9 +608,9 @@ describe('DelegationsService', () => {
       'SAISIE',
       'VALIDATION',
     ]);
-    expect(recues.every((p) => p.delegationId === String(r.delegation.id))).toBe(
-      true,
-    );
+    expect(
+      recues.every((p) => p.delegationId === String(r.delegation.id)),
+    ).toBe(true);
   });
 
   it('getPermissionsRecues exclut une délégation expirée', async () => {

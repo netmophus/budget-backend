@@ -67,7 +67,11 @@ export const CODES_PAYS_UEMOA: readonly CodePaysUemoa[] = [
 // Index unique métier (codeStructure, dateDebutValidite) — en métadata
 // d'entité pour que `synchronize:true` (tests pg-mem) le crée aussi,
 // pas seulement la migration. Cf. fix 2.3A.1.
-@Index('uq_dim_structure_business_date', ['codeStructure', 'dateDebutValidite'], { unique: true })
+@Index(
+  'uq_dim_structure_business_date',
+  ['codeStructure', 'dateDebutValidite'],
+  { unique: true },
+)
 // Index unique partiel `uq_dim_structure_courante (codeStructure)
 // WHERE version_courante = true` : créé par la migration
 // `CreateDimStructure1777800000000` mais PAS déclaré ici comme @Index
@@ -88,7 +92,12 @@ export class DimStructure extends Scd2Entity {
   @Column({ name: 'libelle', type: 'varchar', length: 200 })
   libelle!: string;
 
-  @Column({ name: 'libelle_court', type: 'varchar', length: 50, nullable: true })
+  @Column({
+    name: 'libelle_court',
+    type: 'varchar',
+    length: 50,
+    nullable: true,
+  })
   libelleCourt!: string | null;
 
   @Column({ name: 'type_structure', type: 'varchar', length: 20 })

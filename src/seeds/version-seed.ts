@@ -38,11 +38,13 @@ export const VERSIONS_INITIALES: readonly VersionSeedRow[] = [
     libelle: 'Atterrissage 2026',
     typeVersion: 'atterrissage',
     exerciceFiscal: 2026,
-    commentaire: 'Projection fin d\'année 2026',
+    commentaire: "Projection fin d'année 2026",
   },
 ];
 
-export async function seedVersions(ds: DataSource = AppDataSource): Promise<void> {
+export async function seedVersions(
+  ds: DataSource = AppDataSource,
+): Promise<void> {
   const ownsConnection = !ds.isInitialized;
   if (ownsConnection) {
     await ds.initialize();
@@ -66,7 +68,13 @@ export async function seedVersions(ds: DataSource = AppDataSource): Promise<void
           ("code_version","libelle","type_version","exercice_fiscal",
            "statut","commentaire","utilisateur_creation")
          VALUES ($1,$2,$3,$4,'ouvert',$5,'system')`,
-        [v.codeVersion, v.libelle, v.typeVersion, v.exerciceFiscal, v.commentaire],
+        [
+          v.codeVersion,
+          v.libelle,
+          v.typeVersion,
+          v.exerciceFiscal,
+          v.commentaire,
+        ],
       );
     }
 

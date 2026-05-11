@@ -97,14 +97,15 @@ export class AjouterPersonasBSIC1779200000090 implements MigrationInterface {
       );
 
       // Récupère l'id du user (créé ou existant)
-      const userRow = (await q.query(
-        `SELECT id FROM "user" WHERE email = $1`,
-        [p.email],
-      )) as Array<{ id: string }>;
+      const userRow = (await q.query(`SELECT id FROM "user" WHERE email = $1`, [
+        p.email,
+      ])) as Array<{ id: string }>;
       if (userRow.length === 0) {
         // Cas improbable (INSERT a échoué silencieusement) — on log et on continue.
         // eslint-disable-next-line no-console
-        console.warn(`[Lot 4.1-fix] Persona ${p.email} introuvable après INSERT.`);
+        console.warn(
+          `[Lot 4.1-fix] Persona ${p.email} introuvable après INSERT.`,
+        );
         continue;
       }
       const userId = userRow[0]!.id;
@@ -115,7 +116,7 @@ export class AjouterPersonasBSIC1779200000090 implements MigrationInterface {
       )) as Array<{ id: string }>;
       if (roleRow.length === 0) {
         throw new Error(
-          'Rôle LECTEUR introuvable dans ref_role — le seed Lot 1 n\'a pas été appliqué.',
+          "Rôle LECTEUR introuvable dans ref_role — le seed Lot 1 n'a pas été appliqué.",
         );
       }
       const roleId = roleRow[0]!.id;

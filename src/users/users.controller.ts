@@ -6,9 +6,7 @@ import {
   ApiQuery,
   ApiTags,
 } from '@nestjs/swagger';
-import {
-  CurrentUser,
-} from '../auth/decorators/current-user.decorator';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { AuthUser } from '../auth/decorators/current-user.decorator';
 import { RequirePermissions } from '../auth/decorators/require-permissions.decorator';
 import {
@@ -53,7 +51,9 @@ export class UsersController {
     @Query('q') q: string,
     @Query('limit') limit?: string,
   ): Promise<UserResponseDto[]> {
-    const lim = limit ? Math.min(50, Math.max(1, parseInt(limit, 10) || 10)) : 10;
+    const lim = limit
+      ? Math.min(50, Math.max(1, parseInt(limit, 10) || 10))
+      : 10;
     return this.usersService.recherche(q ?? '', lim);
   }
 

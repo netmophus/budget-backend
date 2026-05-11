@@ -142,9 +142,17 @@ describe('DeviseService', () => {
 
   describe('findAll', () => {
     it('orders by code_iso ASC', async () => {
-      await insertDevise(repo, { codeIso: 'EUR', libelle: 'Euro', estDevisePivot: false });
+      await insertDevise(repo, {
+        codeIso: 'EUR',
+        libelle: 'Euro',
+        estDevisePivot: false,
+      });
       await insertDevise(repo, { codeIso: 'XOF', estDevisePivot: true });
-      await insertDevise(repo, { codeIso: 'USD', libelle: 'Dollar', estDevisePivot: false });
+      await insertDevise(repo, {
+        codeIso: 'USD',
+        libelle: 'Dollar',
+        estDevisePivot: false,
+      });
 
       const result = await service.findAll({ page: 1, limit: 50 });
       expect(result.total).toBe(3);
@@ -167,10 +175,24 @@ describe('DeviseService', () => {
     });
 
     it('filters by estActive', async () => {
-      await insertDevise(repo, { codeIso: 'AAA', libelle: 'A', estActive: true, estDevisePivot: false });
-      await insertDevise(repo, { codeIso: 'BBB', libelle: 'B', estActive: false, estDevisePivot: false });
+      await insertDevise(repo, {
+        codeIso: 'AAA',
+        libelle: 'A',
+        estActive: true,
+        estDevisePivot: false,
+      });
+      await insertDevise(repo, {
+        codeIso: 'BBB',
+        libelle: 'B',
+        estActive: false,
+        estDevisePivot: false,
+      });
 
-      const actifs = await service.findAll({ page: 1, limit: 50, estActive: true });
+      const actifs = await service.findAll({
+        page: 1,
+        limit: 50,
+        estActive: true,
+      });
       expect(actifs.total).toBe(1);
       expect(actifs.items[0]!.codeIso).toBe('AAA');
     });

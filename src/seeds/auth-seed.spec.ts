@@ -53,7 +53,6 @@ describe('PERMISSIONS seed list', () => {
   });
 });
 
-
 describe('assertProductionPasswordPolicy', () => {
   const ENV_VAR = 'SEED_TEST_PASSWORD';
   const originalNodeEnv = process.env.NODE_ENV;

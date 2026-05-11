@@ -77,7 +77,7 @@ export class BudgetImportController {
   @ApiOkResponse({ type: ImportBudgetRapportDto })
   @ApiBadRequestResponse({
     description:
-      "Fichier manquant, format non supporté, header invalide, ou fichier vide.",
+      'Fichier manquant, format non supporté, header invalide, ou fichier vide.',
   })
   @ApiConflictResponse({
     description: "Version statut différent de 'ouvert' (Brouillon).",

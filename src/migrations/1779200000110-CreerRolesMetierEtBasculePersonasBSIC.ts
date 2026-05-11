@@ -94,7 +94,7 @@ const ROLES_DEFINITIONS: Array<{
     code: 'AUDITEUR',
     libelle: 'Auditeur',
     description:
-      'Lecture seule transverse pour audit interne et contrôle externe BCEAO. Aucun droit d\'écriture.',
+      "Lecture seule transverse pour audit interne et contrôle externe BCEAO. Aucun droit d'écriture.",
     permissions: [
       'AUDIT.LIRE',
       'BUDGET.LIRE',
@@ -115,9 +115,7 @@ const PERSONAS_MAPPING: Array<{ email: string; role: string }> = [
   { email: 'dga.exploitation@miznas.local', role: 'PUBLICATEUR' },
 ];
 
-export class CreerRolesMetierEtBasculePersonasBSIC1779200000110
-  implements MigrationInterface
-{
+export class CreerRolesMetierEtBasculePersonasBSIC1779200000110 implements MigrationInterface {
   name = 'CreerRolesMetierEtBasculePersonasBSIC1779200000110';
 
   public async up(q: QueryRunner): Promise<void> {

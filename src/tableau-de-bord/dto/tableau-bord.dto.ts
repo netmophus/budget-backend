@@ -61,7 +61,9 @@ export class FiltresEcartsDto {
   ligneMetierIds?: string[];
 
   @ApiProperty({ example: '2027-01' })
-  @Matches(/^\d{4}-\d{2}$/, { message: 'Format YYYY-MM attendu pour moisDebut.' })
+  @Matches(/^\d{4}-\d{2}$/, {
+    message: 'Format YYYY-MM attendu pour moisDebut.',
+  })
   moisDebut!: string;
 
   @ApiProperty({ example: '2027-12' })

@@ -29,11 +29,7 @@ import { NotificationsService } from './notifications.service';
     EmailQueueModule,
   ],
   controllers: [NotificationsController],
-  providers: [
-    NotificationsService,
-    NotificationsListeners,
-    EmailWorker,
-  ],
+  providers: [NotificationsService, NotificationsListeners, EmailWorker],
   exports: [NotificationsService, EmailQueueModule],
 })
 export class NotificationsModule {}

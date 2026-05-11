@@ -13,7 +13,10 @@ interface CapturedResponse {
   body: Record<string, unknown>;
 }
 
-function createHost(url: string, method = 'GET'): {
+function createHost(
+  url: string,
+  method = 'GET',
+): {
   host: ArgumentsHost;
   captured: CapturedResponse;
 } {
@@ -40,7 +43,8 @@ function createHost(url: string, method = 'GET'): {
     }),
     getArgs: () => [],
     getArgByIndex: () => undefined,
-    switchToRpc: () => ({ getContext: () => ({}), getData: () => ({}) }) as never,
+    switchToRpc: () =>
+      ({ getContext: () => ({}), getData: () => ({}) }) as never,
     switchToWs: () => ({ getClient: () => ({}), getData: () => ({}) }) as never,
     getType: () => 'http' as never,
     getClass: () => Object as never,

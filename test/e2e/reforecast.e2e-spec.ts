@@ -21,7 +21,11 @@ import type { DataSource } from 'typeorm';
 
 import { bootstrapApp } from './helpers/app';
 import { type AuthSession, bearer, login, PERSONAS } from './helpers/auth';
-import { insertFaitBudget, insertFaitRealise, setVersionStatut } from './fixtures/faits';
+import {
+  insertFaitBudget,
+  insertFaitRealise,
+  setVersionStatut,
+} from './fixtures/faits';
 import {
   getCompteId,
   getCrId,
@@ -41,17 +45,12 @@ describe('E2E.5 — Reforecast avec écrasement OBSOLETE', () => {
 
   beforeAll(async () => {
     app = await bootstrapApp();
-    session = await login(
-      app,
-      PERSONAS.ADMIN.email,
-      PERSONAS.ADMIN.motDePasse,
-    );
+    session = await login(app, PERSONAS.ADMIN.email, PERSONAS.ADMIN.motDePasse);
 
     const ds = app.get<DataSource>(getDataSourceToken());
-    const adminRow = (await ds.query(
-      `SELECT id FROM "user" WHERE email = $1`,
-      [PERSONAS.ADMIN.email],
-    )) as Array<{ id: string }>;
+    const adminRow = (await ds.query(`SELECT id FROM "user" WHERE email = $1`, [
+      PERSONAS.ADMIN.email,
+    ])) as Array<{ id: string }>;
     const fkAdmin = String(adminRow[0]!.id);
 
     fkScenario = await getScenarioId(app, 'CENTRAL');

@@ -14,9 +14,7 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
  *
  * Cf. `docs/modele-donnees.md` §4.4 et le rapport Lot 3.3.
  */
-export class FixBridgeUserRolePerimetreTypeLength1779200000020
-  implements MigrationInterface
-{
+export class FixBridgeUserRolePerimetreTypeLength1779200000020 implements MigrationInterface {
   name = 'FixBridgeUserRolePerimetreTypeLength1779200000020';
 
   public async up(q: QueryRunner): Promise<void> {

@@ -45,10 +45,7 @@ import {
   PreferencesNotificationsDto,
   StatistiquesEmailDto,
 } from './dto/notifications.dto';
-import {
-  EmailQueueProducer,
-  type QueueStats,
-} from './email-queue.producer';
+import { EmailQueueProducer, type QueueStats } from './email-queue.producer';
 import { NotificationsService } from './notifications.service';
 
 @ApiTags('notifications')

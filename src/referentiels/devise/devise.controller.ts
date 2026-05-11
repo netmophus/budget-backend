@@ -45,9 +45,7 @@ export class DeviseController {
     summary: 'Liste paginée des devises (filtres codeIso, estActive).',
   })
   @ApiOkResponse({ type: PaginatedDevisesDto })
-  findAll(
-    @Query() query: ListDevisesQueryDto,
-  ): Promise<PaginatedDevisesDto> {
+  findAll(@Query() query: ListDevisesQueryDto): Promise<PaginatedDevisesDto> {
     return this.deviseService.findAll(query);
   }
 
@@ -76,8 +74,7 @@ export class DeviseController {
   })
   @ApiCreatedResponse({ type: DeviseResponseDto })
   @ApiConflictResponse({
-    description:
-      'Code ISO déjà existant ou tentative de seconde devise pivot.',
+    description: 'Code ISO déjà existant ou tentative de seconde devise pivot.',
   })
   create(
     @Body() dto: CreateDeviseDto,

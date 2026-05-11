@@ -15,10 +15,7 @@
  * que `BR_CIV` ne voit que les indicateurs des fait_budget rattachés
  * à ce CR (même au niveau des totaux globaux).
  */
-import {
-  Injectable,
-  Logger,
-} from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 
 import { AuditService } from '../../audit/audit.service';
@@ -127,7 +124,9 @@ export class IndicateursService {
     filters: IndicateursComparaisonFiltersDto,
     user: { userId: string },
   ): Promise<IndicateursComparaisonDto> {
-    const crIds = await this.perimetreService.getCrAutorisesPourUser(user.userId);
+    const crIds = await this.perimetreService.getCrAutorisesPourUser(
+      user.userId,
+    );
     if (crIds !== null && crIds.length === 0) {
       // Aucun CR autorisé → réponse vide.
       const v = await this.fetchVersionMeta(filters.versionId);
@@ -230,9 +229,9 @@ export class IndicateursService {
 
   // ─── Refresh ─────────────────────────────────────────────────────
 
-  async refreshIndicateurs(
-    user: { email: string },
-  ): Promise<RefreshIndicateursResponseDto> {
+  async refreshIndicateurs(user: {
+    email: string;
+  }): Promise<RefreshIndicateursResponseDto> {
     const t0 = Date.now();
     // CONCURRENTLY : ne bloque pas les SELECT pendant le refresh.
     // Requiert l'index UNIQUE posé par la migration.
@@ -323,7 +322,14 @@ export class IndicateursService {
         if (!derniereMaj || d > derniereMaj) derniereMaj = d;
       }
     }
-    return { pnb, mni, chargesHorsInterets, totalProduits, totalCharges, derniereMaj };
+    return {
+      pnb,
+      mni,
+      chargesHorsInterets,
+      totalProduits,
+      totalCharges,
+      derniereMaj,
+    };
   }
 
   private coef(chargesHorsInterets: number, pnb: number): number | null {
@@ -337,10 +343,9 @@ export class IndicateursService {
   }> {
     const rows = await this.dataSource.query<
       Array<{ id: string; code_version: string; libelle: string }>
-    >(
-      `SELECT id, code_version, libelle FROM dim_version WHERE id = $1`,
-      [versionId],
-    );
+    >(`SELECT id, code_version, libelle FROM dim_version WHERE id = $1`, [
+      versionId,
+    ]);
     const r = rows[0];
     if (!r) {
       // Version inconnue : on retourne un placeholder plutôt que de

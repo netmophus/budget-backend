@@ -41,7 +41,11 @@ export class ImportRapportDto {
   @ApiProperty({ example: 0, description: 'Mises à jour SCD2 (mode upsert).' })
   updated!: number;
 
-  @ApiProperty({ example: 1, description: 'Lignes ignorées (déjà existant en mode insert-only ou no-op).' })
+  @ApiProperty({
+    example: 1,
+    description:
+      'Lignes ignorées (déjà existant en mode insert-only ou no-op).',
+  })
   skipped!: number;
 
   @ApiProperty({ type: [ImportErrorDto] })

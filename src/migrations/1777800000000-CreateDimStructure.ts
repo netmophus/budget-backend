@@ -62,9 +62,15 @@ export class CreateDimStructure1777800000000 implements MigrationInterface {
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
-    await queryRunner.query(`DROP INDEX IF EXISTS "public"."ix_dim_structure_code_pays"`);
-    await queryRunner.query(`DROP INDEX IF EXISTS "public"."ix_dim_structure_parent"`);
-    await queryRunner.query(`DROP INDEX IF EXISTS "public"."uq_dim_structure_business_date"`);
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "public"."ix_dim_structure_code_pays"`,
+    );
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "public"."ix_dim_structure_parent"`,
+    );
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "public"."uq_dim_structure_business_date"`,
+    );
     for (const sql of dropScd2Indexes('dim_structure')) {
       await queryRunner.query(sql);
     }

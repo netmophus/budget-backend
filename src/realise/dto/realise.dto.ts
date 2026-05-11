@@ -93,7 +93,10 @@ export class ModifierFaitRealiseDto {
 }
 
 export class ValiderFaitsRealiseDto {
-  @ApiProperty({ type: [String], description: "Ids des fait_realise à valider." })
+  @ApiProperty({
+    type: [String],
+    description: 'Ids des fait_realise à valider.',
+  })
   @IsArray()
   @ArrayMinSize(1)
   @IsString({ each: true })

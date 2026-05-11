@@ -258,19 +258,24 @@ async function seedDimensions(
   );
 
   // Récupérer tous les ids.
-  async function id(table: string, codeCol: string, code: string): Promise<string> {
-    const r = (await ds.query(
-      `SELECT id FROM ${table} WHERE ${codeCol} = $1`,
-      [code],
-    )) as Array<{ id: string | number }>;
+  async function id(
+    table: string,
+    codeCol: string,
+    code: string,
+  ): Promise<string> {
+    const r = (await ds.query(`SELECT id FROM ${table} WHERE ${codeCol} = $1`, [
+      code,
+    ])) as Array<{ id: string | number }>;
     return String(r[0]!.id);
   }
 
   return {
     fkTemps: String(
-      ((await ds.query(
-        `SELECT id FROM dim_temps WHERE date = '2026-04-01'`,
-      )) as Array<{ id: string | number }>)[0]!.id,
+      (
+        (await ds.query(
+          `SELECT id FROM dim_temps WHERE date = '2026-04-01'`,
+        )) as Array<{ id: string | number }>
+      )[0]!.id,
     ),
     fkCompte: await id('dim_compte', 'code_compte', '611100'),
     fkStructure: await id('dim_structure', 'code_structure', 'AG_TEST'),
@@ -307,10 +312,14 @@ describe('FaitBudgetService', () => {
     await dataSource.query('DELETE FROM ref_taux_change');
     await dataSource.query('UPDATE dim_compte SET fk_compte_parent = NULL');
     await dataSource.query('DELETE FROM dim_compte');
-    await dataSource.query('UPDATE dim_structure SET fk_structure_parent = NULL');
+    await dataSource.query(
+      'UPDATE dim_structure SET fk_structure_parent = NULL',
+    );
     await dataSource.query('DELETE FROM dim_centre_responsabilite');
     await dataSource.query('DELETE FROM dim_structure');
-    await dataSource.query('UPDATE dim_ligne_metier SET fk_ligne_metier_parent = NULL');
+    await dataSource.query(
+      'UPDATE dim_ligne_metier SET fk_ligne_metier_parent = NULL',
+    );
     await dataSource.query('DELETE FROM dim_ligne_metier');
     await dataSource.query('UPDATE dim_produit SET fk_produit_parent = NULL');
     await dataSource.query('DELETE FROM dim_produit');
@@ -509,11 +518,7 @@ describe('FaitBudgetService', () => {
 
     it('refuse si une FK est dans le payload → 422', async () => {
       await expect(
-        service.update(
-          id,
-          { fkCompte: '999' } as never,
-          'admin',
-        ),
+        service.update(id, { fkCompte: '999' } as never, 'admin'),
       ).rejects.toThrow(UnprocessableEntityException);
     });
 
@@ -682,7 +687,9 @@ describe('FaitBudgetService', () => {
           'admin',
         ),
       ).rejects.toMatchObject({
-        message: expect.stringMatching(/dim_(structure|centre_responsabilite|compte|ligne_metier|produit|segment).*'.+'.*valide au 2025-04-01/),
+        message: expect.stringMatching(
+          /dim_(structure|centre_responsabilite|compte|ligne_metier|produit|segment).*'.+'.*valide au 2025-04-01/,
+        ),
       });
     });
 
@@ -871,7 +878,7 @@ describe('FaitBudgetService', () => {
       fkComptePorteur = String(r[0]!.id);
     });
 
-    it("mode MONTANT par défaut : encoursMoyen + tie = null, montant tel que fourni", async () => {
+    it('mode MONTANT par défaut : encoursMoyen + tie = null, montant tel que fourni', async () => {
       const created = await service.create(
         {
           ...ids,
@@ -887,7 +894,7 @@ describe('FaitBudgetService', () => {
       expect(created.montantDevise).toBe(1500000);
     });
 
-    it("mode MONTANT explicite avec encoursMoyen fourni → BadRequestException", async () => {
+    it('mode MONTANT explicite avec encoursMoyen fourni → BadRequestException', async () => {
       await expect(
         service.create(
           {
@@ -920,7 +927,7 @@ describe('FaitBudgetService', () => {
       ).rejects.toThrow(/n'est pas porteur d'intérêts/);
     });
 
-    it("mode ENCOURS_TIE sur compte porteur : montant recalculé = encours × tie / 12", async () => {
+    it('mode ENCOURS_TIE sur compte porteur : montant recalculé = encours × tie / 12', async () => {
       const created = await service.create(
         {
           ...ids,
@@ -943,7 +950,7 @@ describe('FaitBudgetService', () => {
       expect(created.commentaire).toBe('Hypothèse encours retail PCT');
     });
 
-    it("mode ENCOURS_TIE sans tie → BadRequestException explicite", async () => {
+    it('mode ENCOURS_TIE sans tie → BadRequestException explicite', async () => {
       await expect(
         service.create(
           {
@@ -960,7 +967,7 @@ describe('FaitBudgetService', () => {
       ).rejects.toThrow(/requiert tie/);
     });
 
-    it("update : bascule MONTANT → ENCOURS_TIE recalcule montantDevise", async () => {
+    it('update : bascule MONTANT → ENCOURS_TIE recalcule montantDevise', async () => {
       const created = await service.create(
         {
           ...ids,
@@ -988,7 +995,7 @@ describe('FaitBudgetService', () => {
       expect(updated.montantDevise).toBeCloseTo(100, 4);
     });
 
-    it("update : bascule ENCOURS_TIE → MONTANT remet encoursMoyen + tie à null", async () => {
+    it('update : bascule ENCOURS_TIE → MONTANT remet encoursMoyen + tie à null', async () => {
       const created = await service.create(
         {
           ...ids,

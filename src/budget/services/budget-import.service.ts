@@ -72,10 +72,7 @@ const ligneSchema = z
     code_ligne_metier: z.string().min(1, 'Obligatoire'),
     mois: z
       .string()
-      .regex(
-        /^\d{4}-\d{2}(-\d{2})?$/,
-        'Format attendu YYYY-MM ou YYYY-MM-DD',
-      ),
+      .regex(/^\d{4}-\d{2}(-\d{2})?$/, 'Format attendu YYYY-MM ou YYYY-MM-DD'),
     mode_saisie: z.enum(['MONTANT', 'ENCOURS_TIE']),
     montant: z
       .string()
@@ -253,10 +250,11 @@ export class BudgetImportService {
     // 9. Audit (succès ou rollback : toujours consigné)
     // Lot 4.2-fix.A : enrichissement via_delegation_id si l'import
     // s'appuie sur une permission BUDGET.SAISIR reçue par délégation.
-    const viaDelegationId = await this.permissionsService.getDelegationContextPour(
-      user.userId,
-      'BUDGET.SAISIR',
-    );
+    const viaDelegationId =
+      await this.permissionsService.getDelegationContextPour(
+        user.userId,
+        'BUDGET.SAISIR',
+      );
     await this.auditService.log({
       utilisateur: user.email,
       typeAction: 'IMPORT_BUDGET_BULK',
@@ -326,9 +324,7 @@ export class BudgetImportService {
     await workbook.xlsx.load(buffer as unknown as ArrayBuffer);
     const sheet = workbook.worksheets[0];
     if (!sheet) {
-      throw new BadRequestException(
-        'Fichier XLSX sans onglet exploitable.',
-      );
+      throw new BadRequestException('Fichier XLSX sans onglet exploitable.');
     }
     const headers: string[] = [];
     const rows: RowBrute[] = [];
@@ -476,9 +472,7 @@ export class BudgetImportService {
     const moisPremier = moisIso.slice(0, 7) + '-01';
     const temps = await this.dataSource.query<
       Array<{ id: string; jour: number }>
-    >(`SELECT id, jour FROM dim_temps WHERE date = $1 LIMIT 1`, [
-      moisPremier,
-    ]);
+    >(`SELECT id, jour FROM dim_temps WHERE date = $1 LIMIT 1`, [moisPremier]);
     if (temps.length === 0) {
       erreurs.push({
         ligneNumero,
@@ -599,10 +593,9 @@ export class BudgetImportService {
   private async assertVersionOuverte(versionId: string): Promise<void> {
     const rows = await this.dataSource.query<
       Array<{ statut: string; code_version: string }>
-    >(
-      `SELECT statut, code_version FROM dim_version WHERE id = $1`,
-      [versionId],
-    );
+    >(`SELECT statut, code_version FROM dim_version WHERE id = $1`, [
+      versionId,
+    ]);
     if (rows.length === 0) {
       throw new NotFoundException(`Version ${versionId} introuvable.`);
     }
@@ -627,7 +620,9 @@ export class BudgetImportService {
     fkSegment: string;
   } | null = null;
 
-  private async resoudreFkDefaults(_versionId: string): Promise<
+  private async resoudreFkDefaults(
+    _versionId: string,
+  ): Promise<
     | { ok: true; fkDevise: string; fkProduit: string; fkSegment: string }
     | { ok: false; message: string }
   > {
@@ -759,9 +754,7 @@ export class BudgetImportService {
           (e.encours_moyen === null
             ? op.encoursMoyen === null
             : Number(e.encours_moyen) === op.encoursMoyen) &&
-          (e.tie === null
-            ? op.tie === null
-            : Number(e.tie) === op.tie) &&
+          (e.tie === null ? op.tie === null : Number(e.tie) === op.tie) &&
           (e.commentaire ?? null) === (op.commentaire ?? null);
         if (inchange) {
           ignorees++;

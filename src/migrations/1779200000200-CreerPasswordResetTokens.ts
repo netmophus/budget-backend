@@ -16,9 +16,7 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
  * (`PasswordResetCleanupCronService`) supprime les tokens dont
  * `date_expiration < now() - 30 jours`.
  */
-export class CreerPasswordResetTokens1779200000200
-  implements MigrationInterface
-{
+export class CreerPasswordResetTokens1779200000200 implements MigrationInterface {
   name = 'CreerPasswordResetTokens1779200000200';
 
   public async up(q: QueryRunner): Promise<void> {

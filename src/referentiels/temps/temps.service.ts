@@ -1,4 +1,8 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 
@@ -82,9 +86,7 @@ export class TempsService {
     }
     const row = await this.repo.findOne({ where: { date } });
     if (!row) {
-      throw new NotFoundException(
-        `Aucun jour calendaire pour la date ${date}`,
-      );
+      throw new NotFoundException(`Aucun jour calendaire pour la date ${date}`);
     }
     return toResponse(row);
   }

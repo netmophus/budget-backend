@@ -125,9 +125,7 @@ describe('Migration Lot41Fix2DataPatches1779200000100', () => {
       `SELECT code FROM ref_type_action_audit WHERE code IN (${placeholders}) ORDER BY code`,
       NOUVEAUX_CODES,
     )) as Array<{ code: string }>;
-    expect(rows.map((r) => r.code).sort()).toEqual(
-      [...NOUVEAUX_CODES].sort(),
-    );
+    expect(rows.map((r) => r.code).sort()).toEqual([...NOUVEAUX_CODES].sort());
   });
 
   it('B — ON CONFLICT DO NOTHING : 2× INSERT sans doublon', async () => {
@@ -164,7 +162,7 @@ describe('Migration Lot41Fix2DataPatches1779200000100', () => {
     expect(normalize(['13', '14'])).not.toBe(normalize(['13', '14', '15']));
   });
 
-  it('C — ce qui sera refusé par l\'index Postgres : doublon exact pour le même user', async () => {
+  it("C — ce qui sera refusé par l'index Postgres : doublon exact pour le même user", async () => {
     // On simule en ajoutant manuellement la logique du trigger.
     await ds.query(
       `INSERT INTO user_perimetres (fk_user, cible_type, cible_cr_ids, actif)

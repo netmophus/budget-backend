@@ -17,9 +17,7 @@ import { DataSource } from 'typeorm';
 
 import { AuditLog } from '../../audit/entities/audit-log.entity';
 import { AuditService } from '../../audit/audit.service';
-import {
-  PerimetreService,
-} from '../../budget/services/perimetre.service';
+import { PerimetreService } from '../../budget/services/perimetre.service';
 import { DimCentreResponsabilite } from '../../referentiels/centre-responsabilite/entities/dim-centre-responsabilite.entity';
 import { DimCompte } from '../../referentiels/compte/entities/dim-compte.entity';
 import { DimDevise } from '../../referentiels/devise/entities/dim-devise.entity';
@@ -115,9 +113,7 @@ async function seed(ds: DataSource): Promise<SeedIds> {
   const roles = (await ds.query(
     `SELECT id, code_role FROM ref_role`,
   )) as Array<{ id: string; code_role: string }>;
-  const roleAdminId = String(
-    roles.find((r) => r.code_role === 'ADMIN')!.id,
-  );
+  const roleAdminId = String(roles.find((r) => r.code_role === 'ADMIN')!.id);
   const roleLecteurId = String(
     roles.find((r) => r.code_role === 'LECTEUR')!.id,
   );
@@ -261,11 +257,7 @@ describe('RealiseService', () => {
       ds.getRepository(UserRole),
       ds.getRepository(UserPerimetre),
     );
-    svc = new RealiseService(
-      ds.getRepository(FaitRealise),
-      perimSvc,
-      auditSvc,
-    );
+    svc = new RealiseService(ds.getRepository(FaitRealise), perimSvc, auditSvc);
   });
 
   const auteur = (id: string) => ({ userId: id, email: `u${id}@m.io` });
@@ -381,9 +373,9 @@ describe('RealiseService', () => {
     it('rejet 400 sur statut=VALIDE', async () => {
       const cree = await svc.creer(dtoBase(), auteur(ids.saisisseurId));
       await svc.valider([cree.id], auteur(ids.adminId));
-      await expect(
-        svc.supprimer(cree.id, auteur(ids.adminId)),
-      ).rejects.toThrow(BadRequestException);
+      await expect(svc.supprimer(cree.id, auteur(ids.adminId))).rejects.toThrow(
+        BadRequestException,
+      );
     });
   });
 
@@ -396,10 +388,7 @@ describe('RealiseService', () => {
         { ...dtoBase(), fkTemps: ids.temps2 },
         auteur(ids.saisisseurId),
       );
-      const r = await svc.valider(
-        [a.id, b.id],
-        auteur(ids.validateurId),
-      );
+      const r = await svc.valider([a.id, b.id], auteur(ids.validateurId));
       expect(r.nbValidees).toBe(2);
       const lignes = await ds
         .getRepository(FaitRealise)

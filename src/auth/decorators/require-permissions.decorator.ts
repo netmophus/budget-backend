@@ -24,7 +24,9 @@ export function RequirePermissions(
   ...args: RequirePermissionsArg[]
 ): MethodDecorator & ClassDecorator {
   if (args.length === 0) {
-    throw new Error('@RequirePermissions requires at least one permission code');
+    throw new Error(
+      '@RequirePermissions requires at least one permission code',
+    );
   }
 
   let metadata: PermissionsMetadata;
@@ -37,9 +39,7 @@ export function RequirePermissions(
       metadata = { permissions: spec.any, mode: 'any' };
     }
   } else {
-    const permissions = args.filter(
-      (a): a is string => typeof a === 'string',
-    );
+    const permissions = args.filter((a): a is string => typeof a === 'string');
     if (permissions.length !== args.length) {
       throw new Error(
         '@RequirePermissions: when passing multiple arguments, all must be strings. Use { any } or { all } for explicit mode.',

@@ -218,7 +218,7 @@ describe('BaseRefSecondaireService', () => {
       expect(r.utilisateurModification).toBe('admin');
     });
 
-    it("refuse de renommer le code si estSysteme=true → 422", async () => {
+    it('refuse de renommer le code si estSysteme=true → 422', async () => {
       const seeded = await seed(repo, {
         code: 'CREATE',
         estSysteme: true,
@@ -249,7 +249,7 @@ describe('BaseRefSecondaireService', () => {
       ).rejects.toThrow(ConflictException);
     });
 
-    it("autorise update libellé même sur estSysteme=true", async () => {
+    it('autorise update libellé même sur estSysteme=true', async () => {
       const seeded = await seed(repo, {
         code: 'CREATE',
         libelle: 'Création',
@@ -274,7 +274,7 @@ describe('BaseRefSecondaireService', () => {
       expect(r.warning).toBeNull();
     });
 
-    it("passe à false sur valeur référencée → warning explicite", async () => {
+    it('passe à false sur valeur référencée → warning explicite', async () => {
       const seeded = await seed(repo, { code: 'agence', estActif: true });
       service.referencedCodes.add('agence');
       const r = await service.toggleActif(String(seeded.id), 'admin');
@@ -304,7 +304,7 @@ describe('BaseRefSecondaireService', () => {
       ).rejects.toThrow(ConflictException);
     });
 
-    it("refuse si valeur référencée par une dimension → 409", async () => {
+    it('refuse si valeur référencée par une dimension → 409', async () => {
       const seeded = await seed(repo, {
         code: 'agence',
         estSysteme: false,
@@ -315,7 +315,7 @@ describe('BaseRefSecondaireService', () => {
       ).rejects.toThrow(ConflictException);
     });
 
-    it("supprime physiquement si non-systeme et non-référencée", async () => {
+    it('supprime physiquement si non-systeme et non-référencée', async () => {
       const seeded = await seed(repo, {
         code: 'succursale',
         estSysteme: false,

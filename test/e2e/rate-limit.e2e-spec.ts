@@ -84,7 +84,7 @@ describe('E2E.9 — Rate limiting login', () => {
     expect(audits[0]!.statut).toBe('failure');
   });
 
-  it("user A bloqué ne bloque PAS user B (isolation par email)", async () => {
+  it('user A bloqué ne bloque PAS user B (isolation par email)', async () => {
     const emailA = `e2e-rl-a-${Date.now()}@miznas.local`;
     const emailB = `e2e-rl-b-${Date.now()}@miznas.local`;
 

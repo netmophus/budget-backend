@@ -6,9 +6,7 @@ import {
   scd2Indexes,
 } from '../common/migrations/scd2-helpers';
 
-export class CreateDimCentreResponsabilite1777850000000
-  implements MigrationInterface
-{
+export class CreateDimCentreResponsabilite1777850000000 implements MigrationInterface {
   name = 'CreateDimCentreResponsabilite1777850000000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {

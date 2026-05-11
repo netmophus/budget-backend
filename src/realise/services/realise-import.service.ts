@@ -21,11 +21,7 @@
  * Réutilise le pattern de BudgetImportService (Lot 3.7) — parsing
  * CSV via csv-parse/sync, parsing XLSX via exceljs.
  */
-import {
-  BadRequestException,
-  Injectable,
-  Logger,
-} from '@nestjs/common';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { parse as parseCsv } from 'csv-parse/sync';
 import ExcelJS from 'exceljs';
 import { DataSource, EntityManager } from 'typeorm';
@@ -181,8 +177,7 @@ export class RealiseImportService {
       nbLignesTraitees: rowsBrutes.length,
       nbLignesCreees: nbCreees,
       nbLignesMisesAJour: nbMisesAJour,
-      nbLignesIgnorees:
-        lignesIgnoreesPourPerimetre.length + nbIgnoreesValides,
+      nbLignesIgnorees: lignesIgnoreesPourPerimetre.length + nbIgnoreesValides,
       nbErreurs: erreurs.length,
       erreurs,
       lignesIgnorees: [...lignesIgnoreesPourPerimetre, ...ignoreesValides],

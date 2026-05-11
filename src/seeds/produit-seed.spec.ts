@@ -44,9 +44,7 @@ describe('produit-seed (data shape)', () => {
   });
 
   it('every child has niveau = parent.niveau + 1', () => {
-    const byCode = new Map(
-      PRODUITS_INITIAUX.map((p) => [p.codeProduit, p]),
-    );
+    const byCode = new Map(PRODUITS_INITIAUX.map((p) => [p.codeProduit, p]));
     for (const p of PRODUITS_INITIAUX) {
       if (p.parentCode === null) continue;
       const parent = byCode.get(p.parentCode);
@@ -68,7 +66,7 @@ describe('produit-seed (data shape)', () => {
     }
   });
 
-  it('has at least 5 produits porteurs d\'intérêts', () => {
+  it("has at least 5 produits porteurs d'intérêts", () => {
     const porteurs = PRODUITS_INITIAUX.filter((p) => p.estPorteurInterets);
     expect(porteurs.length).toBeGreaterThanOrEqual(5);
   });

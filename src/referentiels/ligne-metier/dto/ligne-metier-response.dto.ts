@@ -69,7 +69,7 @@ export class LigneMetierResponseDto {
   @ApiPropertyOptional({
     example: 0,
     description:
-      "Nombre de lignes-métier enfants repointées vers la nouvelle version (stratégie A auto-référence — cf. scd2-pattern.md §8).",
+      'Nombre de lignes-métier enfants repointées vers la nouvelle version (stratégie A auto-référence — cf. scd2-pattern.md §8).',
   })
   lignesMetierEnfantsRelinked?: number;
 }

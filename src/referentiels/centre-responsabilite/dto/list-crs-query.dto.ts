@@ -30,7 +30,9 @@ export class ListCrsQueryDto {
   @Max(200)
   limit: number = 50;
 
-  @ApiPropertyOptional({ description: 'Filtre sur le code de la structure parente.' })
+  @ApiPropertyOptional({
+    description: 'Filtre sur le code de la structure parente.',
+  })
   @IsOptional()
   @IsString()
   @MaxLength(50)
@@ -41,7 +43,9 @@ export class ListCrsQueryDto {
   @IsEnum(TYPES_CR)
   typeCr?: TypeCr;
 
-  @ApiPropertyOptional({ description: 'Filtre LIKE %libelle% case-insensitive.' })
+  @ApiPropertyOptional({
+    description: 'Filtre LIKE %libelle% case-insensitive.',
+  })
   @IsOptional()
   @IsString()
   @MaxLength(200)

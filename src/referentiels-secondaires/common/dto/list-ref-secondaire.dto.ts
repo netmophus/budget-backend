@@ -33,19 +33,22 @@ export class ListRefSecondaireDto {
   @Max(200)
   limit: number = 50;
 
-  @ApiPropertyOptional({ description: "Filtre est_actif (true/false)." })
+  @ApiPropertyOptional({ description: 'Filtre est_actif (true/false).' })
   @IsOptional()
   @Transform(({ value }) => toBoolean(value))
   @IsBoolean()
   estActif?: boolean;
 
-  @ApiPropertyOptional({ description: "Filtre est_systeme (true/false)." })
+  @ApiPropertyOptional({ description: 'Filtre est_systeme (true/false).' })
   @IsOptional()
   @Transform(({ value }) => toBoolean(value))
   @IsBoolean()
   estSysteme?: boolean;
 
-  @ApiPropertyOptional({ description: 'Recherche LIKE %libelle%.', maxLength: 200 })
+  @ApiPropertyOptional({
+    description: 'Recherche LIKE %libelle%.',
+    maxLength: 200,
+  })
   @IsOptional()
   @IsString()
   @MaxLength(200)

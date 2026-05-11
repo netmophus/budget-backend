@@ -30,7 +30,9 @@ describe('UsersService', () => {
     Pick<Repository<User>, 'findOne' | 'findAndCount'>
   > & { manager: { query: jest.Mock } };
   let userRoleRepo: jest.Mocked<Pick<Repository<UserRole>, 'find'>>;
-  let permissionsService: jest.Mocked<Pick<PermissionsService, 'getEffectivePermissions'>>;
+  let permissionsService: jest.Mocked<
+    Pick<PermissionsService, 'getEffectivePermissions'>
+  >;
 
   beforeEach(async () => {
     userRepo = {
@@ -76,7 +78,12 @@ describe('UsersService', () => {
 
     it('applies skip/take from page+limit and forwards filters', async () => {
       userRepo.findAndCount.mockResolvedValue([[], 0]);
-      await service.findAll({ page: 3, limit: 10, email: 'admin', estActif: true });
+      await service.findAll({
+        page: 3,
+        limit: 10,
+        email: 'admin',
+        estActif: true,
+      });
       const callArg = userRepo.findAndCount.mock.calls[0][0]!;
       expect(callArg.skip).toBe(20);
       expect(callArg.take).toBe(10);
@@ -111,7 +118,7 @@ describe('UsersService', () => {
       });
     });
 
-    it("Lot 4.1-fix : sans withPerimetresCount, nombrePerimetresActifs absent (rétrocompat)", async () => {
+    it('Lot 4.1-fix : sans withPerimetresCount, nombrePerimetresActifs absent (rétrocompat)', async () => {
       userRepo.findAndCount.mockResolvedValue([[makeUser()], 1]);
       const result = await service.findAll({ page: 1, limit: 20 });
       expect(result.items[0]).not.toHaveProperty('nombrePerimetresActifs');
@@ -184,8 +191,9 @@ describe('UsersService', () => {
 
     beforeEach(() => {
       // étendre le mock userRepo avec createQueryBuilder
-      (userRepo as unknown as { createQueryBuilder: jest.Mock }).createQueryBuilder =
-        jest.fn();
+      (
+        userRepo as unknown as { createQueryBuilder: jest.Mock }
+      ).createQueryBuilder = jest.fn();
     });
 
     it('retourne [] pour une query vide', async () => {
@@ -193,13 +201,16 @@ describe('UsersService', () => {
       expect(result).toEqual([]);
     });
 
-    it("ILIKE sur email/nom/prenom OR + filtre est_actif=true", async () => {
+    it('ILIKE sur email/nom/prenom OR + filtre est_actif=true', async () => {
       const qb = makeQbReturning([makeUser({ email: 'aicha@test.local' })]);
-      (userRepo as unknown as { createQueryBuilder: jest.Mock }).createQueryBuilder =
-        jest.fn().mockReturnValue(qb);
+      (
+        userRepo as unknown as { createQueryBuilder: jest.Mock }
+      ).createQueryBuilder = jest.fn().mockReturnValue(qb);
       const result = await service.recherche('aich', 10);
       expect(result).toHaveLength(1);
-      expect(qb.where).toHaveBeenCalledWith('u.estActif = :true', { true: true });
+      expect(qb.where).toHaveBeenCalledWith('u.estActif = :true', {
+        true: true,
+      });
       expect(qb.andWhere).toHaveBeenCalledWith(
         '(u.email ILIKE :p OR u.nom ILIKE :p OR u.prenom ILIKE :p)',
         { p: '%aich%' },
@@ -209,16 +220,18 @@ describe('UsersService', () => {
 
     it('borne la limite à 50 (anti-DoS)', async () => {
       const qb = makeQbReturning([]);
-      (userRepo as unknown as { createQueryBuilder: jest.Mock }).createQueryBuilder =
-        jest.fn().mockReturnValue(qb);
+      (
+        userRepo as unknown as { createQueryBuilder: jest.Mock }
+      ).createQueryBuilder = jest.fn().mockReturnValue(qb);
       await service.recherche('test', 9999);
       expect(qb.limit).toHaveBeenCalledWith(50);
     });
 
     it('borne la limite à 1 minimum', async () => {
       const qb = makeQbReturning([]);
-      (userRepo as unknown as { createQueryBuilder: jest.Mock }).createQueryBuilder =
-        jest.fn().mockReturnValue(qb);
+      (
+        userRepo as unknown as { createQueryBuilder: jest.Mock }
+      ).createQueryBuilder = jest.fn().mockReturnValue(qb);
       await service.recherche('test', 0);
       expect(qb.limit).toHaveBeenCalledWith(1);
     });

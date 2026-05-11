@@ -14,9 +14,7 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
  *
  * Idempotent : ON CONFLICT (code) DO NOTHING.
  */
-export class AddRefTypeActionAdminUsers1779200000140
-  implements MigrationInterface
-{
+export class AddRefTypeActionAdminUsers1779200000140 implements MigrationInterface {
   name = 'AddRefTypeActionAdminUsers1779200000140';
 
   public async up(q: QueryRunner): Promise<void> {

@@ -7,10 +7,7 @@
  *  - create (refus doublon) + hook Q9 (Lot 3.2)
  *  - update / softDelete : refus si statut != 'ouvert' (409 Conflict)
  */
-import {
-  ConflictException,
-  NotFoundException,
-} from '@nestjs/common';
+import { ConflictException, NotFoundException } from '@nestjs/common';
 import { DataType, IMemoryDb, newDb } from 'pg-mem';
 import { DataSource, Repository } from 'typeorm';
 
@@ -55,7 +52,11 @@ async function rawInsert(
   attrs: {
     codeVersion: string;
     libelle?: string;
-    typeVersion?: 'budget_initial' | 'reforecast_1' | 'reforecast_2' | 'atterrissage';
+    typeVersion?:
+      | 'budget_initial'
+      | 'reforecast_1'
+      | 'reforecast_2'
+      | 'atterrissage';
     exerciceFiscal?: number;
     statut?: 'ouvert' | 'soumis' | 'valide' | 'gele';
   },
@@ -262,9 +263,7 @@ describe('VersionService', () => {
         codeVersion: 'BUDGET_INITIAL_2026',
         statut: 'valide',
       });
-      await expect(service.softDelete(id)).rejects.toThrow(
-        ConflictException,
-      );
+      await expect(service.softDelete(id)).rejects.toThrow(ConflictException);
     });
 
     it('returns false when id unknown', async () => {
@@ -324,7 +323,7 @@ describe('VersionService', () => {
       expect(count[0]!.c).toBe(1);
     });
 
-    it("idempotence par code : si MEDIAN_<exercice> existe déjà sans exerciceFiscal renseigné, pas de doublon", async () => {
+    it('idempotence par code : si MEDIAN_<exercice> existe déjà sans exerciceFiscal renseigné, pas de doublon', async () => {
       // Cas hérité Lot 2.4 : un scénario MEDIAN_2029 existait avec
       // exerciceFiscal=NULL. Le hook ne doit pas créer un doublon.
       await dataSource.query(
@@ -370,7 +369,10 @@ describe('VersionService', () => {
         type_action: string;
         statut: string;
         id_cible: string | null;
-        payload_apres: { codeScenario?: string; declencheur?: { codeVersion?: string } };
+        payload_apres: {
+          codeScenario?: string;
+          declencheur?: { codeVersion?: string };
+        };
         commentaire: string;
       }>;
       expect(audits).toHaveLength(1);

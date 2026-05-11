@@ -76,7 +76,7 @@ describe('Templates Handlebars (Lot 4.3)', () => {
       ...VARS_BASE,
       codeVersion: 'BI_2027',
       auteurEmail: 'controleur@miznas.local',
-      commentaire: 'Frais d\'exploitation surévalués sur Q3.',
+      commentaire: "Frais d'exploitation surévalués sur Q3.",
       lien_action: '/budget/versions',
     });
     expectValide(html);

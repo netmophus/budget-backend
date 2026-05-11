@@ -54,10 +54,7 @@ const RefTypeVersionController = createRefSecondaireControllerClass<
 );
 
 @Module({
-  imports: [
-    TypeOrmModule.forFeature([RefTypeVersion, DimVersion]),
-    AuthModule,
-  ],
+  imports: [TypeOrmModule.forFeature([RefTypeVersion, DimVersion]), AuthModule],
   providers: [RefTypeVersionService],
   controllers: [RefTypeVersionController],
   exports: [RefTypeVersionService],

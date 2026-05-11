@@ -41,15 +41,18 @@ describe('PasswordExpiredGuard', () => {
     const guard = new PasswordExpiredGuard(makeReflectorWith(true, undefined));
     expect(
       guard.canActivate(
-        makeContext({ userId: '1', email: 'a@b.c', mdpExpire: true, doitChangerMdp: true }),
+        makeContext({
+          userId: '1',
+          email: 'a@b.c',
+          mdpExpire: true,
+          doitChangerMdp: true,
+        }),
       ),
     ).toBe(true);
   });
 
   it('laisse passer une route @AllowExpiredPassword() même avec doitChangerMdp', () => {
-    const guard = new PasswordExpiredGuard(
-      makeReflectorWith(undefined, true),
-    );
+    const guard = new PasswordExpiredGuard(makeReflectorWith(undefined, true));
     expect(
       guard.canActivate(
         makeContext({ userId: '1', email: 'a@b.c', doitChangerMdp: true }),
@@ -63,7 +66,12 @@ describe('PasswordExpiredGuard', () => {
     );
     expect(
       guard.canActivate(
-        makeContext({ userId: '1', email: 'a@b.c', mdpExpire: false, doitChangerMdp: false }),
+        makeContext({
+          userId: '1',
+          email: 'a@b.c',
+          mdpExpire: false,
+          doitChangerMdp: false,
+        }),
       ),
     ).toBe(true);
   });
@@ -104,7 +112,7 @@ describe('PasswordExpiredGuard', () => {
     }
   });
 
-  it("doitChangerMdp prime sur mdpExpire (cas user dans les 2 états)", () => {
+  it('doitChangerMdp prime sur mdpExpire (cas user dans les 2 états)', () => {
     const guard = new PasswordExpiredGuard(
       makeReflectorWith(undefined, undefined),
     );

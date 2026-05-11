@@ -33,10 +33,7 @@ import { DataSource, ILike, Repository } from 'typeorm';
 import { Scd2Service } from '../../common/services/scd2.service';
 import { StructureService } from '../structure/structure.service';
 import { CreateCrDto } from './dto/create-cr.dto';
-import {
-  CrResponseDto,
-  StructureCouranteDto,
-} from './dto/cr-response.dto';
+import { CrResponseDto, StructureCouranteDto } from './dto/cr-response.dto';
 import { ListCrsQueryDto } from './dto/list-crs-query.dto';
 import { PaginatedCrsDto } from './dto/paginated-crs.dto';
 import { UpdateCrDto } from './dto/update-cr.dto';
@@ -96,9 +93,7 @@ export class CentreResponsabiliteService extends Scd2Service<DimCentreResponsabi
 
   // ─── Lecture / liste ──────────────────────────────────────────────
 
-  async findAllPaginated(
-    query: ListCrsQueryDto,
-  ): Promise<PaginatedCrsDto> {
+  async findAllPaginated(query: ListCrsQueryDto): Promise<PaginatedCrsDto> {
     const qb = this.repo
       .createQueryBuilder('cr')
       .leftJoinAndSelect('cr.structure', 'structure');
@@ -220,10 +215,7 @@ export class CentreResponsabiliteService extends Scd2Service<DimCentreResponsabi
 
   // ─── Mutation ─────────────────────────────────────────────────────
 
-  async create(
-    dto: CreateCrDto,
-    utilisateur: string,
-  ): Promise<CrResponseDto> {
+  async create(dto: CreateCrDto, utilisateur: string): Promise<CrResponseDto> {
     const existing = await this.findCurrent(dto.codeCr);
     if (existing) {
       throw new ConflictException(

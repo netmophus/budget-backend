@@ -44,7 +44,11 @@ describe('sanitize', () => {
 
   it('redacts authorization / cookie headers', () => {
     const out = sanitize({
-      headers: { Authorization: 'Bearer abc', cookie: 'session=xyz', host: 'localhost' },
+      headers: {
+        Authorization: 'Bearer abc',
+        cookie: 'session=xyz',
+        host: 'localhost',
+      },
     }) as { headers: Record<string, unknown> };
     expect(out.headers.Authorization).toBe('***REDACTED***');
     expect(out.headers.cookie).toBe('***REDACTED***');

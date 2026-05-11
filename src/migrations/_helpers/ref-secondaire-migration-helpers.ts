@@ -51,15 +51,9 @@ export async function dropRefSecondaireTable(
   q: QueryRunner,
   tableName: string,
 ): Promise<void> {
-  await q.query(
-    `DROP INDEX IF EXISTS "public"."ix_${tableName}_est_systeme"`,
-  );
-  await q.query(
-    `DROP INDEX IF EXISTS "public"."ix_${tableName}_actif_ordre"`,
-  );
-  await q.query(
-    `DROP INDEX IF EXISTS "public"."uq_${tableName}_code"`,
-  );
+  await q.query(`DROP INDEX IF EXISTS "public"."ix_${tableName}_est_systeme"`);
+  await q.query(`DROP INDEX IF EXISTS "public"."ix_${tableName}_actif_ordre"`);
+  await q.query(`DROP INDEX IF EXISTS "public"."uq_${tableName}_code"`);
   await q.query(`DROP TABLE "${tableName}"`);
 }
 

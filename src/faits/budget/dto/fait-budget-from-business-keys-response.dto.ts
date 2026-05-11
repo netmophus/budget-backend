@@ -18,9 +18,7 @@ export type TauxChangeSource =
   | 'auto-cloture'
   | 'auto-moyen-mensuel';
 
-export type MontantFcfaSource =
-  | 'fourni-utilisateur'
-  | 'calcule-automatique';
+export type MontantFcfaSource = 'fourni-utilisateur' | 'calcule-automatique';
 
 export class DimensionResolueDto {
   @ApiProperty({ example: 'compte' })

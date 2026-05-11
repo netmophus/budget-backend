@@ -78,8 +78,7 @@ const SUJETS: Record<TypeEvenement, string> = {
   DELEGATION_EXPIREE: '[MIZNAS] Délégation expirée',
   DELEGATION_REVOQUEE: '[MIZNAS] Délégation révoquée',
   AFFECTATION_CREEE: '[MIZNAS] Nouvelle affectation de périmètre',
-  RESET_PASSWORD_ADMIN:
-    '[MIZNAS] Votre mot de passe a été réinitialisé',
+  RESET_PASSWORD_ADMIN: '[MIZNAS] Votre mot de passe a été réinitialisé',
   RESET_PASSWORD_SELF_SERVICE:
     '[MIZNAS] Réinitialisation de votre mot de passe',
   DELEGATION_RAPPEL_J3_DELEGANT:
@@ -287,14 +286,13 @@ export class NotificationsService {
     typeAction: string,
     idCible: string,
   ): Promise<User | null> {
-    const rows = (await this.userRepo.manager.query<
-      Array<{ utilisateur: string }>
-    >(
-      `SELECT utilisateur FROM audit_log
+    const rows =
+      (await this.userRepo.manager.query<Array<{ utilisateur: string }>>(
+        `SELECT utilisateur FROM audit_log
         WHERE type_action = $1 AND id_cible = $2 AND statut = 'success'
         ORDER BY id DESC LIMIT 1`,
-      [typeAction, String(idCible)],
-    )) ?? [];
+        [typeAction, String(idCible)],
+      )) ?? [];
     if (rows.length === 0) return null;
     return this.userRepo.findOne({ where: { email: rows[0]!.utilisateur } });
   }
@@ -595,22 +593,24 @@ export class NotificationsService {
       .createQueryBuilder('e')
       .where('e.dateCreation >= :j30', { j30 })
       .getCount();
-    const parStatutRows = (await this.emailLogRepo.manager.query<
-      Array<{ statut: StatutEmail; n: string }>
-    >(
-      `SELECT statut, COUNT(*)::text AS n FROM email_log
+    const parStatutRows =
+      (await this.emailLogRepo.manager.query<
+        Array<{ statut: StatutEmail; n: string }>
+      >(
+        `SELECT statut, COUNT(*)::text AS n FROM email_log
         WHERE date_creation >= $1
         GROUP BY statut`,
-      [j30],
-    )) ?? [];
-    const parEvRows = (await this.emailLogRepo.manager.query<
-      Array<{ evenement: string; n: string }>
-    >(
-      `SELECT evenement, COUNT(*)::text AS n FROM email_log
+        [j30],
+      )) ?? [];
+    const parEvRows =
+      (await this.emailLogRepo.manager.query<
+        Array<{ evenement: string; n: string }>
+      >(
+        `SELECT evenement, COUNT(*)::text AS n FROM email_log
         WHERE date_creation >= $1
         GROUP BY evenement`,
-      [j30],
-    )) ?? [];
+        [j30],
+      )) ?? [];
     const parStatut: Record<StatutEmail, number> = {
       EN_ATTENTE: 0,
       EN_COURS: 0,
@@ -637,7 +637,8 @@ export class NotificationsService {
     return {
       id: String(e.id),
       evenement: e.evenement,
-      fkDestinataire: e.fkDestinataire === null ? null : String(e.fkDestinataire),
+      fkDestinataire:
+        e.fkDestinataire === null ? null : String(e.fkDestinataire),
       destinataireEmail: e.destinataireEmail,
       sujet: e.sujet,
       template: e.template,

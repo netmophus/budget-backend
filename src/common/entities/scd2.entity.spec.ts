@@ -48,9 +48,7 @@ describe('Scd2Entity', () => {
   });
 
   it('uses date type for validity boundaries (debut not nullable, fin nullable)', () => {
-    const debut = columns.find(
-      (c) => c.options.name === 'date_debut_validite',
-    );
+    const debut = columns.find((c) => c.options.name === 'date_debut_validite');
     const fin = columns.find((c) => c.options.name === 'date_fin_validite');
     expect(debut?.options.type).toBe('date');
     expect(debut?.options.nullable).toBeFalsy();

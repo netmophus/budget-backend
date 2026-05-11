@@ -15,7 +15,10 @@
  * Utilise `withReuse()` pour accélérer les runs locaux successifs.
  */
 import 'reflect-metadata';
-import { PostgreSqlContainer, StartedPostgreSqlContainer } from '@testcontainers/postgresql';
+import {
+  PostgreSqlContainer,
+  StartedPostgreSqlContainer,
+} from '@testcontainers/postgresql';
 import * as path from 'path';
 import { GenericContainer, type StartedTestContainer } from 'testcontainers';
 import { DataSource } from 'typeorm';
@@ -40,7 +43,10 @@ const SEED_AUTH_BEFORE_TIMESTAMP = 1779200000090;
  * (e.g. "InitAuthSchema1777384329141" → 1777384329141). Les instances
  * n'exposent pas `timestamp` directement.
  */
-function migrationTimestamp(m: { name?: string; constructor?: { name: string } }): number {
+function migrationTimestamp(m: {
+  name?: string;
+  constructor?: { name: string };
+}): number {
   const name = m.name ?? m.constructor?.name ?? '';
   const match = /(\d{13})$/.exec(name);
   return match ? Number(match[1]) : 0;
@@ -87,8 +93,10 @@ export default async function globalSetup(): Promise<void> {
   process.env.DB_NAME = database;
   process.env.JWT_SECRET =
     process.env.JWT_SECRET ?? 'e2e-jwt-secret-' + 'x'.repeat(80);
-  process.env.JWT_ACCESS_EXPIRES_IN = process.env.JWT_ACCESS_EXPIRES_IN ?? '15m';
-  process.env.JWT_REFRESH_EXPIRES_IN = process.env.JWT_REFRESH_EXPIRES_IN ?? '7d';
+  process.env.JWT_ACCESS_EXPIRES_IN =
+    process.env.JWT_ACCESS_EXPIRES_IN ?? '15m';
+  process.env.JWT_REFRESH_EXPIRES_IN =
+    process.env.JWT_REFRESH_EXPIRES_IN ?? '7d';
   process.env.NODE_ENV = 'test';
   process.env.LOG_LEVEL = process.env.LOG_LEVEL ?? 'silent';
   process.env.BCRYPT_ROUNDS = '4';
@@ -99,7 +107,8 @@ export default async function globalSetup(): Promise<void> {
   // dédié rate-limit.e2e-spec.ts override temporairement à 'false'.
   process.env.LOGIN_RATE_LIMIT_DISABLED = 'true';
   process.env.SMTP_FROM = process.env.SMTP_FROM ?? 'miznas-e2e@local';
-  process.env.APP_BASE_URL = process.env.APP_BASE_URL ?? 'http://localhost:5173';
+  process.env.APP_BASE_URL =
+    process.env.APP_BASE_URL ?? 'http://localhost:5173';
   // Lot 6.3 — connexion Redis pour BullMQ (queue 'emails').
   process.env.REDIS_HOST = redisHost;
   process.env.REDIS_PORT = String(redisPort);

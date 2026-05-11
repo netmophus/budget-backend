@@ -127,7 +127,7 @@ async function seedProduits(ds: DataSource): Promise<{
     parentCode: string | null,
     epi = false,
   ) {
-    const parentId = parentCode === null ? null : ids.get(parentCode) ?? null;
+    const parentId = parentCode === null ? null : (ids.get(parentCode) ?? null);
     await ds.query(
       `INSERT INTO dim_produit
         ("code_produit","libelle","type_produit","fk_produit_parent","niveau",
@@ -309,9 +309,7 @@ describe('Produit (e2e) — SCD2 hiérarchique + relink auto-référence straté
       `SELECT type_action, statut FROM audit_log WHERE entite_cible = 'dim_produit'`,
     )) as Array<{ type_action: string; statut: string }>;
     expect(
-      audits.find(
-        (a) => a.type_action === 'CREATE' && a.statut === 'success',
-      ),
+      audits.find((a) => a.type_action === 'CREATE' && a.statut === 'success'),
     ).toBeDefined();
   });
 
@@ -347,10 +345,9 @@ describe('Produit (e2e) — SCD2 hiérarchique + relink auto-référence straté
       .get('/api/v1/referentiels/produits/racines')
       .set('Authorization', `Bearer ${lecteurToken}`)
       .expect(200);
-    expect(res.body.map((r: { codeProduit: string }) => r.codeProduit).sort()).toEqual([
-      'CREDIT_GRP',
-      'DEPOT_GRP',
-    ]);
+    expect(
+      res.body.map((r: { codeProduit: string }) => r.codeProduit).sort(),
+    ).toEqual(['CREDIT_GRP', 'DEPOT_GRP']);
   });
 
   it('GET /produits/par-code/DEPOT_GRP → version courante', async () => {

@@ -28,9 +28,7 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
  *
  * Cf. `docs/modele-donnees.md` §4.6.
  */
-export class EnrichVersionWorkflow1779200000040
-  implements MigrationInterface
-{
+export class EnrichVersionWorkflow1779200000040 implements MigrationInterface {
   name = 'EnrichVersionWorkflow1779200000040';
 
   public async up(q: QueryRunner): Promise<void> {

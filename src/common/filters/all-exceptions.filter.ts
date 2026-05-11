@@ -109,8 +109,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
         // Lot 6.4.A — un `code` applicatif posé par l'exception prime
         // sur le mapping HTTP générique (cf. PasswordExpiredGuard
         // qui distingue MDP_TEMPORAIRE de MDP_EXPIRE).
-        errorCode:
-          codeApplicatif ?? this.errorCodeForHttpStatus(statusCode),
+        errorCode: codeApplicatif ?? this.errorCodeForHttpStatus(statusCode),
       };
     }
 

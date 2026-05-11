@@ -81,7 +81,7 @@ export class PermissionsGuard implements CanActivate {
         utilisateur: user.email,
         ipSource: (req.ip ?? null) as string | null,
         userAgent:
-          ((req.headers['user-agent'] as string | undefined) ?? null) ?? null,
+          (req.headers['user-agent'] as string | undefined) ?? null ?? null,
         typeAction: 'PERMISSION_DENIED',
         entiteCible: 'auth',
         idCible: user.userId,

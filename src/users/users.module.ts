@@ -43,6 +43,11 @@ import { UsersService } from './users.service';
     UserPerimetreService,
     UsersAdminService, // Lot Administration
   ],
-  exports: [TypeOrmModule, UsersService, UserPerimetreService, UsersAdminService],
+  exports: [
+    TypeOrmModule,
+    UsersService,
+    UserPerimetreService,
+    UsersAdminService,
+  ],
 })
 export class UsersModule {}

@@ -94,9 +94,7 @@ async function seedUser(
     ],
   );
   // Repository TypeORM pour avoir le mapping camelCase correct.
-  const u = await ds
-    .getRepository(User)
-    .findOne({ where: { email } });
+  const u = await ds.getRepository(User).findOne({ where: { email } });
   if (!u) throw new Error('seed user not found');
   return u;
 }
@@ -125,8 +123,9 @@ function makePermsMock(
  * l'id du email_log nouvellement créé.
  */
 function makeQueueMock(): EmailQueueProducer & { publier: jest.Mock } {
-  return { publier: jest.fn().mockResolvedValue(undefined) } as unknown as
-    EmailQueueProducer & { publier: jest.Mock };
+  return {
+    publier: jest.fn().mockResolvedValue(undefined),
+  } as unknown as EmailQueueProducer & { publier: jest.Mock };
 }
 
 describe('NotificationsService', () => {
@@ -245,7 +244,7 @@ describe('NotificationsService', () => {
       expect(sendMailMock).not.toHaveBeenCalled();
     });
 
-    it('liste blanche notifications_email_types ne contient pas l\'event → SUPPRIME', async () => {
+    it("liste blanche notifications_email_types ne contient pas l'event → SUPPRIME", async () => {
       const cfg = makeConfig({ EMAIL_DRY_RUN: 'false' });
       service = new NotificationsService(
         ds.getRepository(EmailLog),
@@ -281,7 +280,7 @@ describe('NotificationsService', () => {
       );
     });
 
-    it("E1 BUDGET_SOUMIS → users avec BUDGET.VALIDER (hors auteur)", async () => {
+    it('E1 BUDGET_SOUMIS → users avec BUDGET.VALIDER (hors auteur)', async () => {
       const auteur = await seedUser(ds, 'auteur@miznas.local');
       const valid = await seedUser(ds, 'valid@miznas.local');
       await seedUser(ds, 'autre@miznas.local');
@@ -302,7 +301,7 @@ describe('NotificationsService', () => {
       expect(r.map((u) => u.email)).toEqual(['valid@miznas.local']);
     });
 
-    it("E2 BUDGET_VALIDE → soumetteur (audit lookup) + users BUDGET.PUBLIER", async () => {
+    it('E2 BUDGET_VALIDE → soumetteur (audit lookup) + users BUDGET.PUBLIER', async () => {
       const soum = await seedUser(ds, 'soum@miznas.local');
       const pub = await seedUser(ds, 'pub@miznas.local');
       // Audit log d'une soumission précédente sur cette version
@@ -327,7 +326,7 @@ describe('NotificationsService', () => {
       ]);
     });
 
-    it("E3 BUDGET_REJETE → soumetteur uniquement", async () => {
+    it('E3 BUDGET_REJETE → soumetteur uniquement', async () => {
       const soum = await seedUser(ds, 'soum@miznas.local');
       await seedUser(ds, 'autre@miznas.local');
       await ds.query(
@@ -341,7 +340,7 @@ describe('NotificationsService', () => {
       expect(r.map((u) => u.email)).toEqual(['soum@miznas.local']);
     });
 
-    it("E4 BUDGET_PUBLIE → soumetteur + validateur + saisisseurs", async () => {
+    it('E4 BUDGET_PUBLIE → soumetteur + validateur + saisisseurs', async () => {
       const soum = await seedUser(ds, 'soum@miznas.local');
       const valid = await seedUser(ds, 'valid@miznas.local');
       const sais = await seedUser(ds, 'sais@miznas.local');
@@ -369,7 +368,7 @@ describe('NotificationsService', () => {
       ]);
     });
 
-    it("E5 DELEGATION_CREEE → délégataire (id fourni par listener)", async () => {
+    it('E5 DELEGATION_CREEE → délégataire (id fourni par listener)', async () => {
       const dlg = await seedUser(ds, 'dlg@miznas.local');
       const r = await service.resoudreDestinataires('DELEGATION_CREEE', {
         destinataireUserIds: [dlg.id],
@@ -378,7 +377,7 @@ describe('NotificationsService', () => {
       expect(r[0]!.email).toBe('dlg@miznas.local');
     });
 
-    it("E7 DELEGATION_EXPIREE → délégant + délégataire", async () => {
+    it('E7 DELEGATION_EXPIREE → délégant + délégataire', async () => {
       const a = await seedUser(ds, 'a@miznas.local');
       const b = await seedUser(ds, 'b@miznas.local');
       const r = await service.resoudreDestinataires('DELEGATION_EXPIREE', {
@@ -387,7 +386,7 @@ describe('NotificationsService', () => {
       expect(r).toHaveLength(2);
     });
 
-    it("E8 DELEGATION_REVOQUEE → délégataire", async () => {
+    it('E8 DELEGATION_REVOQUEE → délégataire', async () => {
       const dlg = await seedUser(ds, 'dlg@miznas.local');
       const r = await service.resoudreDestinataires('DELEGATION_REVOQUEE', {
         destinataireUserIds: [dlg.id],
@@ -395,7 +394,7 @@ describe('NotificationsService', () => {
       expect(r.map((u) => u.email)).toEqual(['dlg@miznas.local']);
     });
 
-    it("E9 AFFECTATION_CREEE → user nouvellement affecté", async () => {
+    it('E9 AFFECTATION_CREEE → user nouvellement affecté', async () => {
       const u = await seedUser(ds, 'newbie@miznas.local');
       const r = await service.resoudreDestinataires('AFFECTATION_CREEE', {
         destinataireUserIds: [u.id],

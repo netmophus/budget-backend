@@ -95,7 +95,9 @@ export class BudgetSaisieService {
   async assertTempsPremierDuMois(fkTemps: string): Promise<DimTemps> {
     const temps = await this.tempsRepo.findOne({ where: { id: fkTemps } });
     if (!temps) {
-      throw new NotFoundException(`Période ${fkTemps} introuvable dans dim_temps.`);
+      throw new NotFoundException(
+        `Période ${fkTemps} introuvable dans dim_temps.`,
+      );
     }
     if (temps.jour !== 1) {
       throw new BadRequestException(
@@ -169,7 +171,8 @@ export class BudgetSaisieService {
     ]);
     if (!version) throw new NotFoundException('Version introuvable.');
     if (!scenario) throw new NotFoundException('Scénario introuvable.');
-    if (!cr) throw new NotFoundException('Centre de responsabilité introuvable.');
+    if (!cr)
+      throw new NotFoundException('Centre de responsabilité introuvable.');
 
     // 2-bis. Charger la ligne_metier (pour la réponse + la matrice)
     const ligneMetierEntity = await this.dataSource.query<
@@ -213,9 +216,7 @@ export class BudgetSaisieService {
     if (query.classeCompte) {
       compteQb.andWhere('c.classe = :cl', { cl: query.classeCompte });
     }
-    const comptes = await compteQb
-      .orderBy('c.codeCompte', 'ASC')
-      .getMany();
+    const comptes = await compteQb.orderBy('c.codeCompte', 'ASC').getMany();
 
     // 5. Charger les lignes fait_budget existantes pour (version,
     //    scenario, cr, ligne_metier, mois de l'exercice). Le filtre
@@ -377,7 +378,7 @@ export class BudgetSaisieService {
       return {
         ok: false,
         message:
-          "Aucun produit par défaut disponible (ni PRODUIT_TRANSVERSE, " +
+          'Aucun produit par défaut disponible (ni PRODUIT_TRANSVERSE, ' +
           'ni produit courant). Seed dim_produit nécessaire.',
         code: 'PRODUIT_DEFAUT_ABSENT',
       };
@@ -421,7 +422,8 @@ export class BudgetSaisieService {
     const start = Date.now();
 
     // 1. Périmètre
-    const crAutorises = await this.perimetreService.getCrAutorisesPourUser(userId);
+    const crAutorises =
+      await this.perimetreService.getCrAutorisesPourUser(userId);
     this.assertCrAutorise(dto.crId, crAutorises);
 
     // 2. Charger version pour vérifier statut
@@ -532,8 +534,8 @@ export class BudgetSaisieService {
             continue;
           }
           // Validation mode ENCOURS_TIE
-          const mode: ModeSaisieFaitBudget =
-            (cell.modeSaisie ?? 'MONTANT') as ModeSaisieFaitBudget;
+          const mode: ModeSaisieFaitBudget = (cell.modeSaisie ??
+            'MONTANT') as ModeSaisieFaitBudget;
           if (mode === 'ENCOURS_TIE' && !compte.estPorteurInterets) {
             erreurs.push({
               ligneIndex: i,
@@ -590,9 +592,7 @@ export class BudgetSaisieService {
               continue;
             }
             montantDevise =
-              Math.round(
-                (cell.encoursMoyen * cell.tie * 10000) / 12,
-              ) / 10000;
+              Math.round((cell.encoursMoyen * cell.tie * 10000) / 12) / 10000;
           }
 
           if (existant) {
@@ -601,9 +601,9 @@ export class BudgetSaisieService {
               Number(existant.montantDevise) === montantDevise &&
               existant.modeSaisie === mode &&
               (existant.encoursMoyen ?? null) ===
-                (mode === 'ENCOURS_TIE' ? cell.encoursMoyen ?? null : null) &&
+                (mode === 'ENCOURS_TIE' ? (cell.encoursMoyen ?? null) : null) &&
               (existant.tie ?? null) ===
-                (mode === 'ENCOURS_TIE' ? cell.tie ?? null : null) &&
+                (mode === 'ENCOURS_TIE' ? (cell.tie ?? null) : null) &&
               (existant.commentaire ?? null) === (cell.commentaire ?? null);
             if (inchange) {
               ignorees++;
@@ -614,8 +614,8 @@ export class BudgetSaisieService {
             existant.tauxChangeApplique = 1; // simplification
             existant.modeSaisie = mode;
             existant.encoursMoyen =
-              mode === 'ENCOURS_TIE' ? cell.encoursMoyen ?? null : null;
-            existant.tie = mode === 'ENCOURS_TIE' ? cell.tie ?? null : null;
+              mode === 'ENCOURS_TIE' ? (cell.encoursMoyen ?? null) : null;
+            existant.tie = mode === 'ENCOURS_TIE' ? (cell.tie ?? null) : null;
             existant.commentaire = cell.commentaire ?? null;
             existant.dateModification = new Date();
             existant.utilisateurModification = userEmail;
@@ -662,9 +662,7 @@ export class BudgetSaisieService {
                 tauxChangeApplique: 1,
                 modeSaisie: mode,
                 encoursMoyen:
-                  mode === 'ENCOURS_TIE'
-                    ? (cell.encoursMoyen ?? null)
-                    : null,
+                  mode === 'ENCOURS_TIE' ? (cell.encoursMoyen ?? null) : null,
                 tie: mode === 'ENCOURS_TIE' ? (cell.tie ?? null) : null,
                 commentaire: cell.commentaire ?? null,
                 utilisateurCreation: userEmail,
@@ -679,10 +677,11 @@ export class BudgetSaisieService {
     const dureeMs = Date.now() - start;
 
     // 6. Audit (Lot 4.2-fix.A : enrichissement via_delegation_id)
-    const viaDelegationId = await this.permissionsService.getDelegationContextPour(
-      userId,
-      'BUDGET.SAISIR',
-    );
+    const viaDelegationId =
+      await this.permissionsService.getDelegationContextPour(
+        userId,
+        'BUDGET.SAISIR',
+      );
     await this.auditService.log({
       utilisateur: userEmail,
       typeAction: 'IMPORT_BUDGET',

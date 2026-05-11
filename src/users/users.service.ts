@@ -59,18 +59,19 @@ export class UsersService {
       const today = new Date().toISOString().slice(0, 10);
       const ids = items.map((u) => u.id);
       const placeholders = ids.map((_, i) => `$${i + 1}`).join(',');
-      const counts = (await this.userRepo.manager.query<
-        Array<{ fk_user: string; n: string }>
-      >(
-        `SELECT fk_user, COUNT(*)::text AS n
+      const counts =
+        (await this.userRepo.manager.query<
+          Array<{ fk_user: string; n: string }>
+        >(
+          `SELECT fk_user, COUNT(*)::text AS n
            FROM user_perimetres
           WHERE fk_user IN (${placeholders})
             AND actif = true
             AND date_debut <= $${ids.length + 1}
             AND (date_fin IS NULL OR date_fin >= $${ids.length + 1})
           GROUP BY fk_user`,
-        [...ids, today],
-      )) ?? [];
+          [...ids, today],
+        )) ?? [];
       const byUser = new Map(
         counts.map((c) => [String(c.fk_user), Number(c.n)]),
       );
@@ -101,10 +102,9 @@ export class UsersService {
     const items = await this.userRepo
       .createQueryBuilder('u')
       .where('u.estActif = :true', { true: true })
-      .andWhere(
-        '(u.email ILIKE :p OR u.nom ILIKE :p OR u.prenom ILIKE :p)',
-        { p: pattern },
-      )
+      .andWhere('(u.email ILIKE :p OR u.nom ILIKE :p OR u.prenom ILIKE :p)', {
+        p: pattern,
+      })
       .orderBy('u.email', 'ASC')
       .limit(safeLimit)
       .getMany();
@@ -129,7 +129,8 @@ export class UsersService {
       perimetreId: ur.perimetreId,
     }));
 
-    const permissions = await this.permissionsService.getEffectivePermissions(id);
+    const permissions =
+      await this.permissionsService.getEffectivePermissions(id);
 
     return { ...toUserResponse(user), roles, permissions };
   }

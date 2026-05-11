@@ -23,7 +23,10 @@ export class ScenarioResponseDto {
   @ApiProperty({ enum: ['actif', 'archive'] })
   statut!: StatutScenario;
 
-  @ApiPropertyOptional({ example: 'Hypothèses macro de référence', nullable: true })
+  @ApiPropertyOptional({
+    example: 'Hypothèses macro de référence',
+    nullable: true,
+  })
   commentaire!: string | null;
 
   @ApiPropertyOptional({ example: 2027, nullable: true })

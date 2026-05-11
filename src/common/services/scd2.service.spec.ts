@@ -286,7 +286,11 @@ describe('Scd2Service', () => {
 
   describe('findAllCurrent', () => {
     it('returns only versionCourante=true rows (no extra filter)', async () => {
-      await seed(repo, { codeTest: 'A', libelle: 'A-cur', versionCourante: true });
+      await seed(repo, {
+        codeTest: 'A',
+        libelle: 'A-cur',
+        versionCourante: true,
+      });
       await seed(repo, {
         codeTest: 'A',
         libelle: 'A-old',
@@ -294,7 +298,11 @@ describe('Scd2Service', () => {
         dateDebutValidite: '2024-01-01',
         dateFinValidite: '2025-01-01',
       });
-      await seed(repo, { codeTest: 'B', libelle: 'B-cur', versionCourante: true });
+      await seed(repo, {
+        codeTest: 'B',
+        libelle: 'B-cur',
+        versionCourante: true,
+      });
 
       const all = await service.findAllCurrent();
       expect(all).toHaveLength(2);

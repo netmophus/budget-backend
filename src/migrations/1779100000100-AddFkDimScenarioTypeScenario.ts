@@ -8,9 +8,7 @@ import {
 const CHECK_NAME = 'ck_dim_scenario_type';
 const RECREATE_CHECK = `"type_scenario" IN ('central','optimiste','pessimiste','alternatif')`;
 
-export class AddFkDimScenarioTypeScenario1779100000100
-  implements MigrationInterface
-{
+export class AddFkDimScenarioTypeScenario1779100000100 implements MigrationInterface {
   name = 'AddFkDimScenarioTypeScenario1779100000100';
 
   public async up(q: QueryRunner): Promise<void> {

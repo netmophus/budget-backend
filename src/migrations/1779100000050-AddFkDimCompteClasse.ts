@@ -27,16 +27,12 @@ export class AddFkDimCompteClasse1779100000050 implements MigrationInterface {
       `ALTER TABLE "dim_compte" ADD COLUMN "classe_str" varchar(50)`,
     );
     // 2. Copie avec cast
-    await q.query(
-      `UPDATE "dim_compte" SET "classe_str" = "classe"::varchar`,
-    );
+    await q.query(`UPDATE "dim_compte" SET "classe_str" = "classe"::varchar`);
     // 3. Drop CHECK contrainte historique + index sur l'int + colonne
     await q.query(
       `ALTER TABLE "dim_compte" DROP CONSTRAINT IF EXISTS "ck_dim_compte_classe"`,
     );
-    await q.query(
-      `DROP INDEX IF EXISTS "public"."ix_dim_compte_classe"`,
-    );
+    await q.query(`DROP INDEX IF EXISTS "public"."ix_dim_compte_classe"`);
     await q.query(`ALTER TABLE "dim_compte" DROP COLUMN "classe"`);
     // 4. Renommer
     await q.query(
@@ -62,18 +58,12 @@ export class AddFkDimCompteClasse1779100000050 implements MigrationInterface {
   public async down(q: QueryRunner): Promise<void> {
     // Reverse complet : varchar → int. Cast inverse, fonctionne
     // tant que les valeurs sont '1'..'9'.
-    await q.query(
-      `DROP INDEX IF EXISTS "public"."ix_dim_compte_classe"`,
-    );
+    await q.query(`DROP INDEX IF EXISTS "public"."ix_dim_compte_classe"`);
     await q.query(
       `ALTER TABLE "dim_compte" DROP CONSTRAINT IF EXISTS "fk_dim_compte_classe"`,
     );
-    await q.query(
-      `ALTER TABLE "dim_compte" ADD COLUMN "classe_int" int`,
-    );
-    await q.query(
-      `UPDATE "dim_compte" SET "classe_int" = "classe"::int`,
-    );
+    await q.query(`ALTER TABLE "dim_compte" ADD COLUMN "classe_int" int`);
+    await q.query(`UPDATE "dim_compte" SET "classe_int" = "classe"::int`);
     await q.query(`ALTER TABLE "dim_compte" DROP COLUMN "classe"`);
     await q.query(
       `ALTER TABLE "dim_compte" RENAME COLUMN "classe_int" TO "classe"`,

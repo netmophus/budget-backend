@@ -138,13 +138,11 @@ describe('temps-seed (pure functions)', () => {
 
     it('marks all weekends as non-working days across a sample year', () => {
       const rows = generateTempsRows(2026, 2026);
-      const weekendsNotOuvres = rows.filter(
-        (r) => {
-          const d = new Date(`${r.date}T00:00:00Z`);
-          const dayOfWeek = d.getUTCDay();
-          return (dayOfWeek === 0 || dayOfWeek === 6) && r.jourOuvre;
-        },
-      );
+      const weekendsNotOuvres = rows.filter((r) => {
+        const d = new Date(`${r.date}T00:00:00Z`);
+        const dayOfWeek = d.getUTCDay();
+        return (dayOfWeek === 0 || dayOfWeek === 6) && r.jourOuvre;
+      });
       expect(weekendsNotOuvres).toHaveLength(0);
     });
 

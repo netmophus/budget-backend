@@ -57,10 +57,7 @@ const RefClasseCompteController = createRefSecondaireControllerClass<
 );
 
 @Module({
-  imports: [
-    TypeOrmModule.forFeature([RefClasseCompte, DimCompte]),
-    AuthModule,
-  ],
+  imports: [TypeOrmModule.forFeature([RefClasseCompte, DimCompte]), AuthModule],
   providers: [RefClasseCompteService],
   controllers: [RefClasseCompteController],
   exports: [RefClasseCompteService],

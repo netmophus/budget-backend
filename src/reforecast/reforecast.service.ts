@@ -261,8 +261,7 @@ export class ReforecastService {
         statutPublicationApres: 'OBSOLETE',
         fkVersionRemplacante: fkRemplacante,
       },
-      commentaire:
-        `Reforecast ${versionId} marqué OBSOLETE (remplacé par ${fkRemplacante}).`,
+      commentaire: `Reforecast ${versionId} marqué OBSOLETE (remplacé par ${fkRemplacante}).`,
     });
   }
 
@@ -397,7 +396,11 @@ export class ReforecastService {
         p.anneeConsolide,
       ]);
     } else {
-      await this.genererLignesFuturMoyenneTrimestre(manager, p, moisFinConsolide);
+      await this.genererLignesFuturMoyenneTrimestre(
+        manager,
+        p,
+        moisFinConsolide,
+      );
     }
 
     const cnt = (await manager.query(
@@ -498,13 +501,16 @@ export class ReforecastService {
         GROUP BY fr.fk_centre_responsabilite, fr.fk_compte,
                  fr.fk_ligne_metier, fr.fk_devise`,
       [p.anneeConsolide, moisDebut, moisFin],
-    )) as Array<{ cr: string; cpt: string; lm: string; dev: string; m: number }>;
+    )) as Array<{
+      cr: string;
+      cpt: string;
+      lm: string;
+      dev: string;
+      m: number;
+    }>;
     const moyMap = new Map<string, number>();
     for (const r of moyennesRows) {
-      moyMap.set(
-        `${r.cr}|${r.cpt}|${r.lm}|${r.dev}`,
-        Number(r.m),
-      );
+      moyMap.set(`${r.cr}|${r.cpt}|${r.lm}|${r.dev}`, Number(r.m));
     }
 
     // 2) Récupérer les lignes futures du source
@@ -518,7 +524,12 @@ export class ReforecastService {
           AND fb.fk_scenario = $2::bigint
           AND t.annee = $3
           AND t.mois > $4`,
-      [p.sourceVersionId, p.sourceScenarioId, p.anneeConsolide, moisFinConsolide],
+      [
+        p.sourceVersionId,
+        p.sourceScenarioId,
+        p.anneeConsolide,
+        moisFinConsolide,
+      ],
     )) as Array<{
       fk_temps: string;
       fk_compte: string;
@@ -578,7 +589,10 @@ export class ReforecastService {
     }
   }
 
-  private async countLignes(m: EntityManager, versionId: string): Promise<number> {
+  private async countLignes(
+    m: EntityManager,
+    versionId: string,
+  ): Promise<number> {
     const cnt = (await m.query(
       `SELECT COUNT(*)::int AS n FROM fait_budget WHERE fk_version = $1::bigint`,
       [versionId],
@@ -599,9 +613,7 @@ export class ReforecastService {
   // Comparaison reforecast ↔ version source
   // ═══════════════════════════════════════════════════════════════
 
-  async getComparaison(
-    id: string,
-  ): Promise<{
+  async getComparaison(id: string): Promise<{
     lignes: Array<{
       fkCentre: string;
       codeCr: string;

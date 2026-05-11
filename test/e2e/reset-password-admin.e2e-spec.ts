@@ -200,5 +200,4 @@ describe('E2E.10 — Reset password admin async + email', () => {
       .expect(200);
     expect(loginRes.body.doitChangerMdp).toBe(true);
   });
-
 });

@@ -235,7 +235,7 @@ describe('CompteImportService', () => {
 
   // ─── Doublon insert-only → SKIP
 
-  it('mode insert-only : doublon existant → skipped (pas d\'erreur)', async () => {
+  it("mode insert-only : doublon existant → skipped (pas d'erreur)", async () => {
     await rawInsert(dataSource, {
       codeCompte: '6',
       classe: '6',
@@ -327,7 +327,7 @@ describe('CompteImportService', () => {
 
   // ─── CSV vide
 
-  it('CSV avec uniquement l\'entête → totalLines=0, rapport vide', async () => {
+  it("CSV avec uniquement l'entête → totalLines=0, rapport vide", async () => {
     const path = writeCsv('empty.csv', [HEADER]);
 
     const report = await importService.importCsv(path, 'insert-only', 'tester');
@@ -343,11 +343,8 @@ describe('CompteImportService', () => {
 
   // ─── importBuffer (wrapper temp file)
 
-  it('importBuffer écrit un fichier temporaire et nettoie après l\'import', async () => {
-    const csv = [
-      HEADER,
-      '6,CHARGES,6,,,1,D,,false,false',
-    ].join('\n');
+  it("importBuffer écrit un fichier temporaire et nettoie après l'import", async () => {
+    const csv = [HEADER, '6,CHARGES,6,,,1,D,,false,false'].join('\n');
 
     const report = await importService.importBuffer(
       Buffer.from(csv, 'utf-8'),

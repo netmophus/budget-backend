@@ -39,8 +39,7 @@ export class ScenarioController {
   @Get()
   @RequirePermissions('REFERENTIEL.LIRE')
   @ApiOperation({
-    summary:
-      'Liste paginée des scénarios (filtres statut, typeScenario).',
+    summary: 'Liste paginée des scénarios (filtres statut, typeScenario).',
   })
   @ApiOkResponse({ type: PaginatedScenariosDto })
   findAll(
@@ -97,7 +96,7 @@ export class ScenarioController {
   @ApiOkResponse({ type: ScenarioResponseDto })
   @ApiNotFoundResponse()
   @ApiConflictResponse({
-    description: "Scenario archivé — modification refusée.",
+    description: 'Scenario archivé — modification refusée.',
   })
   update(
     @Param('id') id: string,

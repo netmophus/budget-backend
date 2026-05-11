@@ -55,12 +55,24 @@ async function createDataSource(): Promise<DataSource> {
     type: 'postgres',
     entities: [
       AuditLog,
-      User, UserRole, UserPerimetre,
-      Role, Permission, RolePermission,
-      DimStructure, DimCentreResponsabilite, DimCompte,
-      DimLigneMetier, DimDevise, DimProduit, DimSegment,
-      DimTemps, DimVersion, DimScenario,
-      FaitBudget, FaitRealise,
+      User,
+      UserRole,
+      UserPerimetre,
+      Role,
+      Permission,
+      RolePermission,
+      DimStructure,
+      DimCentreResponsabilite,
+      DimCompte,
+      DimLigneMetier,
+      DimDevise,
+      DimProduit,
+      DimSegment,
+      DimTemps,
+      DimVersion,
+      DimScenario,
+      FaitBudget,
+      FaitRealise,
     ],
     synchronize: true,
   }) as DataSource;
@@ -83,7 +95,9 @@ async function seed(ds: DataSource): Promise<SeedIds> {
         date_debut_validite, version_courante, est_actif, utilisateur_creation)
      VALUES ('S','S','filiale',1,'2026-01-01',true,true,'system')`,
   );
-  const struct = (await ds.query(`SELECT id FROM dim_structure`)) as Array<{ id: string }>;
+  const struct = (await ds.query(`SELECT id FROM dim_structure`)) as Array<{
+    id: string;
+  }>;
   await ds.query(
     `INSERT INTO dim_centre_responsabilite
        (code_cr, libelle, type_cr, fk_structure, date_debut_validite,
@@ -91,7 +105,9 @@ async function seed(ds: DataSource): Promise<SeedIds> {
      VALUES ('CR','CR','profit_center',$1::bigint,'2026-01-01',true,true,'system')`,
     [struct[0]!.id],
   );
-  const cr = (await ds.query(`SELECT id FROM dim_centre_responsabilite`)) as Array<{ id: string }>;
+  const cr = (await ds.query(
+    `SELECT id FROM dim_centre_responsabilite`,
+  )) as Array<{ id: string }>;
   await ds.query(
     `INSERT INTO dim_compte
        (code_compte, libelle, classe, niveau, est_compte_collectif,
@@ -99,46 +115,60 @@ async function seed(ds: DataSource): Promise<SeedIds> {
         est_actif, utilisateur_creation)
      VALUES ('611','C','6',4,false,false,'2026-01-01',true,true,'system')`,
   );
-  const cpt = (await ds.query(`SELECT id FROM dim_compte`)) as Array<{ id: string }>;
+  const cpt = (await ds.query(`SELECT id FROM dim_compte`)) as Array<{
+    id: string;
+  }>;
   await ds.query(
     `INSERT INTO dim_ligne_metier
        (code_ligne_metier, libelle, niveau, date_debut_validite,
         version_courante, est_actif, utilisateur_creation)
      VALUES ('LM','LM',1,'2026-01-01',true,true,'system')`,
   );
-  const lm = (await ds.query(`SELECT id FROM dim_ligne_metier`)) as Array<{ id: string }>;
+  const lm = (await ds.query(`SELECT id FROM dim_ligne_metier`)) as Array<{
+    id: string;
+  }>;
   await ds.query(
     `INSERT INTO dim_devise (code_iso, libelle, symbole, nb_decimales,
        est_devise_pivot, est_active, utilisateur_creation)
      VALUES ('XOF','F CFA','F CFA',0,true,true,'system')`,
   );
-  const dev = (await ds.query(`SELECT id FROM dim_devise`)) as Array<{ id: string }>;
+  const dev = (await ds.query(`SELECT id FROM dim_devise`)) as Array<{
+    id: string;
+  }>;
   await ds.query(
     `INSERT INTO dim_produit (code_produit, libelle, type_produit, niveau,
        est_porteur_interets, date_debut_validite, version_courante,
        est_actif, utilisateur_creation)
      VALUES ('P','P','autre',1,false,'2026-01-01',true,true,'system')`,
   );
-  const prod = (await ds.query(`SELECT id FROM dim_produit`)) as Array<{ id: string }>;
+  const prod = (await ds.query(`SELECT id FROM dim_produit`)) as Array<{
+    id: string;
+  }>;
   await ds.query(
     `INSERT INTO dim_segment (code_segment, libelle, categorie,
        date_debut_validite, version_courante, est_actif, utilisateur_creation)
      VALUES ('S','S','particulier','2026-01-01',true,true,'system')`,
   );
-  const seg = (await ds.query(`SELECT id FROM dim_segment`)) as Array<{ id: string }>;
+  const seg = (await ds.query(`SELECT id FROM dim_segment`)) as Array<{
+    id: string;
+  }>;
   await ds.query(
     `INSERT INTO dim_temps
        (date, annee, trimestre, mois, jour, jour_ouvre, est_fin_de_mois,
         est_fin_de_trimestre, est_fin_d_annee, exercice_fiscal, libelle_mois)
      VALUES ('2027-01-01',2027,1,1,1,true,false,false,false,2027,'M1')`,
   );
-  const t = (await ds.query(`SELECT id FROM dim_temps`)) as Array<{ id: string }>;
+  const t = (await ds.query(`SELECT id FROM dim_temps`)) as Array<{
+    id: string;
+  }>;
   await ds.query(
     `INSERT INTO dim_scenario (code_scenario, libelle, type_scenario,
        statut, exercice_fiscal, utilisateur_creation)
      VALUES ('S','S','central','actif',2027,'system')`,
   );
-  const sce = (await ds.query(`SELECT id FROM dim_scenario`)) as Array<{ id: string }>;
+  const sce = (await ds.query(`SELECT id FROM dim_scenario`)) as Array<{
+    id: string;
+  }>;
 
   // Version BUDGET (publiée) qui sert de source
   await ds.query(
@@ -179,8 +209,16 @@ async function seed(ds: DataSource): Promise<SeedIds> {
                $6::bigint, $7::bigint, $8::bigint, $9::bigint, $10::bigint,
                1000, 1000, 1, 'MONTANT', 'system')`,
       [
-        t[0]!.id, cpt[0]!.id, struct[0]!.id, cr[0]!.id, lm[0]!.id,
-        prod[0]!.id, seg[0]!.id, dev[0]!.id, fkVer, sce[0]!.id,
+        t[0]!.id,
+        cpt[0]!.id,
+        struct[0]!.id,
+        cr[0]!.id,
+        lm[0]!.id,
+        prod[0]!.id,
+        seg[0]!.id,
+        dev[0]!.id,
+        fkVer,
+        sce[0]!.id,
       ],
     );
   }
@@ -238,7 +276,9 @@ describe('VersionWorkflowService — comportement spécifique reforecast (Lot 5.
       [ids.versionBudgetId],
     )) as Array<{ type_action: string }>;
     expect(audits.map((a) => a.type_action)).toContain('SOUMETTRE_BUDGET');
-    expect(audits.map((a) => a.type_action)).not.toContain('SOUMETTRE_REFORECAST');
+    expect(audits.map((a) => a.type_action)).not.toContain(
+      'SOUMETTRE_REFORECAST',
+    );
   });
 
   it('valider un reforecast émet VALIDER_REFORECAST', async () => {
@@ -270,7 +310,10 @@ describe('VersionWorkflowService — comportement spécifique reforecast (Lot 5.
       `SELECT type_action, payload_apres FROM audit_log
         WHERE id_cible = $1::text AND type_action = 'REJETER_REFORECAST'`,
       [ids.versionReforecastId],
-    )) as Array<{ type_action: string; payload_apres: { commentaireRejet?: string } }>;
+    )) as Array<{
+      type_action: string;
+      payload_apres: { commentaireRejet?: string };
+    }>;
     expect(audits).toHaveLength(1);
     expect(audits[0]!.payload_apres.commentaireRejet).toBe('Mauvaise méthode');
   });

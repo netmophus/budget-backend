@@ -89,7 +89,7 @@ describe('Migrations FK ref_* (Lot 2.5-bis-B)', () => {
     },
   ];
 
-  it('expose 13 migrations dans l\'ordre croissant des timestamps', () => {
+  it("expose 13 migrations dans l'ordre croissant des timestamps", () => {
     expect(MIGRATIONS).toHaveLength(13);
     const timestamps = MIGRATIONS.map((m) => {
       const match = m.name.match(/(\d{13})$/);

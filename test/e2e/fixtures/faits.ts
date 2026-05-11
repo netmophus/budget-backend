@@ -43,7 +43,12 @@ export async function insertFaitBudget(
     [params.fkCentreResponsabilite, codeProduit, codeSegment],
   )) as Array<{ fk_structure: string; fk_produit: string; fk_segment: string }>;
 
-  if (!meta[0] || !meta[0].fk_structure || !meta[0].fk_produit || !meta[0].fk_segment) {
+  if (
+    !meta[0] ||
+    !meta[0].fk_structure ||
+    !meta[0].fk_produit ||
+    !meta[0].fk_segment
+  ) {
     throw new Error(
       `[e2e fixture insertFaitBudget] FK indirectes introuvables : structure=${meta[0]?.fk_structure}, produit=${meta[0]?.fk_produit}, segment=${meta[0]?.fk_segment}`,
     );

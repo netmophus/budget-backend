@@ -61,7 +61,12 @@ export class UserPerimetre {
   })
   cibleCrIds!: string[] | null;
 
-  @Column({ name: 'origine', type: 'varchar', length: 30, default: 'PRINCIPAL' })
+  @Column({
+    name: 'origine',
+    type: 'varchar',
+    length: 30,
+    default: 'PRINCIPAL',
+  })
   origine!: OriginePerimetre;
 
   @Column({ name: 'delegation_id', type: 'bigint', nullable: true })

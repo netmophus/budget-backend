@@ -129,9 +129,7 @@ export class CompteController {
   @RequirePermissions('REFERENTIEL.LIRE')
   @ApiOperation({ summary: 'Descendants récursifs (version courante).' })
   @ApiOkResponse({ type: [CompteResponseDto] })
-  async findDescendants(
-    @Param('id') id: string,
-  ): Promise<CompteResponseDto[]> {
+  async findDescendants(@Param('id') id: string): Promise<CompteResponseDto[]> {
     const rows = await this.compteService.findDescendants(id);
     return rows.map((r) => this.mapRow(r));
   }
@@ -140,9 +138,7 @@ export class CompteController {
   @RequirePermissions('REFERENTIEL.LIRE')
   @ApiOperation({ summary: "Ancêtres jusqu'à la racine (version courante)." })
   @ApiOkResponse({ type: [CompteResponseDto] })
-  async findAncestors(
-    @Param('id') id: string,
-  ): Promise<CompteResponseDto[]> {
+  async findAncestors(@Param('id') id: string): Promise<CompteResponseDto[]> {
     const rows = await this.compteService.findAncestors(id);
     return rows.map((r) => this.mapRow(r));
   }
@@ -258,7 +254,8 @@ export class CompteController {
   @ApiNoContentResponse()
   @ApiNotFoundResponse()
   @ApiConflictResponse({
-    description: 'Le compte a des enfants courants — fermer/transférer d\'abord.',
+    description:
+      "Le compte a des enfants courants — fermer/transférer d'abord.",
   })
   async desactiver(
     @Param('codeCompte') codeCompte: string,
@@ -269,7 +266,9 @@ export class CompteController {
 
   // ─── helpers
 
-  private mapRow(r: import('./entities/dim-compte.entity').DimCompte): CompteResponseDto {
+  private mapRow(
+    r: import('./entities/dim-compte.entity').DimCompte,
+  ): CompteResponseDto {
     return {
       id: r.id,
       codeCompte: r.codeCompte,

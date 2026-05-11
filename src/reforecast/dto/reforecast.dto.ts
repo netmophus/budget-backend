@@ -219,9 +219,7 @@ export class RejeterReforecastDto {
   @IsString()
   @IsNotEmpty()
   @MaxLength(2000)
-  @Transform(({ value }) =>
-    typeof value === 'string' ? value.trim() : value,
-  )
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
   commentaire!: string;
 }
 

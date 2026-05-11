@@ -13,7 +13,8 @@ const SEEDS: RefSecondaireSeed[] = [
   {
     code: 'central',
     libelle: 'Central',
-    description: 'Hypothèses macro de référence (taux directeur BCEAO, croissance UEMOA).',
+    description:
+      'Hypothèses macro de référence (taux directeur BCEAO, croissance UEMOA).',
     ordre: 10,
     estSysteme: true,
   },

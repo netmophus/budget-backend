@@ -122,7 +122,9 @@ export const STRUCTURES_INITIALES: readonly StructureSeedRow[] = [
   },
 ];
 
-export async function seedStructures(ds: DataSource = AppDataSource): Promise<void> {
+export async function seedStructures(
+  ds: DataSource = AppDataSource,
+): Promise<void> {
   const ownsConnection = !ds.isInitialized;
   if (ownsConnection) {
     await ds.initialize();
@@ -197,7 +199,11 @@ export async function seedStructures(ds: DataSource = AppDataSource): Promise<vo
          COUNT(*) FILTER (WHERE fk_structure_parent IS NULL)::int AS racines
        FROM dim_structure`,
     );
-    const row = stats[0] as { total: number; courantes: number; racines: number };
+    const row = stats[0] as {
+      total: number;
+      courantes: number;
+      racines: number;
+    };
     console.log(
       `[seed:structures] total=${row.total} courantes=${row.courantes} racines=${row.racines} (attendu : 9 / 9 / 1)`,
     );

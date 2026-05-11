@@ -8,9 +8,7 @@ import {
 const CHECK_NAME = 'ck_dim_segment_categorie';
 const RECREATE_CHECK = `"categorie" IN ('particulier','professionnel','pme','grande_entreprise','institutionnel','secteur_public')`;
 
-export class AddFkDimSegmentCategorie1779100000070
-  implements MigrationInterface
-{
+export class AddFkDimSegmentCategorie1779100000070 implements MigrationInterface {
   name = 'AddFkDimSegmentCategorie1779100000070';
 
   public async up(q: QueryRunner): Promise<void> {

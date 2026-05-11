@@ -67,7 +67,8 @@ const ALPHA_MAJUSCULE = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
 const ALPHA_MINUSCULE = 'abcdefghijkmnpqrstuvwxyz';
 const ALPHA_CHIFFRE = '23456789';
 const ALPHA_SPECIAL = '!@#$%&*?';
-const ALPHA_TOUS = ALPHA_MAJUSCULE + ALPHA_MINUSCULE + ALPHA_CHIFFRE + ALPHA_SPECIAL;
+const ALPHA_TOUS =
+  ALPHA_MAJUSCULE + ALPHA_MINUSCULE + ALPHA_CHIFFRE + ALPHA_SPECIAL;
 
 function pickChar(alphabet: string): string {
   const idx = randomBytes(1)[0]! % alphabet.length;

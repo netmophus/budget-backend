@@ -42,7 +42,9 @@ export class ListProduitsQueryDto {
   @IsIn(TYPE_PRODUIT_VALUES as readonly string[])
   typeProduit?: TypeProduit;
 
-  @ApiPropertyOptional({ description: 'Filtre LIKE %libelle% case-insensitive.' })
+  @ApiPropertyOptional({
+    description: 'Filtre LIKE %libelle% case-insensitive.',
+  })
   @IsOptional()
   @IsString()
   @MaxLength(200)

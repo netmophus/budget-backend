@@ -16,9 +16,7 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
  * pour les permissions / codes audit, INSERT WHERE NOT EXISTS pour
  * les bridges_role_permission (pas d'index UNIQUE en base).
  */
-export class CreerFaitRealiseEtPermissions1779200000150
-  implements MigrationInterface
-{
+export class CreerFaitRealiseEtPermissions1779200000150 implements MigrationInterface {
   name = 'CreerFaitRealiseEtPermissions1779200000150';
 
   public async up(q: QueryRunner): Promise<void> {

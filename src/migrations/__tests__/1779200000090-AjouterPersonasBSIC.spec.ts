@@ -97,7 +97,7 @@ describe('Migration AjouterPersonasBSIC1779200000090', () => {
     await dataSource.destroy();
   });
 
-  it("crée les 6 personas avec est_actif=true", async () => {
+  it('crée les 6 personas avec est_actif=true', async () => {
     await migration.up(queryRunner);
     const placeholders = PERSONAS_EMAILS.map((_, i) => `$${i + 1}`).join(',');
     const rows = (await dataSource.query(
@@ -137,7 +137,7 @@ describe('Migration AjouterPersonasBSIC1779200000090', () => {
     expect(rows[0]!.mot_de_passe_hash).toMatch(/^\$2b\$10\$/);
   });
 
-  it("idempotente : 2× up sans doublons", async () => {
+  it('idempotente : 2× up sans doublons', async () => {
     await migration.up(queryRunner);
     await migration.up(queryRunner); // 2e appel
     const placeholders = PERSONAS_EMAILS.map((_, i) => `$${i + 1}`).join(',');

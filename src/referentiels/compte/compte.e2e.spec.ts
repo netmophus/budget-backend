@@ -129,7 +129,7 @@ async function seedAll(ds: DataSource): Promise<SeedIds> {
     parentCode: string | null,
     sens: string | null = null,
   ) {
-    const parentId = parentCode === null ? null : ids.get(parentCode) ?? null;
+    const parentId = parentCode === null ? null : (ids.get(parentCode) ?? null);
     await ds.query(
       `INSERT INTO dim_compte
         ("code_compte","libelle","classe","sous_classe","fk_compte_parent",
@@ -153,7 +153,7 @@ async function seedAll(ds: DataSource): Promise<SeedIds> {
   await ins('611200', 'Primes et bonus', 6, 4, '611', 'D');
   // Comptes classe 7 pour valider le filtre `classes=6,7` (Lot 3 UX A.1).
   await ins('7', 'PRODUITS', 7, 1, null, 'C');
-  await ins('70', 'Produits d\'exploitation', 7, 2, '7', 'C');
+  await ins('70', "Produits d'exploitation", 7, 2, '7', 'C');
   await ins('701', 'Intérêts perçus', 7, 3, '70', 'C');
   await ins('701100', 'Intérêts sur prêts', 7, 4, '701', 'C');
 
@@ -178,7 +178,8 @@ describe('Compte (e2e) — 3ᵉ dimension SCD2 + relink auto-référence straté
 
   beforeAll(async () => {
     process.env.NODE_ENV = 'test';
-    process.env.JWT_SECRET = 'test-secret-compte-e2e-min-32-chars-eeeeeeeeeeeeeeee';
+    process.env.JWT_SECRET =
+      'test-secret-compte-e2e-min-32-chars-eeeeeeeeeeeeeeee';
     process.env.JWT_ACCESS_EXPIRES_IN = '15m';
     process.env.JWT_REFRESH_EXPIRES_IN = '7d';
     process.env.BCRYPT_ROUNDS = '4';
@@ -288,7 +289,7 @@ describe('Compte (e2e) — 3ᵉ dimension SCD2 + relink auto-référence straté
       sens: string | null = null,
     ) {
       const parentId =
-        parentCode === null ? null : localIds.get(parentCode) ?? null;
+        parentCode === null ? null : (localIds.get(parentCode) ?? null);
       await dataSource.query(
         `INSERT INTO dim_compte
           ("code_compte","libelle","classe","sous_classe","fk_compte_parent",
@@ -312,7 +313,7 @@ describe('Compte (e2e) — 3ᵉ dimension SCD2 + relink auto-référence straté
     await ins('611200', 'Primes et bonus', 6, 4, '611', 'D');
     // Classe 7 — pour valider le filtre `classes=6,7` (UX A.1).
     await ins('7', 'PRODUITS', 7, 1, null, 'C');
-    await ins('70', 'Produits d\'exploitation', 7, 2, '7', 'C');
+    await ins('70', "Produits d'exploitation", 7, 2, '7', 'C');
     await ins('701', 'Intérêts perçus', 7, 3, '70', 'C');
     await ins('701100', 'Intérêts sur prêts', 7, 4, '701', 'C');
 
@@ -375,7 +376,13 @@ describe('Compte (e2e) — 3ᵉ dimension SCD2 + relink auto-référence straté
     await request(app.getHttpServer())
       .post('/api/v1/referentiels/comptes')
       .set('Authorization', `Bearer ${lecteurToken}`)
-      .send({ codeCompte: '999', libelle: 'X', classe: '6', niveau: 2, codeCompteParent: '6' })
+      .send({
+        codeCompte: '999',
+        libelle: 'X',
+        classe: '6',
+        niveau: 2,
+        codeCompteParent: '6',
+      })
       .expect(403);
   });
 
@@ -398,7 +405,9 @@ describe('Compte (e2e) — 3ᵉ dimension SCD2 + relink auto-référence straté
     const audits = (await dataSource.query(
       `SELECT type_action, statut FROM audit_log WHERE entite_cible = 'dim_compte'`,
     )) as Array<{ type_action: string; statut: string }>;
-    expect(audits.find((a) => a.type_action === 'CREATE' && a.statut === 'success')).toBeDefined();
+    expect(
+      audits.find((a) => a.type_action === 'CREATE' && a.statut === 'success'),
+    ).toBeDefined();
   });
 
   it('POST /comptes avec codeCompte existant → 409', async () => {
@@ -510,7 +519,11 @@ describe('Compte (e2e) — 3ᵉ dimension SCD2 + relink auto-référence straté
     const versions611 = (await dataSource.query(
       `SELECT id, libelle, version_courante FROM dim_compte
        WHERE code_compte = '611' ORDER BY date_debut_validite ASC`,
-    )) as Array<{ id: string | number; libelle: string; version_courante: boolean }>;
+    )) as Array<{
+      id: string | number;
+      libelle: string;
+      version_courante: boolean;
+    }>;
     expect(versions611).toHaveLength(2);
     const newId = String(versions611.find((v) => v.version_courante)!.id);
     expect(newId).not.toBe(ancienId);

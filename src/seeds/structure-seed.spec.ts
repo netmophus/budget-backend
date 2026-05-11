@@ -40,7 +40,9 @@ describe('structure-seed (data shape)', () => {
 
   it('AG_ABJ_PLATEAU has 4 ancestors up to SOC_BANK_UEMOA', () => {
     // Walks the parentCode chain.
-    const byCode = new Map(STRUCTURES_INITIALES.map((s) => [s.codeStructure, s]));
+    const byCode = new Map(
+      STRUCTURES_INITIALES.map((s) => [s.codeStructure, s]),
+    );
     const chain: string[] = [];
     let cursor: string | null | undefined = 'AG_ABJ_PLATEAU';
     while (cursor) {

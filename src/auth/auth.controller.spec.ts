@@ -63,7 +63,12 @@ describe('AuthController', () => {
 
     expect(result).toEqual({
       ...fakeTokens,
-      user: { id: '1', email: 'admin@miznas.local', nom: 'Admin', prenom: 'MIZNAS' },
+      user: {
+        id: '1',
+        email: 'admin@miznas.local',
+        nom: 'Admin',
+        prenom: 'MIZNAS',
+      },
     });
     expect(service.login).toHaveBeenCalledWith(
       'admin@miznas.local',
@@ -99,9 +104,19 @@ describe('AuthController', () => {
   });
 
   it('me delegates to AuthService.getCurrentUser', async () => {
-    const view = { id: '1', email: 'admin@miznas.local', nom: 'A', prenom: 'B', roles: [], permissions: [] };
+    const view = {
+      id: '1',
+      email: 'admin@miznas.local',
+      nom: 'A',
+      prenom: 'B',
+      roles: [],
+      permissions: [],
+    };
     service.getCurrentUser.mockResolvedValue(view);
-    const result = await controller.me({ userId: '1', email: 'admin@miznas.local' });
+    const result = await controller.me({
+      userId: '1',
+      email: 'admin@miznas.local',
+    });
     expect(result).toBe(view);
     expect(service.getCurrentUser).toHaveBeenCalledWith('1');
   });

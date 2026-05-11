@@ -89,9 +89,7 @@ export function isoWeek(date: Date): number {
   const dayNum = d.getUTCDay() || 7;
   d.setUTCDate(d.getUTCDate() + 4 - dayNum);
   const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
-  return Math.ceil(
-    ((d.getTime() - yearStart.getTime()) / 86_400_000 + 1) / 7,
-  );
+  return Math.ceil(((d.getTime() - yearStart.getTime()) / 86_400_000 + 1) / 7);
 }
 
 export function trimestre(mois: number): number {
@@ -173,9 +171,10 @@ export function generateTempsRows(
   return rows;
 }
 
-export function defaultRange(
-  now: Date = new Date(),
-): { startYear: number; endYear: number } {
+export function defaultRange(now: Date = new Date()): {
+  startYear: number;
+  endYear: number;
+} {
   const cur = now.getUTCFullYear();
   return { startYear: cur - 5, endYear: cur + 4 };
 }
@@ -195,7 +194,9 @@ export async function seedTemps(ds: DataSource = AppDataSource): Promise<void> {
     // process Jest e2e (process.argv pointe sur jest, pas seed).
     const force = process.argv.slice(2).includes('--force');
     if (force) {
-      console.log('[seed:temps] --force : purge de dim_temps avant régénération');
+      console.log(
+        '[seed:temps] --force : purge de dim_temps avant régénération',
+      );
       await ds.query(`DELETE FROM dim_temps`);
     }
 
@@ -238,7 +239,9 @@ export async function seedTemps(ds: DataSource = AppDataSource): Promise<void> {
          ON CONFLICT ("date") DO NOTHING`,
         params,
       );
-      const affected = Array.isArray(result) ? slice.length : (result ?? slice.length);
+      const affected = Array.isArray(result)
+        ? slice.length
+        : (result ?? slice.length);
       inserted += typeof affected === 'number' ? affected : slice.length;
     }
 

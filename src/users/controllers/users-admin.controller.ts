@@ -60,7 +60,7 @@ export class UsersAdminController {
   @RequirePermissions('USER.GERER')
   @ApiOperation({
     summary:
-      "Créer un utilisateur (USER.GERER). Mot de passe initial ≥ 12 caractères, ≥ 1 rôle.",
+      'Créer un utilisateur (USER.GERER). Mot de passe initial ≥ 12 caractères, ≥ 1 rôle.',
   })
   @ApiCreatedResponse({ type: UserResponseDto })
   creer(
@@ -87,7 +87,7 @@ export class UsersAdminController {
   @RequirePermissions('USER.GERER')
   @ApiOperation({
     summary:
-      "Désactiver un utilisateur (USER.GERER). Auto-désactivation interdite.",
+      'Désactiver un utilisateur (USER.GERER). Auto-désactivation interdite.',
   })
   desactiver(
     @Param('id') id: string,
@@ -112,9 +112,9 @@ export class UsersAdminController {
   @RequirePermissions('USER.GERER')
   @ApiOperation({
     summary:
-      'Générer un mot de passe temporaire (USER.GERER) et l\'envoyer par ' +
-      'email à l\'utilisateur (Lot 6.4.C — async via queue BullMQ). Le mot ' +
-      'de passe en clair n\'apparaît PAS dans la réponse API.',
+      "Générer un mot de passe temporaire (USER.GERER) et l'envoyer par " +
+      "email à l'utilisateur (Lot 6.4.C — async via queue BullMQ). Le mot " +
+      "de passe en clair n'apparaît PAS dans la réponse API.",
   })
   @ApiOkResponse({ type: ResetPasswordResponseDto })
   resetPassword(
@@ -155,8 +155,7 @@ export class UsersAdminController {
   @HttpCode(HttpStatus.OK)
   @RequirePermissions('USER.GERER')
   @ApiOperation({
-    summary:
-      'Révoquer tous les refresh tokens actifs du user (USER.GERER).',
+    summary: 'Révoquer tous les refresh tokens actifs du user (USER.GERER).',
   })
   forcerDeconnexion(
     @Param('id') id: string,
@@ -168,8 +167,7 @@ export class UsersAdminController {
   @Get(':id/historique-connexion')
   @RequirePermissions('USER.GERER')
   @ApiOperation({
-    summary:
-      "50 dernières lignes audit_log de connexion du user (USER.GERER).",
+    summary: '50 dernières lignes audit_log de connexion du user (USER.GERER).',
   })
   @ApiOkResponse({ type: [HistoriqueConnexionItemDto] })
   historiqueConnexion(
@@ -209,7 +207,7 @@ export class UsersAdminController {
   @RequirePermissions('USER.GERER')
   @ApiOperation({
     summary:
-      "Retirer un rôle (USER.GERER). Garde-fou : ≥ 1 rôle actif obligatoire.",
+      'Retirer un rôle (USER.GERER). Garde-fou : ≥ 1 rôle actif obligatoire.',
   })
   retirerRole(
     @Param('id') id: string,

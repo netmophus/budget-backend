@@ -70,7 +70,7 @@ describe('E2E.2 — Saisie réalisé end-to-end', () => {
     await app.close();
   });
 
-  it('GET /referentiels/temps/par-date/:date renvoie l\'id du jour', async () => {
+  it("GET /referentiels/temps/par-date/:date renvoie l'id du jour", async () => {
     const res = await request(app.getHttpServer())
       .get('/api/v1/referentiels/temps/par-date/2027-03-01')
       .set(bearer(adjSession))

@@ -13,8 +13,7 @@ const SEEDS: RefSecondaireSeed[] = [
   {
     code: 'cloture',
     libelle: 'Clôture',
-    description:
-      'Taux fin de période, utilisé pour reforecast / atterrissage.',
+    description: 'Taux fin de période, utilisé pour reforecast / atterrissage.',
     ordre: 10,
     estSysteme: true,
   },
@@ -28,8 +27,7 @@ const SEEDS: RefSecondaireSeed[] = [
   {
     code: 'fixe_budgetaire',
     libelle: 'Fixe budgétaire',
-    description:
-      'Taux figé en début de cycle pour la version budget_initial.',
+    description: 'Taux figé en début de cycle pour la version budget_initial.',
     ordre: 30,
     estSysteme: true,
   },

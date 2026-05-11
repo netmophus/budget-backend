@@ -96,10 +96,12 @@ export class UserPerimetreService {
       qb.andWhere('up.origine = :origine', { origine: options.origine });
     }
     if (options.dateRef) {
-      qb.andWhere('up.dateDebut <= :d', { d: options.dateRef })
-        .andWhere('(up.dateFin IS NULL OR up.dateFin >= :d)', {
+      qb.andWhere('up.dateDebut <= :d', { d: options.dateRef }).andWhere(
+        '(up.dateFin IS NULL OR up.dateFin >= :d)',
+        {
           d: options.dateRef,
-        });
+        },
+      );
     }
     qb.orderBy('up.dateDebut', 'DESC').addOrderBy('up.id', 'DESC');
     const rows = await qb.getMany();
@@ -281,9 +283,7 @@ export class UserPerimetreService {
       );
     }
     if (!p.actif) {
-      throw new ConflictException(
-        `Affectation ${perimetreId} déjà inactive.`,
-      );
+      throw new ConflictException(`Affectation ${perimetreId} déjà inactive.`);
     }
     // Désactivation soft + audit en transaction atomique (Lot 4.1-fix2.B).
     await this.repo.manager.transaction(async (tx) => {

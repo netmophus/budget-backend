@@ -1,10 +1,4 @@
-import {
-  Check,
-  Column,
-  Entity,
-  Index,
-  PrimaryGeneratedColumn,
-} from 'typeorm';
+import { Check, Column, Entity, Index, PrimaryGeneratedColumn } from 'typeorm';
 
 export type TypeAction =
   | 'LOGIN'
@@ -92,10 +86,7 @@ export type AuditStatut = 'success' | 'failure';
 @Index('ix_audit_log_date_action', ['dateAction'])
 @Index('ix_audit_log_entite_id', ['entiteCible', 'idCible'])
 @Index('ix_audit_log_utilisateur_date', ['utilisateur', 'dateAction'])
-@Check(
-  'ck_audit_log_statut',
-  `"statut" IN ('success','failure')`,
-)
+@Check('ck_audit_log_statut', `"statut" IN ('success','failure')`)
 export class AuditLog {
   @PrimaryGeneratedColumn('identity', { type: 'bigint' })
   id!: string;

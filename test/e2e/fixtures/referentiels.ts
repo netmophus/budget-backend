@@ -14,7 +14,9 @@ export async function getTempsIdParDate(
   date: string,
 ): Promise<string> {
   const ds = app.get<DataSource>(getDataSourceToken());
-  const rows = (await ds.query(`SELECT id FROM dim_temps WHERE date = $1`, [date])) as Array<{ id: string }>;
+  const rows = (await ds.query(`SELECT id FROM dim_temps WHERE date = $1`, [
+    date,
+  ])) as Array<{ id: string }>;
   if (rows.length === 0) {
     throw new Error(`[e2e fixture] dim_temps date=${date} introuvable.`);
   }
@@ -46,7 +48,9 @@ export async function getLigneMetierId(
     [codeLigne],
   )) as Array<{ id: string }>;
   if (rows.length === 0) {
-    throw new Error(`[e2e fixture] dim_ligne_metier code=${codeLigne} introuvable.`);
+    throw new Error(
+      `[e2e fixture] dim_ligne_metier code=${codeLigne} introuvable.`,
+    );
   }
   return String(rows[0]!.id);
 }
@@ -56,7 +60,10 @@ export async function getDeviseId(
   codeIso: string,
 ): Promise<string> {
   const ds = app.get<DataSource>(getDataSourceToken());
-  const rows = (await ds.query(`SELECT id FROM dim_devise WHERE code_iso = $1`, [codeIso])) as Array<{ id: string }>;
+  const rows = (await ds.query(
+    `SELECT id FROM dim_devise WHERE code_iso = $1`,
+    [codeIso],
+  )) as Array<{ id: string }>;
   if (rows.length === 0) {
     throw new Error(`[e2e fixture] dim_devise code=${codeIso} introuvable.`);
   }
@@ -73,7 +80,9 @@ export async function getCrId(
     [codeCr],
   )) as Array<{ id: string }>;
   if (rows.length === 0) {
-    throw new Error(`[e2e fixture] dim_centre_responsabilite code=${codeCr} introuvable.`);
+    throw new Error(
+      `[e2e fixture] dim_centre_responsabilite code=${codeCr} introuvable.`,
+    );
   }
   return String(rows[0]!.id);
 }
@@ -83,9 +92,14 @@ export async function getVersionId(
   codeVersion: string,
 ): Promise<string> {
   const ds = app.get<DataSource>(getDataSourceToken());
-  const rows = (await ds.query(`SELECT id FROM dim_version WHERE code_version = $1`, [codeVersion])) as Array<{ id: string }>;
+  const rows = (await ds.query(
+    `SELECT id FROM dim_version WHERE code_version = $1`,
+    [codeVersion],
+  )) as Array<{ id: string }>;
   if (rows.length === 0) {
-    throw new Error(`[e2e fixture] dim_version code=${codeVersion} introuvable.`);
+    throw new Error(
+      `[e2e fixture] dim_version code=${codeVersion} introuvable.`,
+    );
   }
   return String(rows[0]!.id);
 }
@@ -95,9 +109,14 @@ export async function getScenarioId(
   codeScenario: string,
 ): Promise<string> {
   const ds = app.get<DataSource>(getDataSourceToken());
-  const rows = (await ds.query(`SELECT id FROM dim_scenario WHERE code_scenario = $1`, [codeScenario])) as Array<{ id: string }>;
+  const rows = (await ds.query(
+    `SELECT id FROM dim_scenario WHERE code_scenario = $1`,
+    [codeScenario],
+  )) as Array<{ id: string }>;
   if (rows.length === 0) {
-    throw new Error(`[e2e fixture] dim_scenario code=${codeScenario} introuvable.`);
+    throw new Error(
+      `[e2e fixture] dim_scenario code=${codeScenario} introuvable.`,
+    );
   }
   return String(rows[0]!.id);
 }

@@ -92,7 +92,10 @@ export class UsersAdminService {
 
   // ─── Création ──────────────────────────────────────────────
 
-  async creer(dto: CreerUserDto, currentUser: AuthCaller): Promise<UserResponseDto> {
+  async creer(
+    dto: CreerUserDto,
+    currentUser: AuthCaller,
+  ): Promise<UserResponseDto> {
     // Email unique
     const existant = await this.userRepo.findOne({
       where: { email: dto.email },
@@ -204,7 +207,11 @@ export class UsersAdminService {
           entiteCible: 'user',
           idCible: String(saved.id),
           statut: 'success',
-          payloadApres: { email: saved.email, nom: saved.nom, prenom: saved.prenom },
+          payloadApres: {
+            email: saved.email,
+            nom: saved.nom,
+            prenom: saved.prenom,
+          },
           commentaire: `Modification de ${saved.email}.`,
         },
         tx,
@@ -215,7 +222,10 @@ export class UsersAdminService {
 
   // ─── Désactivation / réactivation ──────────────────────────
 
-  async desactiver(id: string, currentUser: AuthCaller): Promise<UserResponseDto> {
+  async desactiver(
+    id: string,
+    currentUser: AuthCaller,
+  ): Promise<UserResponseDto> {
     if (id === currentUser.userId) {
       throw new ForbiddenException(
         'Auto-désactivation interdite. Demandez à un autre administrateur.',
@@ -245,7 +255,10 @@ export class UsersAdminService {
     });
   }
 
-  async reactiver(id: string, currentUser: AuthCaller): Promise<UserResponseDto> {
+  async reactiver(
+    id: string,
+    currentUser: AuthCaller,
+  ): Promise<UserResponseDto> {
     const u = await this.userRepo.findOne({ where: { id } });
     if (!u) throw new NotFoundException(`User ${id} introuvable.`);
     if (u.estActif) return toUserResponse(u);
@@ -307,8 +320,9 @@ export class UsersAdminService {
 
     const motDePasseTemporaire = genererMotDePasseTemporaire();
     const hash = await bcrypt.hash(motDePasseTemporaire, BCRYPT_COST);
-    const dateExpirationMdp =
-      this.authService.nouvelleDateExpiration(RESET_MDP_DUREE_JOURS);
+    const dateExpirationMdp = this.authService.nouvelleDateExpiration(
+      RESET_MDP_DUREE_JOURS,
+    );
     const dateExpirationFr = formatDateFr(dateExpirationMdp);
 
     u.motDePasseHash = hash;
@@ -439,24 +453,25 @@ export class UsersAdminService {
   ): Promise<HistoriqueConnexionItemDto[]> {
     const u = await this.userRepo.findOne({ where: { id } });
     if (!u) throw new NotFoundException(`User ${id} introuvable.`);
-    const rows = (await this.userRepo.manager.query<
-      Array<{
-        id: string;
-        date_action: Date;
-        type_action: string;
-        statut: string;
-        ip_source: string | null;
-        user_agent: string | null;
-      }>
-    >(
-      `SELECT id, date_action, type_action, statut, ip_source, user_agent
+    const rows =
+      (await this.userRepo.manager.query<
+        Array<{
+          id: string;
+          date_action: Date;
+          type_action: string;
+          statut: string;
+          ip_source: string | null;
+          user_agent: string | null;
+        }>
+      >(
+        `SELECT id, date_action, type_action, statut, ip_source, user_agent
          FROM audit_log
         WHERE utilisateur = $1
           AND type_action IN ('LOGIN','LOGIN_FAILED','LOGOUT')
         ORDER BY id DESC
         LIMIT 50`,
-      [u.email],
-    )) ?? [];
+        [u.email],
+      )) ?? [];
     return rows.map((r) => ({
       id: String(r.id),
       dateAction: new Date(r.date_action).toISOString(),

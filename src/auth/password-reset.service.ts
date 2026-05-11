@@ -95,8 +95,7 @@ export class PasswordResetService {
   private reponseUniformeForgot(): ForgotPasswordResult {
     return {
       success: true,
-      message:
-        "Si l'email existe, un lien de réinitialisation a été envoyé.",
+      message: "Si l'email existe, un lien de réinitialisation a été envoyé.",
     };
   }
 
@@ -135,9 +134,7 @@ export class PasswordResetService {
     // Cas connu : génération token + INSERT + publication queue.
     const tokenClair = randomUUID();
     const tokenHash = this.hashToken(tokenClair);
-    const dateExpiration = new Date(
-      Date.now() + TOKEN_DUREE_MINUTES * 60_000,
-    );
+    const dateExpiration = new Date(Date.now() + TOKEN_DUREE_MINUTES * 60_000);
     const lienReset = `${this.appBaseUrl}/reset-password?token=${tokenClair}`;
 
     let emailLogId: string | null = null;
@@ -239,8 +236,7 @@ export class PasswordResetService {
       throw new GoneException({
         statusCode: 410,
         code: 'EXPIRED_TOKEN',
-        message:
-          'Lien de réinitialisation expiré. Refaites une demande.',
+        message: 'Lien de réinitialisation expiré. Refaites une demande.',
       });
     }
 
@@ -282,8 +278,7 @@ export class PasswordResetService {
           entiteCible: 'user',
           idCible: String(user.id),
           statut: 'success',
-          commentaire:
-            'Mot de passe réinitialisé via lien email self-service.',
+          commentaire: 'Mot de passe réinitialisé via lien email self-service.',
         },
         tx,
       );
@@ -302,9 +297,7 @@ export class PasswordResetService {
    * audit / forensics. Audit `NETTOYAGE_RESET_TOKENS` avec count.
    */
   async nettoyerTokensExpires(): Promise<{ supprimes: number }> {
-    const seuil = new Date(
-      Date.now() - TOKEN_RETENTION_JOURS * 86_400_000,
-    );
+    const seuil = new Date(Date.now() - TOKEN_RETENTION_JOURS * 86_400_000);
     const r = await this.tokenRepo.delete({ dateExpiration: LessThan(seuil) });
     const supprimes = r.affected ?? 0;
 
