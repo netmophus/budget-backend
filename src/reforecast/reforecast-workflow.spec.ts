@@ -232,7 +232,7 @@ function buildWorkflow(ds: DataSource): VersionWorkflowService {
   const events = new EventEmitter2();
   // Stub PermissionsService.getDelegationContextPour → toujours null
   const perms = {
-    getDelegationContextPour: async () => null,
+    getDelegationContextPour: () => Promise.resolve(null),
   } as unknown as PermissionsService;
   return new VersionWorkflowService(versionRepo, ds, audit, perms, events);
 }

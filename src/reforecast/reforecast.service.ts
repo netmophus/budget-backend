@@ -96,10 +96,10 @@ export class ReforecastService {
       // reforecast peut être basé sur un reforecast déjà publié).
       // Refuse les types inattendus.
 
-      const scenarioRows = (await manager.query(
+      const scenarioRows = await manager.query<Array<{ id: string }>>(
         `SELECT id FROM dim_scenario WHERE id = $1`,
         [dto.fkScenarioSource],
-      )) as Array<{ id: string }>;
+      );
       if (scenarioRows.length === 0) {
         throw new NotFoundException(
           `Scénario source ${dto.fkScenarioSource} introuvable.`,
@@ -110,7 +110,7 @@ export class ReforecastService {
       // pour le trimestre consolidé.
       const moisDebut = (dto.trimestreConsolide - 1) * 3 + 1;
       const moisFin = dto.trimestreConsolide * 3;
-      const realiseRows = (await manager.query(
+      const realiseRows = await manager.query<Array<{ n: number }>>(
         `SELECT COUNT(*)::int AS n
            FROM fait_realise fr
            INNER JOIN dim_temps t ON t.id = fr.fk_temps
@@ -118,7 +118,7 @@ export class ReforecastService {
             AND t.annee = $1
             AND t.mois BETWEEN $2 AND $3`,
         [dto.anneeConsolide, moisDebut, moisFin],
-      )) as Array<{ n: number }>;
+      );
       if ((realiseRows[0]?.n ?? 0) === 0) {
         throw new UnprocessableEntityException(
           `Aucun réalisé validé sur le trimestre T${dto.trimestreConsolide} ` +
@@ -130,7 +130,7 @@ export class ReforecastService {
       // même clé (Q1 décision produit). On a besoin de l'id du
       // nouveau d'abord — donc on crée la nouvelle version, puis on
       // marque obsolètes en référence à elle.
-      const obsoleteIds = (await manager.query(
+      const obsoleteIds = await manager.query<Array<{ id: string }>>(
         `SELECT id FROM dim_version
           WHERE type_version = 'reforecast'
             AND statut_publication = 'ACTIVE'
@@ -144,14 +144,14 @@ export class ReforecastService {
           dto.trimestreConsolide,
           dto.anneeConsolide,
         ],
-      )) as Array<{ id: string }>;
+      );
 
       // 4) Créer la nouvelle version REFORECAST
       const codeVersion = this.genererCodeVersion(
         dto.trimestreConsolide,
         dto.anneeConsolide,
       );
-      const insertVersion = (await manager.query(
+      const insertVersion = await manager.query<Array<{ id: string }>>(
         `INSERT INTO dim_version (
            code_version, libelle, type_version, exercice_fiscal,
            statut, statut_publication,
@@ -179,8 +179,8 @@ export class ReforecastService {
           dto.commentaire ?? null,
           user.email,
         ],
-      )) as Array<{ id: string }>;
-      const newVersionId = insertVersion[0]!.id;
+      );
+      const newVersionId = insertVersion[0].id;
 
       // 5) Marquer OBSOLETE les anciens (avec fk_version_remplacante)
       for (const old of obsoleteIds) {
@@ -402,10 +402,10 @@ export class ReforecastService {
       );
     }
 
-    const cnt = (await manager.query(
+    const cnt = await manager.query<Array<{ n: number }>>(
       `SELECT COUNT(*)::int AS n FROM fait_budget WHERE fk_version = $1::bigint`,
       [p.newVersionId],
-    )) as Array<{ n: number }>;
+    );
     return cnt[0]?.n ?? 0;
   }
 
@@ -418,16 +418,16 @@ export class ReforecastService {
     manager?: EntityManager,
   ): Promise<ReforecastResponseDto> {
     const m = manager ?? this.dataSource.manager;
-    const rows = (await m.query(
+    const rows = await m.query<ReforecastListRow[]>(
       `${this.SELECT_LIST_BASE}
         WHERE v.id = $1::bigint
           AND v.type_version = 'reforecast'`,
       [id],
-    )) as ReforecastListRow[];
+    );
     if (rows.length === 0) {
       throw new NotFoundException(`Reforecast ${id} introuvable.`);
     }
-    const dto = this.toDto(rows[0]!);
+    const dto = this.toDto(rows[0]);
     dto.nbLignes = await this.countLignes(m, dto.id);
     return dto;
   }
@@ -455,10 +455,7 @@ export class ReforecastService {
     const sql = `${this.SELECT_LIST_BASE}
        WHERE ${conditions.join(' AND ')}
        ORDER BY v.date_creation DESC`;
-    const rows = (await this.dataSource.query(
-      sql,
-      params,
-    )) as ReforecastListRow[];
+    const rows = await this.dataSource.query<ReforecastListRow[]>(sql, params);
     const dtos = rows.map((r) => this.toDto(r));
     for (const dto of dtos) {
       dto.nbLignes = await this.countLignes(this.dataSource.manager, dto.id);
@@ -486,7 +483,15 @@ export class ReforecastService {
     const moisFin = p.trimestreConsolide * 3;
 
     // 1) Calculer les moyennes par groupe (CR, compte, ligne_metier, devise)
-    const moyennesRows = (await manager.query(
+    const moyennesRows = await manager.query<
+      Array<{
+        cr: string;
+        cpt: string;
+        lm: string;
+        dev: string;
+        m: number;
+      }>
+    >(
       `SELECT fr.fk_centre_responsabilite AS cr,
               fr.fk_compte AS cpt,
               fr.fk_ligne_metier AS lm,
@@ -500,20 +505,27 @@ export class ReforecastService {
         GROUP BY fr.fk_centre_responsabilite, fr.fk_compte,
                  fr.fk_ligne_metier, fr.fk_devise`,
       [p.anneeConsolide, moisDebut, moisFin],
-    )) as Array<{
-      cr: string;
-      cpt: string;
-      lm: string;
-      dev: string;
-      m: number;
-    }>;
+    );
     const moyMap = new Map<string, number>();
     for (const r of moyennesRows) {
       moyMap.set(`${r.cr}|${r.cpt}|${r.lm}|${r.dev}`, Number(r.m));
     }
 
     // 2) Récupérer les lignes futures du source
-    const lignes = (await manager.query(
+    const lignes = await manager.query<
+      Array<{
+        fk_temps: string;
+        fk_compte: string;
+        fk_structure: string;
+        fk_centre: string;
+        fk_ligne_metier: string;
+        fk_produit: string;
+        fk_segment: string;
+        fk_devise: string;
+        fk_scenario: string;
+        taux_change_applique: string;
+      }>
+    >(
       `SELECT fb.fk_temps, fb.fk_compte, fb.fk_structure, fb.fk_centre,
               fb.fk_ligne_metier, fb.fk_produit, fb.fk_segment, fb.fk_devise,
               fb.fk_scenario, fb.taux_change_applique
@@ -529,18 +541,7 @@ export class ReforecastService {
         p.anneeConsolide,
         moisFinConsolide,
       ],
-    )) as Array<{
-      fk_temps: string;
-      fk_compte: string;
-      fk_structure: string;
-      fk_centre: string;
-      fk_ligne_metier: string;
-      fk_produit: string;
-      fk_segment: string;
-      fk_devise: string;
-      fk_scenario: string;
-      taux_change_applique: string;
-    }>;
+    );
 
     // 3) INSERT en batch (chunks de 500)
     const CHUNK = 500;
@@ -592,10 +593,10 @@ export class ReforecastService {
     m: EntityManager,
     versionId: string,
   ): Promise<number> {
-    const cnt = (await m.query(
+    const cnt = await m.query<Array<{ n: number }>>(
       `SELECT COUNT(*)::int AS n FROM fait_budget WHERE fk_version = $1::bigint`,
       [versionId],
-    )) as Array<{ n: number }>;
+    );
     return cnt[0]?.n ?? 0;
   }
 
@@ -636,7 +637,21 @@ export class ReforecastService {
     const trim = v.trimestreConsolide!;
     const methode = v.methodeExtrapolation!;
 
-    const rows = (await this.dataSource.query(
+    const rows = await this.dataSource.query<
+      Array<{
+        fk_centre: string;
+        code_cr: string;
+        fk_compte: string;
+        code_compte: string;
+        fk_ligne_metier: string;
+        code_ligne_metier: string;
+        fk_temps: string;
+        mois: number;
+        annee: number;
+        montant_reforecast: string;
+        montant_source: string;
+      }>
+    >(
       `SELECT
          fb.fk_centre AS fk_centre,
          cr.code_cr,
@@ -668,19 +683,7 @@ export class ReforecastService {
        WHERE fb.fk_version = $1::bigint
        ORDER BY cr.code_cr, c.code_compte, t.annee, t.mois`,
       [id, v.fkVersionSource, v.fkScenarioSource],
-    )) as Array<{
-      fk_centre: string;
-      code_cr: string;
-      fk_compte: string;
-      code_compte: string;
-      fk_ligne_metier: string;
-      code_ligne_metier: string;
-      fk_temps: string;
-      mois: number;
-      annee: number;
-      montant_reforecast: string;
-      montant_source: string;
-    }>;
+    );
 
     const lignes = rows.map((r) => {
       const moisNum = Number(r.mois);
