@@ -161,7 +161,7 @@ export class BudgetImportService {
         'Fichier vide ou aucune ligne de données après le header.',
       );
     }
-    const colonnesPresentes = Object.keys(rowsBrutes[0]!);
+    const colonnesPresentes = Object.keys(rowsBrutes[0]);
     const manquantes = HEADER_ORDONNE.filter(
       (c) => !colonnesPresentes.includes(c),
     );
@@ -186,7 +186,7 @@ export class BudgetImportService {
     for (let i = 0; i < rowsBrutes.length; i++) {
       const ligneNumero = i + 2; // i=0 → ligne 2 du fichier (header=1)
       await this.validerLigne(
-        rowsBrutes[i]!,
+        rowsBrutes[i],
         ligneNumero,
         versionId,
         scenarioId,
@@ -309,6 +309,7 @@ export class BudgetImportService {
     // csv-parse auto-détecte point-virgule ou virgule via le sniffing
     // sur le header (option `delimiter: [',', ';', '\t']`). UTF-8 BOM
     // consommé via `bom: true`.
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion -- csv-parse retourne unknown[], le cast porte le typage RowBrute pour la signature de retour
     const rows = parseCsv(buffer, {
       columns: true,
       skip_empty_lines: true,
@@ -345,11 +346,11 @@ export class BudgetImportService {
         // Les dates Excel arrivent comme objets Date — on normalise
         // au format ISO YYYY-MM-DD pour la suite.
         if (cellVal instanceof Date) {
-          obj[headers[c]!] = cellVal.toISOString().slice(0, 10);
+          obj[headers[c]] = cellVal.toISOString().slice(0, 10);
         } else if (cellVal === null || cellVal === undefined) {
-          obj[headers[c]!] = '';
+          obj[headers[c]] = '';
         } else {
-          obj[headers[c]!] = String(cellVal).trim();
+          obj[headers[c]] = String(cellVal).trim();
         }
       }
       // Ignore les lignes vides (toutes cellules vides).
@@ -401,8 +402,8 @@ export class BudgetImportService {
       });
       return;
     }
-    const fkCentre = String(cr[0]!.id);
-    const fkStructureCr = String(cr[0]!.fk_structure);
+    const fkCentre = String(cr[0].id);
+    const fkStructureCr = String(cr[0].fk_structure);
 
     // Périmètre user
     if (crAutorises !== null && !crAutorises.includes(fkCentre)) {
@@ -436,7 +437,7 @@ export class BudgetImportService {
       });
       return;
     }
-    if (compte[0]!.est_compte_collectif) {
+    if (compte[0].est_compte_collectif) {
       erreurs.push({
         ligneNumero,
         code: 'COMPTE_AGREGE',
@@ -447,7 +448,7 @@ export class BudgetImportService {
       });
       return;
     }
-    const fkCompte = String(compte[0]!.id);
+    const fkCompte = String(compte[0].id);
 
     // Résolution FK Ligne métier
     const lm = await this.dataSource.query<Array<{ id: string }>>(
@@ -465,7 +466,7 @@ export class BudgetImportService {
       });
       return;
     }
-    const fkLigneMetier = String(lm[0]!.id);
+    const fkLigneMetier = String(lm[0].id);
 
     // Résolution FK Temps (ramener au 1er du mois)
     const moisIso = data.mois.length === 7 ? `${data.mois}-01` : data.mois;
@@ -482,7 +483,7 @@ export class BudgetImportService {
       });
       return;
     }
-    if (temps[0]!.jour !== 1) {
+    if (temps[0].jour !== 1) {
       erreurs.push({
         ligneNumero,
         code: 'TEMPS_PAS_PREMIER_DU_MOIS',
@@ -491,7 +492,7 @@ export class BudgetImportService {
       });
       return;
     }
-    const fkTemps = String(temps[0]!.id);
+    const fkTemps = String(temps[0].id);
 
     // Cohérence mode + montants
     let montant: number;
@@ -599,10 +600,10 @@ export class BudgetImportService {
     if (rows.length === 0) {
       throw new NotFoundException(`Version ${versionId} introuvable.`);
     }
-    if (rows[0]!.statut !== 'ouvert') {
+    if (rows[0].statut !== 'ouvert') {
       throw new ConflictException(
-        `Import refusé : la version ${rows[0]!.code_version} est au statut ` +
-          `'${rows[0]!.statut}'. Seul le statut 'ouvert' (Brouillon) autorise l'import.`,
+        `Import refusé : la version ${rows[0].code_version} est au statut ` +
+          `'${rows[0].statut}'. Seul le statut 'ouvert' (Brouillon) autorise l'import.`,
       );
     }
   }
@@ -657,9 +658,9 @@ export class BudgetImportService {
       return { ok: false, message: 'Aucun segment courant disponible.' };
     }
     this.defaultsCache = {
-      fkDevise: String(xof[0]!.id),
+      fkDevise: String(xof[0].id),
       fkProduit: String(fkProduit),
-      fkSegment: String(segment[0]!.id),
+      fkSegment: String(segment[0].id),
     };
     return { ok: true, ...this.defaultsCache };
   }
@@ -747,7 +748,7 @@ export class BudgetImportService {
         );
         inserees++;
       } else {
-        const e = existing[0]!;
+        const e = existing[0];
         const inchange =
           Number(e.montant_devise) === op.montant &&
           e.mode_saisie === op.modeSaisie &&

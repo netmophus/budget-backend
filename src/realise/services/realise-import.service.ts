@@ -120,7 +120,7 @@ export class RealiseImportService {
     }
 
     // 3. Validation header
-    const colonnesPresentes = Object.keys(rowsBrutes[0]!);
+    const colonnesPresentes = Object.keys(rowsBrutes[0]);
     const manquantes = HEADER_ORDONNE.filter(
       (c) => !colonnesPresentes.includes(c),
     );
@@ -147,7 +147,7 @@ export class RealiseImportService {
     for (let i = 0; i < rowsBrutes.length; i++) {
       const ligneNumero = i + 2; // 1 = header
       await this.validerLigne(
-        rowsBrutes[i]!,
+        rowsBrutes[i],
         ligneNumero,
         crAutorises,
         operations,
@@ -221,6 +221,7 @@ export class RealiseImportService {
     format: 'csv' | 'xlsx',
   ): Promise<RowBrute[]> {
     if (format === 'csv') {
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion -- csv-parse retourne unknown[], le cast porte le typage RowBrute pour la signature de retour
       const rows = parseCsv(buffer, {
         columns: true,
         skip_empty_lines: true,
@@ -249,11 +250,11 @@ export class RealiseImportService {
       for (let c = 0; c < headers.length; c++) {
         const cellVal = cells[c + 1];
         if (cellVal instanceof Date) {
-          obj[headers[c]!] = cellVal.toISOString().slice(0, 10);
+          obj[headers[c]] = cellVal.toISOString().slice(0, 10);
         } else if (cellVal === null || cellVal === undefined) {
-          obj[headers[c]!] = '';
+          obj[headers[c]] = '';
         } else {
-          obj[headers[c]!] = String(cellVal).trim();
+          obj[headers[c]] = String(cellVal).trim();
         }
       }
       if (Object.values(obj).some((v) => v !== '')) rows.push(obj);
@@ -295,7 +296,7 @@ export class RealiseImportService {
       });
       return;
     }
-    const fkCentre = String(cr[0]!.id);
+    const fkCentre = String(cr[0].id);
 
     // Périmètre
     if (crAutorises !== null && !crAutorises.includes(fkCentre)) {
@@ -365,10 +366,10 @@ export class RealiseImportService {
     operations.push({
       ligneNumero,
       fkCentreResponsabilite: fkCentre,
-      fkCompte: String(compte[0]!.id),
-      fkLigneMetier: String(lm[0]!.id),
-      fkTemps: String(t[0]!.id),
-      fkDevise: String(dev[0]!.id),
+      fkCompte: String(compte[0].id),
+      fkLigneMetier: String(lm[0].id),
+      fkTemps: String(t[0].id),
+      fkDevise: String(dev[0].id),
       montant: data.montant,
       mode: data.mode as 'MNT' | 'VOL' | 'UNIT',
       commentaire: data.commentaire,
