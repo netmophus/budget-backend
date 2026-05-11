@@ -43,6 +43,9 @@ export default tseslint.config(
   // Override Lot 6.6 : tests, migrations et seeds utilisent des patterns
   // dynamiques (mocks Jest, raw SQL via runner.query, fixtures TypeORM)
   // ou les types stricts apportent peu de valeur et bloquent la productivite.
+  // require-await ajoute (Lot 6.6.B-4) : les mocks Jest utilisent frequemment
+  // async () => ... pour matcher les signatures d interfaces sans necessiter
+  // d await reel.
   // Trace en dette : a reprendre si bascule vers approche fixture-based
   // typee (Lot 7+).
   {
@@ -62,6 +65,7 @@ export default tseslint.config(
       '@typescript-eslint/no-unsafe-return': 'off',
       '@typescript-eslint/unbound-method': 'off',
       '@typescript-eslint/no-unnecessary-type-assertion': 'off',
+      '@typescript-eslint/require-await': 'off',
     },
   },
 );
