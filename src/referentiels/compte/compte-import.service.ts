@@ -144,8 +144,9 @@ export class CompteImportService {
     const csvReport = await this.csvImportService.import<LigneCompte>({
       filePath,
       schema: ligneCompteSchema,
-      onRow: async (row, lineNo) => {
+      onRow: (row, lineNo) => {
         validRows.push({ data: row, lineNo });
+        return Promise.resolve();
       },
     });
 

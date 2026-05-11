@@ -124,7 +124,7 @@ export class PerimetreService {
            WHERE id = $1 AND version_courante = true`,
           [ur.perimetreId],
         );
-        if (exists.length > 0) setIds.add(String(exists[0]!.id));
+        if (exists.length > 0) setIds.add(String(exists[0].id));
       }
     }
     return Array.from(setIds);
@@ -187,7 +187,7 @@ export class PerimetreService {
            WHERE id = $1 AND version_courante = true`,
           [p.cibleId],
         );
-        if (exists.length > 0) setIds.add(String(exists[0]!.id));
+        if (exists.length > 0) setIds.add(String(exists[0].id));
       } else if (p.cibleType === 'CR_SET') {
         if (!p.cibleCrIds || p.cibleCrIds.length === 0) {
           this.logger.warn(
@@ -297,8 +297,8 @@ export class PerimetreService {
       return [];
     }
 
-    const all = new Set<string>([String(racine[0]!.id)]);
-    let frontiere = [String(racine[0]!.id)];
+    const all = new Set<string>([String(racine[0].id)]);
+    let frontiere = [String(racine[0].id)];
     while (frontiere.length > 0) {
       // IN ($1, $2, …) plutôt que ANY($1::bigint[]) car pg-mem ne
       // supporte pas la syntaxe ANY array.

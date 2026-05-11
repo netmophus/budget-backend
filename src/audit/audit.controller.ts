@@ -35,7 +35,7 @@ export class AuditController {
     return this.auditService.findAll(query, {
       caller: user.email,
       ipSource: req.ip ?? null,
-      userAgent: (req.headers['user-agent'] as string | undefined) ?? null,
+      userAgent: req.headers['user-agent'] ?? null,
     });
   }
 

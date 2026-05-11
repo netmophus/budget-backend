@@ -148,12 +148,12 @@ export class DelegationsRappelService {
   async notifierJ3(): Promise<RappelJ3Result> {
     // PostgreSQL `date_fin` est un type DATE → comparaison sur jour
     // entier, pas timestamp. CURRENT_DATE + 3 jours.
-    const matches = (await this.delegationRepo.query(
+    const matches = await this.delegationRepo.query<Array<{ id: string }>>(
       `SELECT id FROM delegations
         WHERE date_fin = CURRENT_DATE + INTERVAL '3 days'
           AND actif = true
           AND derniere_notification_j3 IS NULL`,
-    )) as Array<{ id: string }>;
+    );
 
     if (matches.length === 0) {
       return { notifiees: 0, emailsPublies: 0, emailsSupprimes: 0 };

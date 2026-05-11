@@ -351,7 +351,7 @@ export class CompteService extends Scd2Service<DimCompte> {
         codePosteBudgetaire: dto.codePosteBudgetaire ?? null,
         estCompteCollectif: dto.estCompteCollectif ?? false,
         estPorteurInterets: dto.estPorteurInterets ?? false,
-      } as Partial<DimCompte>,
+      },
       utilisateur,
     );
     return this.findCurrentByCode(dto.codeCompte).catch(() =>
@@ -470,7 +470,7 @@ export class CompteService extends Scd2Service<DimCompte> {
       if (wantsEstActifChange) {
         updates.estActif = dto.estActif;
       }
-      await this.repo.update({ id: current.id }, updates as never);
+      await this.repo.update({ id: current.id }, updates);
       const refreshed = await this.findCurrentByCode(codeCompte);
       return { ...refreshed, modeMaj: 'ecrasement_intra_jour' };
     }
@@ -551,7 +551,7 @@ export class CompteService extends Scd2Service<DimCompte> {
         fkCompteParent: nouvelId,
         utilisateurModification: utilisateur,
         dateModification: () => 'CURRENT_TIMESTAMP',
-      } as never)
+      })
       .where('fk_compte_parent = :ancien', { ancien: ancienId })
       .execute();
     return { count: result.affected ?? 0 };

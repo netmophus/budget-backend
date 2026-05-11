@@ -64,7 +64,7 @@ export class LoginRateLimiterService {
       (t) => now - t < FENETRE_IP_MS,
     );
     if (ipTimes.length >= LIMITE) {
-      const oldest = ipTimes[0]!;
+      const oldest = ipTimes[0];
       const retryAfter = Math.ceil((FENETRE_IP_MS - (now - oldest)) / 1000);
       return { bloque: true, motif: 'IP', retryAfterSeconds: retryAfter };
     }
@@ -74,7 +74,7 @@ export class LoginRateLimiterService {
       (t) => now - t < FENETRE_EMAIL_MS,
     );
     if (emailTimes.length >= LIMITE) {
-      const oldest = emailTimes[0]!;
+      const oldest = emailTimes[0];
       const retryAfter = Math.ceil((FENETRE_EMAIL_MS - (now - oldest)) / 1000);
       return { bloque: true, motif: 'EMAIL', retryAfterSeconds: retryAfter };
     }
@@ -105,7 +105,7 @@ export class LoginRateLimiterService {
       (t) => now - t < FENETRE_FORGOT_MS,
     );
     if (ipTimes.length >= LIMITE_FORGOT) {
-      const oldest = ipTimes[0]!;
+      const oldest = ipTimes[0];
       const retryAfter = Math.ceil((FENETRE_FORGOT_MS - (now - oldest)) / 1000);
       return { bloque: true, motif: 'IP', retryAfterSeconds: retryAfter };
     }

@@ -288,7 +288,7 @@ export class LigneMetierService extends Scd2Service<DimLigneMetier> {
         libelle: dto.libelle,
         fkLigneMetierParent: parent ? String(parent.id) : null,
         niveau: dto.niveau,
-      } as Partial<DimLigneMetier>,
+      },
       utilisateur,
     );
     return this.findCurrentByCode(dto.codeLigneMetier).catch(() =>
@@ -393,7 +393,7 @@ export class LigneMetierService extends Scd2Service<DimLigneMetier> {
       if (wantsEstActifChange) {
         updates.estActif = dto.estActif;
       }
-      await this.repo.update({ id: current.id }, updates as never);
+      await this.repo.update({ id: current.id }, updates);
       const refreshed = await this.findCurrentByCode(codeLigneMetier);
       return { ...refreshed, modeMaj: 'ecrasement_intra_jour' };
     }
@@ -471,7 +471,7 @@ export class LigneMetierService extends Scd2Service<DimLigneMetier> {
         fkLigneMetierParent: nouvelId,
         utilisateurModification: utilisateur,
         dateModification: () => 'CURRENT_TIMESTAMP',
-      } as never)
+      })
       .where('fk_ligne_metier_parent = :ancien', { ancien: ancienId })
       .execute();
     return { count: result.affected ?? 0 };

@@ -87,7 +87,7 @@ export class IndicateursService {
       coefExploitation: this.coef(sums.chargesHorsInterets, sums.pnb),
       derniereMaj: sums.derniereMaj?.toISOString() ?? null,
       nbCrInclus,
-    } as IndicateursGlobauxDto;
+    };
   }
 
   async getIndicateursParCr(

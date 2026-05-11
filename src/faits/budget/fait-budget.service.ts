@@ -52,7 +52,6 @@ import {
 import {
   FaitBudgetDimensionRef,
   FaitBudgetResponseDto,
-  FaitBudgetTempsRef,
 } from './dto/fait-budget-response.dto';
 import { ListFaitBudgetQueryDto } from './dto/list-fait-budget-query.dto';
 import { PaginatedFaitBudgetDto } from './dto/paginated-fait-budget.dto';
@@ -115,12 +114,12 @@ function toResponse(f: FaitBudget): FaitBudgetResponseDto {
     dateModification: f.dateModification,
     utilisateurModification: f.utilisateurModification,
     temps: f.temps
-      ? ({
+      ? {
           id: String(f.temps.id),
           date: f.temps.date,
           mois: f.temps.mois,
           annee: f.temps.annee,
-        } as FaitBudgetTempsRef)
+        }
       : undefined,
     compte: buildDimRef({
       id: f.compte?.id ?? '',

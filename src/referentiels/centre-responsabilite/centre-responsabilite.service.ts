@@ -232,7 +232,7 @@ export class CentreResponsabiliteService extends Scd2Service<DimCentreResponsabi
         libelleCourt: dto.libelleCourt ?? null,
         typeCr: dto.typeCr,
         fkStructure,
-      } as Partial<DimCentreResponsabilite>,
+      },
       utilisateur,
     );
     return this.findCurrentByCode(dto.codeCr).catch(() => toResponse(created));
@@ -311,7 +311,7 @@ export class CentreResponsabiliteService extends Scd2Service<DimCentreResponsabi
       if (wantsEstActifChange) {
         updates.estActif = dto.estActif;
       }
-      await this.repo.update({ id: current.id }, updates as never);
+      await this.repo.update({ id: current.id }, updates);
       const refreshed = await this.findCurrentByCode(codeCr);
       return { ...refreshed, modeMaj: 'ecrasement_intra_jour' };
     }
@@ -362,7 +362,7 @@ export class CentreResponsabiliteService extends Scd2Service<DimCentreResponsabi
         fkStructure: nouvelIdStructure,
         utilisateurModification: utilisateur,
         dateModification: () => 'CURRENT_TIMESTAMP',
-      } as never)
+      })
       .where('fk_structure = :ancien', { ancien: ancienIdStructure })
       .execute();
     return { count: result.affected ?? 0 };

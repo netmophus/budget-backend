@@ -294,7 +294,7 @@ export class NotificationsService {
         [typeAction, String(idCible)],
       )) ?? [];
     if (rows.length === 0) return null;
-    return this.userRepo.findOne({ where: { email: rows[0]!.utilisateur } });
+    return this.userRepo.findOne({ where: { email: rows[0].utilisateur } });
   }
 
   // ─── Envoi ──────────────────────────────────────────────────────

@@ -46,7 +46,7 @@ export class ForgotPasswordRateLimitGuard implements CanActivate {
     const result = this.limiter.enregistrerEtVerifierForgot(ip);
     if (!result.bloque) return true;
 
-    const userAgent = (req.headers['user-agent'] ?? null) as string | null;
+    const userAgent = req.headers['user-agent'] ?? null;
     const body = (req.body as ForgotBody | undefined) ?? {};
     const emailTente = (body.email ?? '').trim();
 

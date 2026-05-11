@@ -31,9 +31,12 @@ export class CreateFaitBudgetFromBusinessKeysDto {
     description:
       'Date métier du fait, format YYYY-MM-DD. Doit être un 1er du mois (maille mensuelle, cf. modele-donnees §4.1). Sert à résoudre fk_temps ET les versions SCD2 (Option B).',
   })
-  @IsDateString({ strict: true } as never, {
-    message: 'dateMetier doit être une date ISO YYYY-MM-DD',
-  })
+  @IsDateString(
+    { strict: true },
+    {
+      message: 'dateMetier doit être une date ISO YYYY-MM-DD',
+    },
+  )
   @Matches(/^\d{4}-\d{2}-01$/, {
     message:
       'dateMetier doit être un 1er du mois (maille mensuelle) — ex. 2026-04-01',

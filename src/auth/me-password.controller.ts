@@ -61,8 +61,8 @@ export class MePasswordController {
     @CurrentUser() user: AuthUser,
     @Req() req: Request,
   ): Promise<ChangerMdpResponse> {
-    const ip = (req.ip ?? null) as string | null;
-    const userAgent = (req.headers['user-agent'] ?? null) as string | null;
+    const ip = req.ip ?? null;
+    const userAgent = req.headers['user-agent'] ?? null;
     const result = await this.authService.changerMdp(
       user.userId,
       dto.ancienMdp,

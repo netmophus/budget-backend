@@ -82,7 +82,7 @@ export class ForgotPasswordController {
     @Ip() ip: string,
     @Req() req: Request,
   ): Promise<ForgotPasswordResult> {
-    const userAgent = (req.headers['user-agent'] ?? null) as string | null;
+    const userAgent = req.headers['user-agent'] ?? null;
     return this.passwordResetService.demanderReset(dto.email, ip, userAgent);
   }
 

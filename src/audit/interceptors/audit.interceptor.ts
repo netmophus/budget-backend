@@ -40,8 +40,8 @@ export class AuditInterceptor implements NestInterceptor {
     const req = context.switchToHttp().getRequest<AuthedRequest>();
     const start = Date.now();
     const utilisateur = req.user?.email ?? 'anonymous';
-    const ipSource = (req.ip ?? null) as string | null;
-    const userAgent = (req.headers['user-agent'] as string | undefined) ?? null;
+    const ipSource = req.ip ?? null;
+    const userAgent = req.headers['user-agent'] ?? null;
 
     const baseEntry = {
       utilisateur,

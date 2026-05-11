@@ -66,9 +66,9 @@ function codeAudit(
   base: 'SOUMETTRE' | 'VALIDER' | 'REJETER' | 'PUBLIER',
 ): TypeAction {
   if (type === 'reforecast') {
-    return `${base}_REFORECAST` as TypeAction;
+    return `${base}_REFORECAST`;
   }
-  return `${base}_BUDGET` as TypeAction;
+  return `${base}_BUDGET`;
 }
 
 /**
@@ -129,10 +129,10 @@ export class VersionWorkflowService {
       // soumise — sinon on transmet pour validation un travail nul.
       // Raw query SQL pour éviter d'importer FaitBudget (couplage
       // entité indésirable côté VersionModule, cf. version.module.ts).
-      const rows = (await manager.query(
+      const rows = await manager.query<Array<{ n: number }>>(
         `SELECT COUNT(*)::int AS n FROM fait_budget WHERE fk_version = $1`,
         [versionId],
-      )) as Array<{ n: number }>;
+      );
       const nbLignes = rows[0]?.n ?? 0;
       if (nbLignes === 0) {
         throw new UnprocessableEntityException(

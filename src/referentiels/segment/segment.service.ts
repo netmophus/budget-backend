@@ -139,7 +139,7 @@ export class SegmentService extends Scd2Service<DimSegment> {
       {
         libelle: dto.libelle,
         categorie: dto.categorie,
-      } as Partial<DimSegment>,
+      },
       utilisateur,
     );
     return this.findCurrentByCode(dto.codeSegment).catch(() =>
@@ -212,7 +212,7 @@ export class SegmentService extends Scd2Service<DimSegment> {
       if (wantsEstActifChange) {
         updates.estActif = dto.estActif;
       }
-      await this.repo.update({ id: current.id }, updates as never);
+      await this.repo.update({ id: current.id }, updates);
       const refreshed = await this.findCurrentByCode(codeSegment);
       return { ...refreshed, modeMaj: 'ecrasement_intra_jour' };
     }
