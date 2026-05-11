@@ -15,7 +15,9 @@ function makeConfig(env: Record<string, string> = {}): ConfigService {
   } as unknown as ConfigService;
 }
 
-function makeService(env: Record<string, string> = {}): LoginRateLimiterService {
+function makeService(
+  env: Record<string, string> = {},
+): LoginRateLimiterService {
   return new LoginRateLimiterService(makeConfig(env));
 }
 
@@ -40,13 +42,16 @@ describe('LoginRateLimiterService', () => {
       const r = svc.enregistrerEtVerifier(`10.0.0.${i}`, 'cible@miznas.local');
       expect(r.bloque).toBe(false);
     }
-    const sixieme = svc.enregistrerEtVerifier('10.0.0.99', 'cible@miznas.local');
+    const sixieme = svc.enregistrerEtVerifier(
+      '10.0.0.99',
+      'cible@miznas.local',
+    );
     expect(sixieme.bloque).toBe(true);
     expect(sixieme.motif).toBe('EMAIL');
     expect(sixieme.retryAfterSeconds).toBeGreaterThan(60); // > 60s, fenêtre 15min
   });
 
-  it("user A bloqué ne bloque pas user B (isolation par email)", () => {
+  it('user A bloqué ne bloque pas user B (isolation par email)', () => {
     const svc = makeService();
     // Saturer A (5 tentatives sur même IP donc on doit varier l'IP)
     for (let i = 0; i < 5; i++) {
@@ -72,7 +77,7 @@ describe('LoginRateLimiterService', () => {
     expect(bOk.bloque).toBe(false);
   });
 
-  it("ne consomme pas le compteur quand bloqué (sinon le user reste bloqué éternellement)", () => {
+  it('ne consomme pas le compteur quand bloqué (sinon le user reste bloqué éternellement)', () => {
     const svc = makeService();
     for (let i = 0; i < 5; i++) {
       svc.enregistrerEtVerifier('1.1.1.1', `u${i}@miznas.local`);
@@ -129,7 +134,7 @@ describe('LoginRateLimiterService', () => {
     expect(svc.enregistrerEtVerifierForgot('2.2.2.2').bloque).toBe(false);
   });
 
-  it("Lot 6.5.A — compteur forgot indépendant du compteur login (pas de cross-pollution)", () => {
+  it('Lot 6.5.A — compteur forgot indépendant du compteur login (pas de cross-pollution)', () => {
     const svc = makeService();
     // Saturer le forgot pour 1.1.1.1
     for (let i = 0; i < 3; i++) svc.enregistrerEtVerifierForgot('1.1.1.1');
@@ -153,13 +158,11 @@ describe('LoginRateLimiterService', () => {
     for (let i = 0; i < 5; i++) {
       svc.enregistrerEtVerifier('1.1.1.1', 'a@b.c');
     }
-    expect(
-      svc.enregistrerEtVerifier('1.1.1.1', 'autre@b.c').bloque,
-    ).toBe(true);
+    expect(svc.enregistrerEtVerifier('1.1.1.1', 'autre@b.c').bloque).toBe(true);
     svc.reset();
     // Après reset, on peut à nouveau tenter
-    expect(
-      svc.enregistrerEtVerifier('1.1.1.1', 'autre@b.c').bloque,
-    ).toBe(false);
+    expect(svc.enregistrerEtVerifier('1.1.1.1', 'autre@b.c').bloque).toBe(
+      false,
+    );
   });
 });

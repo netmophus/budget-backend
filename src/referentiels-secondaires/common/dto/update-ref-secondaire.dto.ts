@@ -36,7 +36,9 @@ export class UpdateRefSecondaireDto {
   @Max(99999)
   ordre?: number;
 
-  @ApiPropertyOptional({ description: 'Active / désactive la valeur (toggle est_actif).' })
+  @ApiPropertyOptional({
+    description: 'Active / désactive la valeur (toggle est_actif).',
+  })
   @IsOptional()
   @IsBoolean()
   estActif?: boolean;
@@ -46,7 +48,9 @@ export class UpdateRefSecondaireDto {
    * côté service si estSysteme=true (le code applicatif s'appuie sur
    * ces codes pour le workflow). Format aligné sur Create.
    */
-  @ApiPropertyOptional({ description: "Renommer le code (refusé si estSysteme=true)." })
+  @ApiPropertyOptional({
+    description: 'Renommer le code (refusé si estSysteme=true).',
+  })
   @IsOptional()
   @IsString()
   @MinLength(1)

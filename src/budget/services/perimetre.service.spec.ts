@@ -103,9 +103,10 @@ async function seedSocBank(ds: DataSource): Promise<SeedIds> {
       [email],
     );
   }
-  const users = (await ds.query(
-    `SELECT id, email FROM "user"`,
-  )) as Array<{ id: string; email: string }>;
+  const users = (await ds.query(`SELECT id, email FROM "user"`)) as Array<{
+    id: string;
+    email: string;
+  }>;
   const userIds: Record<string, string> = {};
   for (const u of users) userIds[u.email] = String(u.id);
 
@@ -259,7 +260,7 @@ describe('PerimetreService', () => {
     expect(result).toBeNull();
   });
 
-  it("user avec perimetre_type=NULL → null (compat héritage)", async () => {
+  it('user avec perimetre_type=NULL → null (compat héritage)', async () => {
     await attribuerRole(
       ds,
       seed.userIds['admin@miznas.local']!,
@@ -273,7 +274,7 @@ describe('PerimetreService', () => {
     expect(result).toBeNull();
   });
 
-  it("rôle STRUCTURE pointant vers BR_CIV → 6 CR descendants", async () => {
+  it('rôle STRUCTURE pointant vers BR_CIV → 6 CR descendants', async () => {
     await attribuerRole(
       ds,
       seed.userIds['preparateur_civ@miznas.local']!,
@@ -295,7 +296,7 @@ describe('PerimetreService', () => {
     expect(ids).not.toContain(seed.crIds['CR_AG_DKR_PLATEAU']);
   });
 
-  it("rôle STRUCTURE pointant vers une feuille AG_ABJ_PLATEAU → 1 CR", async () => {
+  it('rôle STRUCTURE pointant vers une feuille AG_ABJ_PLATEAU → 1 CR', async () => {
     await attribuerRole(
       ds,
       seed.userIds['preparateur_civ@miznas.local']!,
@@ -309,7 +310,7 @@ describe('PerimetreService', () => {
     expect(result).toEqual([seed.crIds['CR_AG_ABJ_PLATEAU']]);
   });
 
-  it("rôle STRUCTURE pointant vers SOC_BANK_UEMOA → tous les CR", async () => {
+  it('rôle STRUCTURE pointant vers SOC_BANK_UEMOA → tous les CR', async () => {
     await attribuerRole(
       ds,
       seed.userIds['admin@miznas.local']!,
@@ -324,7 +325,7 @@ describe('PerimetreService', () => {
     expect(result).toHaveLength(7); // 7 CR seedés au total
   });
 
-  it("2 rôles STRUCTURE BR_CIV + BR_SEN → union 7 CR", async () => {
+  it('2 rôles STRUCTURE BR_CIV + BR_SEN → union 7 CR', async () => {
     const userId = seed.userIds['admin@miznas.local']!;
     await attribuerRole(
       ds,
@@ -346,7 +347,7 @@ describe('PerimetreService', () => {
     expect(result).toContain(seed.crIds['CR_AG_DKR_PLATEAU']);
   });
 
-  it("rôle pointant vers structure désactivée → ignoré (warning), set vide", async () => {
+  it('rôle pointant vers structure désactivée → ignoré (warning), set vide', async () => {
     await attribuerRole(
       ds,
       seed.userIds['preparateur_sen@miznas.local']!,
@@ -360,7 +361,7 @@ describe('PerimetreService', () => {
     expect(result).toEqual([]);
   });
 
-  it("rôle pointant vers structure inexistante → ignoré, set vide", async () => {
+  it('rôle pointant vers structure inexistante → ignoré, set vide', async () => {
     await attribuerRole(
       ds,
       seed.userIds['preparateur_sen@miznas.local']!,
@@ -388,7 +389,7 @@ describe('PerimetreService', () => {
     expect(result).toEqual([seed.crIds['CR_AG_ABJ_PLATEAU']]);
   });
 
-  it("rôle inactif (estActif=false) → ignoré, throw Unauthorized si seul rôle", async () => {
+  it('rôle inactif (estActif=false) → ignoré, throw Unauthorized si seul rôle', async () => {
     await attribuerRole(
       ds,
       seed.userIds['preparateur_civ@miznas.local']!,
@@ -412,7 +413,7 @@ describe('PerimetreService', () => {
 
   // ─── getStructuresAutoriseesPourUser
 
-  it("getStructuresAutoriseesPourUser BR_CIV → 7 structures (BR_CIV + 6 desc.)", async () => {
+  it('getStructuresAutoriseesPourUser BR_CIV → 7 structures (BR_CIV + 6 desc.)', async () => {
     await attribuerRole(
       ds,
       seed.userIds['preparateur_civ@miznas.local']!,
@@ -485,7 +486,7 @@ describe('PerimetreService.getPerimetreEffectif (Lot 4.1)', () => {
     );
   }
 
-  it('STRUCTURE : descend l\'arbre', async () => {
+  it("STRUCTURE : descend l'arbre", async () => {
     const userId = seed.userIds['preparateur_civ@miznas.local']!;
     await ajouterPerimetre(userId, 'STRUCTURE', {
       cibleId: seed.structureIds['BR_CIV']!,
@@ -495,7 +496,7 @@ describe('PerimetreService.getPerimetreEffectif (Lot 4.1)', () => {
     expect(result).toHaveLength(6);
   });
 
-  it("CR : ajoute uniquement le CR ciblé (pas de descente)", async () => {
+  it('CR : ajoute uniquement le CR ciblé (pas de descente)', async () => {
     const userId = seed.userIds['preparateur_civ@miznas.local']!;
     await ajouterPerimetre(userId, 'CR', {
       cibleId: seed.crIds['CR_AG_ABJ_PLATEAU']!,
@@ -583,7 +584,7 @@ describe('PerimetreService.getPerimetreEffectif (Lot 4.1)', () => {
 
   // ─── Lot 4.1-fix2.A : priorité user_perimetres ─────────────────
 
-  it("Lot 4.1-fix2 : user_perimetres prioritaire — bridge global ignoré", async () => {
+  it('Lot 4.1-fix2 : user_perimetres prioritaire — bridge global ignoré', async () => {
     const userId = seed.userIds['preparateur_civ@miznas.local']!;
     // Bridge 'global' → admin théorique
     await ds.query(
@@ -610,7 +611,7 @@ describe('PerimetreService.getPerimetreEffectif (Lot 4.1)', () => {
     );
   });
 
-  it("Lot 4.1-fix2 : user_perimetres STRUCTURE prioritaire — bridge global ignoré", async () => {
+  it('Lot 4.1-fix2 : user_perimetres STRUCTURE prioritaire — bridge global ignoré', async () => {
     const userId = seed.userIds['preparateur_civ@miznas.local']!;
     await ds.query(
       `INSERT INTO bridge_user_role ("fk_user","fk_role","perimetre_type","est_actif","utilisateur_creation")
@@ -626,7 +627,7 @@ describe('PerimetreService.getPerimetreEffectif (Lot 4.1)', () => {
     expect(result).toHaveLength(6);
   });
 
-  it("Lot 4.1-fix2 : fallback bridge_user_role si user_perimetres VIDE", async () => {
+  it('Lot 4.1-fix2 : fallback bridge_user_role si user_perimetres VIDE', async () => {
     const userId = seed.userIds['preparateur_civ@miznas.local']!;
     await ds.query(
       `INSERT INTO bridge_user_role ("fk_user","fk_role","perimetre_type","perimetre_id","est_actif","utilisateur_creation")
@@ -649,7 +650,7 @@ describe('PerimetreService.getPerimetreEffectif (Lot 4.1)', () => {
     expect(result).toBeNull(); // admin global
   });
 
-  it("Lot 4.1-fix2 : user_perimetres expirée (date_fin dépassée) → fallback bridge", async () => {
+  it('Lot 4.1-fix2 : user_perimetres expirée (date_fin dépassée) → fallback bridge', async () => {
     const userId = seed.userIds['preparateur_civ@miznas.local']!;
     await ds.query(
       `INSERT INTO bridge_user_role ("fk_user","fk_role","perimetre_type","est_actif","utilisateur_creation")

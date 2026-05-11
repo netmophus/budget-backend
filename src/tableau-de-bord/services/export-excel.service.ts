@@ -8,10 +8,7 @@
 import { Injectable } from '@nestjs/common';
 import ExcelJS from 'exceljs';
 
-import {
-  EcartsResponseDto,
-  type NiveauAlerte,
-} from '../dto/tableau-bord.dto';
+import { EcartsResponseDto, type NiveauAlerte } from '../dto/tableau-bord.dto';
 
 const COULEURS_NIVEAU: Record<NiveauAlerte, string> = {
   NORMAL: 'C6EFCE', // vert clair
@@ -53,9 +50,18 @@ export class ExportExcelService {
     const k = ecarts.kpi;
     const lignesSynth: Array<{ k: string; v: number | string }> = [
       { k: 'Version', v: metaCodeVersion },
-      { k: 'Période', v: `${ecarts.filtres.moisDebut} → ${ecarts.filtres.moisFin}` },
-      { k: 'Seuil ATTENTION (%)', v: ecarts.filtres.seuilEcartPctAttention ?? 5 },
-      { k: 'Seuil CRITIQUE (%)', v: ecarts.filtres.seuilEcartPctCritique ?? 10 },
+      {
+        k: 'Période',
+        v: `${ecarts.filtres.moisDebut} → ${ecarts.filtres.moisFin}`,
+      },
+      {
+        k: 'Seuil ATTENTION (%)',
+        v: ecarts.filtres.seuilEcartPctAttention ?? 5,
+      },
+      {
+        k: 'Seuil CRITIQUE (%)',
+        v: ecarts.filtres.seuilEcartPctCritique ?? 10,
+      },
       { k: '', v: '' },
       { k: 'Nb total écarts', v: k.nbEcartsTotal },
       { k: 'Nb écarts CRITIQUES', v: k.nbEcartsCritique },

@@ -32,9 +32,7 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
  *
  * Cf. `docs/modele-donnees.md` §4.7.
  */
-export class CreateMvIndicateursBudget1779200000050
-  implements MigrationInterface
-{
+export class CreateMvIndicateursBudget1779200000050 implements MigrationInterface {
   name = 'CreateMvIndicateursBudget1779200000050';
 
   public async up(q: QueryRunner): Promise<void> {
@@ -112,8 +110,6 @@ export class CreateMvIndicateursBudget1779200000050
 
   public async down(q: QueryRunner): Promise<void> {
     // DROP MATERIALIZED VIEW supprime aussi les index attachés.
-    await q.query(
-      `DROP MATERIALIZED VIEW IF EXISTS "mv_indicateurs_budget"`,
-    );
+    await q.query(`DROP MATERIALIZED VIEW IF EXISTS "mv_indicateurs_budget"`);
   }
 }

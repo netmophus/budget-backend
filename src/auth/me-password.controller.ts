@@ -50,9 +50,9 @@ export class MePasswordController {
   @AllowExpiredPassword()
   @ApiOperation({
     summary:
-      'Change le mot de passe de l\'utilisateur courant. Politique : ' +
+      "Change le mot de passe de l'utilisateur courant. Politique : " +
       '≥12 chars + maj + minuscule + chiffre + caractère spécial. ' +
-      'Émet un nouveau couple access/refresh sans flags d\'expiration.',
+      "Émet un nouveau couple access/refresh sans flags d'expiration.",
   })
   @ApiOkResponse({ description: 'Mot de passe changé + nouveaux tokens.' })
   @ApiUnauthorizedResponse({ description: 'Ancien mot de passe incorrect.' })
@@ -61,8 +61,8 @@ export class MePasswordController {
     @CurrentUser() user: AuthUser,
     @Req() req: Request,
   ): Promise<ChangerMdpResponse> {
-    const ip = (req.ip ?? null) as string | null;
-    const userAgent = (req.headers['user-agent'] ?? null) as string | null;
+    const ip = req.ip ?? null;
+    const userAgent = req.headers['user-agent'] ?? null;
     const result = await this.authService.changerMdp(
       user.userId,
       dto.ancienMdp,

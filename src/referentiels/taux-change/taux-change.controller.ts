@@ -61,11 +61,12 @@ export class TauxChangeController {
   @RequirePermissions('REFERENTIEL.LIRE')
   @ApiOperation({
     summary:
-      "Résout le taux applicable à une date donnée (date exacte ou dernier taux antérieur). Utilisé en Lot 3.2 pour le calcul automatique de montant_fcfa.",
+      'Résout le taux applicable à une date donnée (date exacte ou dernier taux antérieur). Utilisé en Lot 3.2 pour le calcul automatique de montant_fcfa.',
   })
   @ApiOkResponse({ type: TauxApplicableDto })
   @ApiNotFoundResponse({
-    description: 'Aucun taux trouvé pour ce (codeDevise, typeTaux) à cette date.',
+    description:
+      'Aucun taux trouvé pour ce (codeDevise, typeTaux) à cette date.',
   })
   @ApiBadRequestResponse({ description: 'Query manquante ou mal formée.' })
   async findApplicable(
@@ -109,8 +110,7 @@ export class TauxChangeController {
   })
   @ApiCreatedResponse({ type: TauxChangeResponseDto })
   @ApiConflictResponse({
-    description:
-      'Triplet (devise, date, typeTaux) déjà existant.',
+    description: 'Triplet (devise, date, typeTaux) déjà existant.',
   })
   create(
     @Body() dto: CreateTauxChangeDto,
@@ -149,7 +149,7 @@ export class TauxChangeController {
   })
   @ApiOperation({
     summary:
-      'Supprime un taux. Autorisé : aucun fait n\'a de FK sortante vers ref_taux_change (le taux est copié dans fait_budget).',
+      "Supprime un taux. Autorisé : aucun fait n'a de FK sortante vers ref_taux_change (le taux est copié dans fait_budget).",
   })
   @ApiNoContentResponse()
   @ApiNotFoundResponse()

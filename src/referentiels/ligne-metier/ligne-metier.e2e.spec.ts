@@ -120,7 +120,7 @@ async function seedAll(ds: DataSource): Promise<SeedIds> {
     niveau: number,
     parentCode: string | null,
   ) {
-    const parentId = parentCode === null ? null : ids.get(parentCode) ?? null;
+    const parentId = parentCode === null ? null : (ids.get(parentCode) ?? null);
     await ds.query(
       `INSERT INTO dim_ligne_metier
         ("code_ligne_metier","libelle","fk_ligne_metier_parent","niveau",
@@ -268,7 +268,7 @@ describe('LigneMetier (e2e) — SCD2 hiérarchique + relink auto-référence str
       parentCode: string | null,
     ) {
       const parentId =
-        parentCode === null ? null : localIds.get(parentCode) ?? null;
+        parentCode === null ? null : (localIds.get(parentCode) ?? null);
       await dataSource.query(
         `INSERT INTO dim_ligne_metier
           ("code_ligne_metier","libelle","fk_ligne_metier_parent","niveau",
@@ -341,9 +341,7 @@ describe('LigneMetier (e2e) — SCD2 hiérarchique + relink auto-référence str
       `SELECT type_action, statut FROM audit_log WHERE entite_cible = 'dim_ligne_metier'`,
     )) as Array<{ type_action: string; statut: string }>;
     expect(
-      audits.find(
-        (a) => a.type_action === 'CREATE' && a.statut === 'success',
-      ),
+      audits.find((a) => a.type_action === 'CREATE' && a.statut === 'success'),
     ).toBeDefined();
   });
 

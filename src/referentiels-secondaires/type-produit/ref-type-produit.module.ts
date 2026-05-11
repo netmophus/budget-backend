@@ -54,10 +54,7 @@ const RefTypeProduitController = createRefSecondaireControllerClass<
 );
 
 @Module({
-  imports: [
-    TypeOrmModule.forFeature([RefTypeProduit, DimProduit]),
-    AuthModule,
-  ],
+  imports: [TypeOrmModule.forFeature([RefTypeProduit, DimProduit]), AuthModule],
   providers: [RefTypeProduitService],
   controllers: [RefTypeProduitController],
   exports: [RefTypeProduitService],

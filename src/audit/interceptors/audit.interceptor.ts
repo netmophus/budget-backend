@@ -27,10 +27,7 @@ export class AuditInterceptor implements NestInterceptor {
     private readonly auditService: AuditService,
   ) {}
 
-  intercept(
-    context: ExecutionContext,
-    next: CallHandler,
-  ): Observable<unknown> {
+  intercept(context: ExecutionContext, next: CallHandler): Observable<unknown> {
     const meta = this.reflector.getAllAndOverride<AuditableMetadata>(
       AUDITABLE_KEY,
       [context.getHandler(), context.getClass()],
@@ -43,9 +40,8 @@ export class AuditInterceptor implements NestInterceptor {
     const req = context.switchToHttp().getRequest<AuthedRequest>();
     const start = Date.now();
     const utilisateur = req.user?.email ?? 'anonymous';
-    const ipSource = (req.ip ?? null) as string | null;
-    const userAgent =
-      ((req.headers['user-agent'] as string | undefined) ?? null) ?? null;
+    const ipSource = req.ip ?? null;
+    const userAgent = req.headers['user-agent'] ?? null;
 
     const baseEntry = {
       utilisateur,
@@ -60,7 +56,7 @@ export class AuditInterceptor implements NestInterceptor {
     return next.handle().pipe(
       mergeMap((response: unknown) => {
         const idCible = meta.extractIdCible
-          ? meta.extractIdCible(req, response) ?? null
+          ? (meta.extractIdCible(req, response) ?? null)
           : null;
         return from(
           this.auditService.log({
@@ -75,7 +71,7 @@ export class AuditInterceptor implements NestInterceptor {
       }),
       catchError((err: unknown) => {
         const idCible = meta.extractIdCible
-          ? meta.extractIdCible(req) ?? null
+          ? (meta.extractIdCible(req) ?? null)
           : null;
         const message = err instanceof Error ? err.message : String(err);
         return from(

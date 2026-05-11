@@ -191,11 +191,14 @@ async function seedDimensions(ds: DataSource): Promise<DimIds> {
      VALUES ('CENTRAL','Central','central','actif','system')`,
   );
 
-  async function id(table: string, codeCol: string, code: string): Promise<string> {
-    const r = (await ds.query(
-      `SELECT id FROM ${table} WHERE ${codeCol} = $1`,
-      [code],
-    )) as Array<{ id: string | number }>;
+  async function id(
+    table: string,
+    codeCol: string,
+    code: string,
+  ): Promise<string> {
+    const r = (await ds.query(`SELECT id FROM ${table} WHERE ${codeCol} = $1`, [
+      code,
+    ])) as Array<{ id: string | number }>;
     return String(r[0]!.id);
   }
 
@@ -335,10 +338,14 @@ describe('FaitBudget (e2e)', () => {
     await dataSource.query('DELETE FROM ref_taux_change');
     await dataSource.query('UPDATE dim_compte SET fk_compte_parent = NULL');
     await dataSource.query('DELETE FROM dim_compte');
-    await dataSource.query('UPDATE dim_structure SET fk_structure_parent = NULL');
+    await dataSource.query(
+      'UPDATE dim_structure SET fk_structure_parent = NULL',
+    );
     await dataSource.query('DELETE FROM dim_centre_responsabilite');
     await dataSource.query('DELETE FROM dim_structure');
-    await dataSource.query('UPDATE dim_ligne_metier SET fk_ligne_metier_parent = NULL');
+    await dataSource.query(
+      'UPDATE dim_ligne_metier SET fk_ligne_metier_parent = NULL',
+    );
     await dataSource.query('DELETE FROM dim_ligne_metier');
     await dataSource.query('UPDATE dim_produit SET fk_produit_parent = NULL');
     await dataSource.query('DELETE FROM dim_produit');
@@ -350,7 +357,13 @@ describe('FaitBudget (e2e)', () => {
     dimIds = await seedDimensions(dataSource);
   });
 
-  function buildBody(overrides: Partial<DimIds> & { montantDevise?: number; montantFcfa?: number; tauxChangeApplique?: number } = {}) {
+  function buildBody(
+    overrides: Partial<DimIds> & {
+      montantDevise?: number;
+      montantFcfa?: number;
+      tauxChangeApplique?: number;
+    } = {},
+  ) {
     return {
       fkTemps: dimIds.fkTemps,
       fkCompte: dimIds.fkCompte,
@@ -372,9 +385,7 @@ describe('FaitBudget (e2e)', () => {
   // ─── Permissions
 
   it('GET sans token → 401', async () => {
-    await request(app.getHttpServer())
-      .get('/api/v1/faits/budget')
-      .expect(401);
+    await request(app.getHttpServer()).get('/api/v1/faits/budget').expect(401);
   });
 
   it('LECTEUR : GET /budget → 200', async () => {
@@ -422,9 +433,7 @@ describe('FaitBudget (e2e)', () => {
       `SELECT type_action, statut FROM audit_log WHERE entite_cible='fait_budget'`,
     )) as Array<{ type_action: string; statut: string }>;
     expect(
-      audits.find(
-        (a) => a.type_action === 'CREATE' && a.statut === 'success',
-      ),
+      audits.find((a) => a.type_action === 'CREATE' && a.statut === 'success'),
     ).toBeDefined();
   });
 
@@ -569,7 +578,11 @@ describe('FaitBudget (e2e)', () => {
     const audits = (await dataSource.query(
       `SELECT type_action, statut, payload_apres FROM audit_log
        WHERE entite_cible = 'fait_budget'`,
-    )) as Array<{ type_action: string; statut: string; payload_apres: unknown }>;
+    )) as Array<{
+      type_action: string;
+      statut: string;
+      payload_apres: unknown;
+    }>;
     expect(audits).toHaveLength(1);
     expect(audits[0]!.type_action).toBe('CREATE');
     expect(audits[0]!.statut).toBe('success');
@@ -829,7 +842,10 @@ describe('FaitBudget (e2e)', () => {
     )) as Array<{
       type_action: string;
       statut: string;
-      payload_apres: { body?: unknown; response?: { resolutionDetails?: unknown } };
+      payload_apres: {
+        body?: unknown;
+        response?: { resolutionDetails?: unknown };
+      };
     }>;
     expect(audits).toHaveLength(1);
     expect(audits[0]!.type_action).toBe('CREATE');
@@ -851,7 +867,7 @@ describe('FaitBudget (e2e)', () => {
     expect(res.body.commentaire).toBeNull();
   });
 
-  it('POST mode=ENCOURS_TIE sur compte porteur d\'intérêts → 201 + montant recalculé + audit', async () => {
+  it("POST mode=ENCOURS_TIE sur compte porteur d'intérêts → 201 + montant recalculé + audit", async () => {
     // Ajouter un compte porteur d'intérêts au seed
     await dataSource.query(
       `INSERT INTO dim_compte

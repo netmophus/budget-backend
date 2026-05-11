@@ -17,7 +17,8 @@ const SEEDS: RefSecondaireSeed[] = [
   {
     code: 'ouvert',
     libelle: 'Ouvert',
-    description: "La saisie est autorisée tant que la version est dans cet état.",
+    description:
+      'La saisie est autorisée tant que la version est dans cet état.',
     ordre: 10,
     estSysteme: true,
   },

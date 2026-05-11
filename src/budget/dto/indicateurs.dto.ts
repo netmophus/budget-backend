@@ -1,6 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { IsInt, IsOptional, IsString, Min } from 'class-validator';
+import { IsInt, IsString, Min } from 'class-validator';
 
 /**
  * Filtres communs aux endpoints GET /budget/indicateurs/{globaux,par-cr}.
@@ -13,7 +13,10 @@ export class IndicateursFiltersDto {
   @IsString()
   versionId!: string;
 
-  @ApiProperty({ example: '7', description: 'fk_scenario (Médian, Optimiste, …)' })
+  @ApiProperty({
+    example: '7',
+    description: 'fk_scenario (Médian, Optimiste, …)',
+  })
   @IsString()
   scenarioId!: string;
 
@@ -47,12 +50,12 @@ export class IndicateursGlobauxDto {
   @ApiProperty({ description: 'Produit Net Bancaire (cl. 7 − 67xxx)' })
   pnb!: number;
 
-  @ApiProperty({ description: 'Marge Nette d\'Intérêt (76xxx − 67xxx)' })
+  @ApiProperty({ description: "Marge Nette d'Intérêt (76xxx − 67xxx)" })
   mni!: number;
 
   @ApiPropertyOptional({
     description:
-      'Coefficient d\'exploitation (charges hors intérêts ÷ PNB × 100). null si PNB ≤ 0.',
+      "Coefficient d'exploitation (charges hors intérêts ÷ PNB × 100). null si PNB ≤ 0.",
     nullable: true,
   })
   coefExploitation!: number | null;

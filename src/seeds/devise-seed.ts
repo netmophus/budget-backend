@@ -78,7 +78,9 @@ export const DEVISES_INITIALES: readonly DeviseSeedRow[] = [
   },
 ];
 
-export async function seedDevises(ds: DataSource = AppDataSource): Promise<void> {
+export async function seedDevises(
+  ds: DataSource = AppDataSource,
+): Promise<void> {
   const ownsConnection = !ds.isInitialized;
   if (ownsConnection) {
     await ds.initialize();

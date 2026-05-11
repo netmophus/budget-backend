@@ -73,8 +73,18 @@ function buildDelegation(overrides: Partial<Delegation> = {}): Delegation {
     utilisateurCreation: 'admin',
     dateModification: null,
     utilisateurModification: null,
-    delegant: buildUser({ id: '10', email: 'manager@miznas.local', nom: 'Manager', prenom: 'Marie' }),
-    delegataire: buildUser({ id: '20', email: 'adjoint@miznas.local', nom: 'Adjoint', prenom: 'Adam' }),
+    delegant: buildUser({
+      id: '10',
+      email: 'manager@miznas.local',
+      nom: 'Manager',
+      prenom: 'Marie',
+    }),
+    delegataire: buildUser({
+      id: '20',
+      email: 'adjoint@miznas.local',
+      nom: 'Adjoint',
+      prenom: 'Adam',
+    }),
     ...overrides,
   } as unknown as Delegation;
 }
@@ -149,7 +159,7 @@ function buildService(opts: BuildOpts = {}): {
 }
 
 describe('DelegationsRappelService — notifierJ3', () => {
-  it('0 délégation matchée → notifiees=0, pas d\'email, pas d\'audit', async () => {
+  it("0 délégation matchée → notifiees=0, pas d'email, pas d'audit", async () => {
     const { service, capt } = buildService({ matches: [] });
     const r = await service.notifierJ3();
     expect(r.notifiees).toBe(0);
@@ -182,9 +192,9 @@ describe('DelegationsRappelService — notifierJ3', () => {
     expect(capt.audits[0]!.typeAction).toBe('DELEGATION_RAPPEL_J3');
     // UPDATE derniere_notification_j3 (Date objet).
     expect(capt.delegationsSaved).toHaveLength(1);
-    expect(
-      capt.delegationsSaved[0]!.derniereNotificationJ3,
-    ).toBeInstanceOf(Date);
+    expect(capt.delegationsSaved[0]!.derniereNotificationJ3).toBeInstanceOf(
+      Date,
+    );
   });
 
   it('délégant opt-out global → email SUPPRIME + délégataire reçoit normalement', async () => {
@@ -203,7 +213,9 @@ describe('DelegationsRappelService — notifierJ3', () => {
       (e) => e.evenement === 'DELEGATION_RAPPEL_J3_DELEGANT',
     )!;
     expect(delegantLog.statut).toBe('SUPPRIME');
-    expect(delegantLog.payload._motifSuppression).toBe('PREF_TOGGLE_GLOBAL_OFF');
+    expect(delegantLog.payload._motifSuppression).toBe(
+      'PREF_TOGGLE_GLOBAL_OFF',
+    );
     const delegataireLog = capt.emails.find(
       (e) => e.evenement === 'DELEGATION_RAPPEL_J3_DELEGATAIRE',
     )!;

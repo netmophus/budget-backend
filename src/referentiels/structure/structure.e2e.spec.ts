@@ -61,7 +61,9 @@ interface AuditRow {
   commentaire: string | null;
 }
 
-async function seedAccessControlAndStructures(ds: DataSource): Promise<SeedIds> {
+async function seedAccessControlAndStructures(
+  ds: DataSource,
+): Promise<SeedIds> {
   // 1. Permissions
   for (const [code, libelle] of [
     ['REFERENTIEL.LIRE', 'Lire les référentiels'],
@@ -114,9 +116,7 @@ async function seedAccessControlAndStructures(ds: DataSource): Promise<SeedIds> 
     `SELECT email, id FROM "user" WHERE email IN ($1, $2, $3)`,
     ['admin@miznas.local', 'lecteur@miznas.local', 'noperms@miznas.local'],
   )) as Array<{ email: string; id: string | number }>;
-  const userIdByEmail = new Map(
-    users.map((u) => [u.email, String(u.id)]),
-  );
+  const userIdByEmail = new Map(users.map((u) => [u.email, String(u.id)]));
 
   // 5. Affectations rôle global
   for (const [email, role] of [
@@ -152,9 +152,8 @@ async function seedAccessControlAndStructures(ds: DataSource): Promise<SeedIds> 
     parentCode: string | null,
     pays: string | null,
   ): Promise<void> {
-    const parentId = parentCode === null
-      ? null
-      : structureIds.get(parentCode) ?? null;
+    const parentId =
+      parentCode === null ? null : (structureIds.get(parentCode) ?? null);
     await ds.query(
       `INSERT INTO dim_structure
         ("code_structure","libelle","type_structure","niveau_hierarchique",
@@ -170,15 +169,78 @@ async function seedAccessControlAndStructures(ds: DataSource): Promise<SeedIds> 
     structureIds.set(code, String(rows[0]!.id));
   }
 
-  await insertStructure('SOC_BANK_UEMOA', 'Banque Pilote UEMOA', 'entite_juridique', 1, null, null);
-  await insertStructure('BR_CIV', "Branche Côte d'Ivoire", 'branche', 2, 'SOC_BANK_UEMOA', 'CIV');
-  await insertStructure('BR_SEN', 'Branche Sénégal', 'branche', 2, 'SOC_BANK_UEMOA', 'SEN');
-  await insertStructure('BR_BFA', 'Branche Burkina Faso', 'branche', 2, 'SOC_BANK_UEMOA', 'BFA');
-  await insertStructure('DIR_CIV_RETAIL', 'Dir Retail CIV', 'direction', 3, 'BR_CIV', 'CIV');
-  await insertStructure('DIR_CIV_CORPORATE', 'Dir Corporate CIV', 'direction', 3, 'BR_CIV', 'CIV');
-  await insertStructure('DEPT_CIV_PARTICULIERS', 'Dept Particuliers', 'departement', 4, 'DIR_CIV_RETAIL', 'CIV');
-  await insertStructure('AG_ABJ_PLATEAU', 'Agence Plateau', 'agence', 5, 'DEPT_CIV_PARTICULIERS', 'CIV');
-  await insertStructure('AG_ABJ_COCODY', 'Agence Cocody', 'agence', 5, 'DEPT_CIV_PARTICULIERS', 'CIV');
+  await insertStructure(
+    'SOC_BANK_UEMOA',
+    'Banque Pilote UEMOA',
+    'entite_juridique',
+    1,
+    null,
+    null,
+  );
+  await insertStructure(
+    'BR_CIV',
+    "Branche Côte d'Ivoire",
+    'branche',
+    2,
+    'SOC_BANK_UEMOA',
+    'CIV',
+  );
+  await insertStructure(
+    'BR_SEN',
+    'Branche Sénégal',
+    'branche',
+    2,
+    'SOC_BANK_UEMOA',
+    'SEN',
+  );
+  await insertStructure(
+    'BR_BFA',
+    'Branche Burkina Faso',
+    'branche',
+    2,
+    'SOC_BANK_UEMOA',
+    'BFA',
+  );
+  await insertStructure(
+    'DIR_CIV_RETAIL',
+    'Dir Retail CIV',
+    'direction',
+    3,
+    'BR_CIV',
+    'CIV',
+  );
+  await insertStructure(
+    'DIR_CIV_CORPORATE',
+    'Dir Corporate CIV',
+    'direction',
+    3,
+    'BR_CIV',
+    'CIV',
+  );
+  await insertStructure(
+    'DEPT_CIV_PARTICULIERS',
+    'Dept Particuliers',
+    'departement',
+    4,
+    'DIR_CIV_RETAIL',
+    'CIV',
+  );
+  await insertStructure(
+    'AG_ABJ_PLATEAU',
+    'Agence Plateau',
+    'agence',
+    5,
+    'DEPT_CIV_PARTICULIERS',
+    'CIV',
+  );
+  await insertStructure(
+    'AG_ABJ_COCODY',
+    'Agence Cocody',
+    'agence',
+    5,
+    'DEPT_CIV_PARTICULIERS',
+    'CIV',
+  );
 
   return {
     adminId: userIdByEmail.get('admin@miznas.local')!,
@@ -201,11 +263,11 @@ describe('Structure (e2e) — première dimension SCD2 réelle', () => {
   let ids: SeedIds;
   let adminToken: string;
   let lecteurToken: string;
-  let noPermsToken: string;
 
   beforeAll(async () => {
     process.env.NODE_ENV = 'test';
-    process.env.JWT_SECRET = 'test-secret-for-structure-e2e-min-32-chars-cccccccccc';
+    process.env.JWT_SECRET =
+      'test-secret-for-structure-e2e-min-32-chars-cccccccccc';
     process.env.JWT_ACCESS_EXPIRES_IN = '15m';
     process.env.JWT_REFRESH_EXPIRES_IN = '7d';
     process.env.BCRYPT_ROUNDS = '4';
@@ -290,11 +352,6 @@ describe('Structure (e2e) — première dimension SCD2 réelle', () => {
       email: 'lecteur@miznas.local',
       jti: 'jti-lecteur',
     });
-    noPermsToken = await jwtService.signAsync({
-      sub: ids.noPermsId,
-      email: 'noperms@miznas.local',
-      jti: 'jti-noperms',
-    });
   });
 
   afterAll(async () => {
@@ -344,7 +401,9 @@ describe('Structure (e2e) — première dimension SCD2 réelle', () => {
     const refreshed = (await dataSource.query(
       `SELECT code_structure, id FROM dim_structure WHERE version_courante = true`,
     )) as Array<{ code_structure: string; id: string | number }>;
-    const byCode = new Map(refreshed.map((r) => [r.code_structure.trim(), String(r.id)]));
+    const byCode = new Map(
+      refreshed.map((r) => [r.code_structure.trim(), String(r.id)]),
+    );
     ids.socId = byCode.get('SOC_BANK_UEMOA') ?? ids.socId;
     ids.brCivId = byCode.get('BR_CIV') ?? ids.brCivId;
     ids.brSenId = byCode.get('BR_SEN') ?? ids.brSenId;
@@ -483,7 +542,9 @@ describe('Structure (e2e) — première dimension SCD2 réelle', () => {
     );
 
     const audits = await fetchAuditStructure();
-    expect(audits.find((a) => a.type_action === 'UPDATE' && a.statut === 'success')).toBeDefined();
+    expect(
+      audits.find((a) => a.type_action === 'UPDATE' && a.statut === 'success'),
+    ).toBeDefined();
   });
 
   it('PATCH /par-code/AG_ABJ_COCODY change estActif=false alone → 200 + in-place (still 1 row)', async () => {
@@ -540,7 +601,7 @@ describe('Structure (e2e) — première dimension SCD2 réelle', () => {
     expect(res.body.length).toBe(8);
   });
 
-  it('GET /:id_AG_ABJ_PLATEAU/ancetres → 4 ancêtres jusqu\'à SOC_BANK_UEMOA', async () => {
+  it("GET /:id_AG_ABJ_PLATEAU/ancetres → 4 ancêtres jusqu'à SOC_BANK_UEMOA", async () => {
     const res = await request(app.getHttpServer())
       .get(`/api/v1/referentiels/structures/${ids.agPlateauId}/ancetres`)
       .set('Authorization', `Bearer ${lecteurToken}`)
@@ -572,7 +633,9 @@ describe('Structure (e2e) — première dimension SCD2 réelle', () => {
     expect(after[0]!.est_actif).toBe(false);
 
     const audits = await fetchAuditStructure();
-    expect(audits.some((a) => a.type_action === 'DELETE' && a.statut === 'success')).toBe(true);
+    expect(
+      audits.some((a) => a.type_action === 'DELETE' && a.statut === 'success'),
+    ).toBe(true);
   });
 
   // ─── Intra-jour (fix 2.3A.1) ─────────────────────────────────────

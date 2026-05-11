@@ -59,14 +59,11 @@ export class NotificationsListeners {
     payload: BudgetEventPayload,
   ): Promise<void> {
     try {
-      const destinataires = await this.notifs.resoudreDestinataires(
-        evenement,
-        {
-          budgetVersionId: payload.versionId,
-          auteurId: payload.auteurId,
-          auteurEmail: payload.auteurEmail,
-        },
-      );
+      const destinataires = await this.notifs.resoudreDestinataires(evenement, {
+        budgetVersionId: payload.versionId,
+        auteurId: payload.auteurId,
+        auteurEmail: payload.auteurEmail,
+      });
       for (const d of destinataires) {
         await this.notifs.envoyer(evenement, d, {
           versionId: payload.versionId,
@@ -117,13 +114,10 @@ export class NotificationsListeners {
     destinataireUserIds: string[],
   ): Promise<void> {
     try {
-      const destinataires = await this.notifs.resoudreDestinataires(
-        evenement,
-        {
-          delegationId: payload.delegationId,
-          destinataireUserIds,
-        },
-      );
+      const destinataires = await this.notifs.resoudreDestinataires(evenement, {
+        delegationId: payload.delegationId,
+        destinataireUserIds,
+      });
       for (const d of destinataires) {
         await this.notifs.envoyer(evenement, d, {
           delegationId: payload.delegationId,

@@ -25,7 +25,7 @@ export class CreerAffectationPerimetreDto {
   cibleType!: CiblePerimetreType;
 
   @ApiPropertyOptional({
-    description: "Id de la cible (STRUCTURE ou CR). Interdit pour CR_SET.",
+    description: 'Id de la cible (STRUCTURE ou CR). Interdit pour CR_SET.',
   })
   @IsOptional()
   @IsString()

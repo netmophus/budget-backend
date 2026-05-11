@@ -2,10 +2,16 @@ import { CallHandler, ExecutionContext } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { firstValueFrom, of, throwError } from 'rxjs';
 import { AuditService } from '../audit.service';
-import { AUDITABLE_KEY, AuditableMetadata } from '../decorators/auditable.decorator';
+import {
+  AUDITABLE_KEY,
+  AuditableMetadata,
+} from '../decorators/auditable.decorator';
 import { AuditInterceptor } from './audit.interceptor';
 
-function makeContext(body: unknown, user?: { email: string }): ExecutionContext {
+function makeContext(
+  body: unknown,
+  user?: { email: string },
+): ExecutionContext {
   return {
     getHandler: () => () => undefined,
     getClass: () => Object,
@@ -24,9 +30,11 @@ function makeContext(body: unknown, user?: { email: string }): ExecutionContext 
 
 function makeReflector(meta: AuditableMetadata | undefined): Reflector {
   return {
-    getAllAndOverride: jest.fn().mockImplementation((k: string) =>
-      k === AUDITABLE_KEY ? meta : undefined,
-    ),
+    getAllAndOverride: jest
+      .fn()
+      .mockImplementation((k: string) =>
+        k === AUDITABLE_KEY ? meta : undefined,
+      ),
   } as unknown as Reflector;
 }
 
@@ -34,11 +42,16 @@ describe('AuditInterceptor', () => {
   let auditService: jest.Mocked<AuditService>;
 
   beforeEach(() => {
-    auditService = { log: jest.fn().mockResolvedValue(undefined) } as unknown as jest.Mocked<AuditService>;
+    auditService = {
+      log: jest.fn().mockResolvedValue(undefined),
+    } as unknown as jest.Mocked<AuditService>;
   });
 
   it('does nothing when @Auditable is absent', async () => {
-    const interceptor = new AuditInterceptor(makeReflector(undefined), auditService);
+    const interceptor = new AuditInterceptor(
+      makeReflector(undefined),
+      auditService,
+    );
     const handler: CallHandler = { handle: () => of({ ok: true }) };
 
     const result = await firstValueFrom(
@@ -49,13 +62,21 @@ describe('AuditInterceptor', () => {
   });
 
   it('logs success with sanitized payload', async () => {
-    const meta: AuditableMetadata = { typeAction: 'CREATE', entiteCible: 'user' };
+    const meta: AuditableMetadata = {
+      typeAction: 'CREATE',
+      entiteCible: 'user',
+    };
     const interceptor = new AuditInterceptor(makeReflector(meta), auditService);
-    const handler: CallHandler = { handle: () => of({ id: '1', email: 'a@b.c' }) };
+    const handler: CallHandler = {
+      handle: () => of({ id: '1', email: 'a@b.c' }),
+    };
     const body = { email: 'a@b.c', motDePasse: 'secret' };
 
     const result = await firstValueFrom(
-      interceptor.intercept(makeContext(body, { email: 'admin@miznas.local' }), handler),
+      interceptor.intercept(
+        makeContext(body, { email: 'admin@miznas.local' }),
+        handler,
+      ),
     );
 
     expect(result).toEqual({ id: '1', email: 'a@b.c' });
@@ -68,13 +89,21 @@ describe('AuditInterceptor', () => {
   });
 
   it('logs failure and re-throws when handler errors', async () => {
-    const meta: AuditableMetadata = { typeAction: 'UPDATE', entiteCible: 'user' };
+    const meta: AuditableMetadata = {
+      typeAction: 'UPDATE',
+      entiteCible: 'user',
+    };
     const interceptor = new AuditInterceptor(makeReflector(meta), auditService);
     const err = new Error('boom');
     const handler: CallHandler = { handle: () => throwError(() => err) };
 
     await expect(
-      firstValueFrom(interceptor.intercept(makeContext({}, { email: 'admin@miznas.local' }), handler)),
+      firstValueFrom(
+        interceptor.intercept(
+          makeContext({}, { email: 'admin@miznas.local' }),
+          handler,
+        ),
+      ),
     ).rejects.toThrow('boom');
     expect(auditService.log).toHaveBeenCalledWith(
       expect.objectContaining({ statut: 'failure', commentaire: 'boom' }),

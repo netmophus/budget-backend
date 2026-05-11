@@ -13,10 +13,7 @@ import { IsNull, Repository } from 'typeorm';
 import { AuditService } from '../audit/audit.service';
 import { User } from '../users/entities/user.entity';
 import { UserRole } from '../users/entities/user-role.entity';
-import {
-  MotifRevocation,
-  RefreshToken,
-} from './entities/refresh-token.entity';
+import { MotifRevocation, RefreshToken } from './entities/refresh-token.entity';
 import { validatePasswordPolicy } from './password-policy';
 
 export interface IssuedTokens {
@@ -94,7 +91,9 @@ export class AuthService {
     const accessDuration = config.get<string>('JWT_ACCESS_EXPIRES_IN') ?? '15m';
     const refreshDuration =
       config.get<string>('JWT_REFRESH_EXPIRES_IN') ?? '7d';
-    this.accessExpiresInSeconds = Math.floor(parseDurationMs(accessDuration) / 1000);
+    this.accessExpiresInSeconds = Math.floor(
+      parseDurationMs(accessDuration) / 1000,
+    );
     this.refreshExpiresInMs = parseDurationMs(refreshDuration);
     this.bcryptRounds = Number.parseInt(
       config.get<string>('BCRYPT_ROUNDS') ?? '12',

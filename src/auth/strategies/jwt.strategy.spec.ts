@@ -2,8 +2,12 @@ import { UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtPayload, JwtStrategy } from './jwt.strategy';
 
-function makeStrategy(secret = 'test-secret-32-bytes-test-secret'): JwtStrategy {
-  const config = { get: (key: string) => (key === 'JWT_SECRET' ? secret : undefined) };
+function makeStrategy(
+  secret = 'test-secret-32-bytes-test-secret',
+): JwtStrategy {
+  const config = {
+    get: (key: string) => (key === 'JWT_SECRET' ? secret : undefined),
+  };
   return new JwtStrategy(config as ConfigService);
 }
 

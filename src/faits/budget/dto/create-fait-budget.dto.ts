@@ -76,7 +76,7 @@ export class CreateFaitBudgetDto {
 
   @ApiProperty({
     example: 1000000.0,
-    description: 'Montant en devise d\'origine.',
+    description: "Montant en devise d'origine.",
   })
   @IsNumber({ maxDecimalPlaces: 4 })
   montantDevise!: number;
@@ -92,7 +92,7 @@ export class CreateFaitBudgetDto {
   @ApiProperty({
     example: 1.0,
     description:
-      "Taux appliqué (1 unité de devise = X FCFA). Pour la devise pivot (XOF), 1.0.",
+      'Taux appliqué (1 unité de devise = X FCFA). Pour la devise pivot (XOF), 1.0.',
   })
   @IsNumber({ maxDecimalPlaces: 8 })
   @Min(0.00000001)
@@ -104,8 +104,8 @@ export class CreateFaitBudgetDto {
     enum: ['MONTANT', 'ENCOURS_TIE'],
     default: 'MONTANT',
     description:
-      "MONTANT (défaut) : `montantDevise` est saisi directement. " +
-      "ENCOURS_TIE : le service recalcule `montantDevise = encoursMoyen × tie / 12` " +
+      'MONTANT (défaut) : `montantDevise` est saisi directement. ' +
+      'ENCOURS_TIE : le service recalcule `montantDevise = encoursMoyen × tie / 12` ' +
       "(réservé aux comptes porteurs d'intérêts).",
   })
   @IsOptional()

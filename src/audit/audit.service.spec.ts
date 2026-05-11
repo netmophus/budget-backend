@@ -6,7 +6,9 @@ import { AuditLog } from './entities/audit-log.entity';
 
 describe('AuditService', () => {
   let service: AuditService;
-  let repo: jest.Mocked<Pick<Repository<AuditLog>, 'insert' | 'findAndCount' | 'findOne'>>;
+  let repo: jest.Mocked<
+    Pick<Repository<AuditLog>, 'insert' | 'findAndCount' | 'findOne'>
+  >;
 
   beforeEach(async () => {
     repo = {
@@ -83,7 +85,10 @@ describe('AuditService', () => {
   });
 
   it('findAll() with caller != system writes a LIRE_AUDIT meta-trail', async () => {
-    await service.findAll({ page: 1, limit: 50 }, { caller: 'admin@miznas.local' });
+    await service.findAll(
+      { page: 1, limit: 50 },
+      { caller: 'admin@miznas.local' },
+    );
     expect(repo.insert).toHaveBeenCalledWith(
       expect.objectContaining({
         utilisateur: 'admin@miznas.local',
@@ -106,17 +111,28 @@ describe('AuditService', () => {
       dateDebut: '2026-04-01T00:00:00.000Z',
       dateFin: '2026-04-30T23:59:59.999Z',
     });
-    const where = (repo.findAndCount.mock.calls[0][0]!.where ?? {}) as Record<string, unknown>;
+    const where = (repo.findAndCount.mock.calls[0][0]!.where ?? {}) as Record<
+      string,
+      unknown
+    >;
     expect(where.dateAction).toBeDefined();
   });
 
   it('findAll() applies dateDebut alone (>=) and dateFin alone (<=)', async () => {
     repo.findAndCount.mockResolvedValue([[], 0]);
-    await service.findAll({ page: 1, limit: 50, dateDebut: '2026-04-01T00:00:00.000Z' });
+    await service.findAll({
+      page: 1,
+      limit: 50,
+      dateDebut: '2026-04-01T00:00:00.000Z',
+    });
     expect(repo.findAndCount.mock.calls[0][0]!.where).toBeDefined();
 
     repo.findAndCount.mockClear();
-    await service.findAll({ page: 1, limit: 50, dateFin: '2026-04-30T23:59:59.999Z' });
+    await service.findAll({
+      page: 1,
+      limit: 50,
+      dateFin: '2026-04-30T23:59:59.999Z',
+    });
     expect(repo.findAndCount.mock.calls[0][0]!.where).toBeDefined();
   });
 
@@ -131,7 +147,10 @@ describe('AuditService', () => {
       idCible: '1',
       statut: 'success',
     });
-    const where = (repo.findAndCount.mock.calls[0][0]!.where ?? {}) as Record<string, unknown>;
+    const where = (repo.findAndCount.mock.calls[0][0]!.where ?? {}) as Record<
+      string,
+      unknown
+    >;
     expect(where.utilisateur).toBe('admin@miznas.local');
     expect(where.typeAction).toBe('LOGIN');
     expect(where.entiteCible).toBe('auth');

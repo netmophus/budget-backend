@@ -55,6 +55,8 @@ describe('UsersController', () => {
   it('me/permissions delegates to PermissionsService', async () => {
     permissionsService.getEffectivePermissions.mockResolvedValue([]);
     await controller.meEffectivePermissions({ userId: '1', email: 'a@b.c' });
-    expect(permissionsService.getEffectivePermissions).toHaveBeenCalledWith('1');
+    expect(permissionsService.getEffectivePermissions).toHaveBeenCalledWith(
+      '1',
+    );
   });
 });

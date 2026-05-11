@@ -79,14 +79,14 @@ export class StructureResponseDto {
   @ApiPropertyOptional({
     enum: ['nouvelle_version', 'ecrasement_intra_jour', 'in_place_est_actif'],
     description:
-      "Présent uniquement dans les réponses de PATCH — indique comment la modification a été appliquée (cf. ModeMajStructure).",
+      'Présent uniquement dans les réponses de PATCH — indique comment la modification a été appliquée (cf. ModeMajStructure).',
   })
   modeMaj?: ModeMajStructure;
 
   @ApiPropertyOptional({
     example: 0,
     description:
-      "Nombre de CR repointés vers la nouvelle version de structure (stratégie A — cf. scd2-pattern.md §8). Présent uniquement après un PATCH qui a créé une nouvelle version SCD2.",
+      'Nombre de CR repointés vers la nouvelle version de structure (stratégie A — cf. scd2-pattern.md §8). Présent uniquement après un PATCH qui a créé une nouvelle version SCD2.',
   })
   crsRelinked?: number;
 }

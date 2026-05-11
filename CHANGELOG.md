@@ -8,6 +8,91 @@ en interne pour BSIC ; pas de release publique).
 
 ## [Non publié]
 
+### Lot 6.6 — Nettoyage codebase (mai 2026)
+
+Objectif : atteindre 0 problems ESLint + 0 erreurs tsc strict
+backend pour activer ces checks en Required CI.
+
+Documentation complète : [docs/lot-6/6.6-nettoyage-codebase.md](./docs/lot-6/6.6-nettoyage-codebase.md).
+
+#### Métriques
+
+- ESLint backend : **3185 → 0 problems** (−100 %)
+- tsc strict backend : **25 → 0 erreurs**
+- `npm run build` : VERT (cassé sur main avant le lot)
+- Vitest : **1151 → 1153 verts** (+2 tests régression Excel formule)
+
+#### Corrigé
+
+- **Bug latent import Excel cellule formule** : `String(cellVal).trim()`
+  donnait `'[object Object]'` au lieu de la valeur calculée pour les
+  cellules `{ formula, result }` retournées par ExcelJS. Fix sur
+  `budget-import.service.ts` + `realise-import.service.ts` avec
+  extraction de `.result` via type guard. 2 tests de régression
+  ajoutés couvrent le scénario.
+- **Régression TS2871 introduite par A.0 prettier** : retrait des
+  parens externes `((X ?? null) ?? null)` → `(X) ?? null ?? null`
+  rendait visible le doublon `?? null` redondant. Fix sur
+  `audit.interceptor.ts` + `permissions.guard.ts`.
+
+#### Ajouté
+
+- Override ESLint backend ciblé sur tests/spec/migrations/seeds
+  pour 8 règles `no-unsafe-*` + `unbound-method` +
+  `no-unnecessary-type-assertion` + `require-await` (rationale :
+  patterns dynamiques mocks Jest / raw SQL / fixtures TypeORM).
+- Configuration `no-unused-vars` avec `argsIgnorePattern: '^_'` /
+  `varsIgnorePattern: '^_'` / `caughtErrorsIgnorePattern: '^_'`
+  (convention `_var` pour params intentionnellement non utilisés).
+- Split du script `lint` (check pur) et `lint:fix` (auto-correct
+  explicite) pour éviter les auto-fix accidentels lors des mesures.
+
+#### Refactor
+
+- Pattern typage racine `manager.query<T>(...)` au lieu de
+  `(await manager.query(...)) as T` (signature TypeORM 0.3,
+  sémantiquement équivalent runtime). Appliqué dans
+  `reforecast.service.ts`, `version-workflow.service.ts`,
+  `delegations-rappel.service.ts`.
+- Pattern save() ternary `Array.isArray(saved) ? saved[0]! : saved`
+  remplacé par `(await save(...)) as unknown as T` dans
+  `scd2.service.ts` + `base-ref-secondaire.service.ts` (TS2352
+  impose `as unknown` pour conversion T[] → T).
+- Retrait de **28 non-null assertions `!`** sur array index dans
+  `budget-import.service.ts` + `realise-import.service.ts`
+  (inutiles avec `noUncheckedIndexedAccess: off`).
+- Retrait de **2 casts `as never`** sur `repo.update()` /
+  `repo.delete()` typeorm (sentinelles validées avant retrait).
+- Refactor du mock `users-admin.controller.spec.ts` pour le
+  nouveau contrat `ResetPasswordResponseDto` (Lot 6.4.C breaking
+  change : mdp envoyé par email, plus retourné dans la réponse).
+- Sync de mocks specs après désync Lots 6.3-6.5 :
+  - `auth.controller.spec` : `LoginResult` ajout `mdpExpire` +
+    `doitChangerMdp`
+  - `notifications.integration.spec` + `templates.spec` :
+    `NotificationsService` constructor 5e arg `EmailQueueProducer`
+  - `fk-ref-secondaire.spec` : imports migrations corrigés
+    (chemin relatif `../../src/migrations/` au lieu de `./`)
+
+#### Désactivations locales avec rationale
+
+Tous les `// eslint-disable-next-line ...` ajoutés portent un
+commentaire `-- raison`. Patterns concernés :
+- `@Transform(({ value }) => ...)` class-transformer dans 9 DTOs
+  `list-*-query.dto.ts` + `reforecast.dto.ts`
+- `EventEmitter2.on()` avec listeners async dans
+  `notifications.integration.spec.ts`
+- `manager.transaction<T>` generic mal inféré dans `scd2.service.ts`
+- Cast `as unknown as T` sur save() typeorm (TS2352)
+- Switch sur enum `HttpStatus` dans `all-exceptions.filter.ts`
+- `csv-parse() as RowBrute[]` dans services d'import (TS2322 sans le cast)
+
+#### Action post-merge
+
+Activer en branch protection main backend :
+- Required check : `ESLint backend`
+- Required check : `tsc strict backend`
+
 ### Lot 6.5 — Notifications résiduelles (mai 2026)
 
 #### Ajouté

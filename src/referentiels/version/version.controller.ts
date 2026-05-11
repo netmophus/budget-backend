@@ -61,9 +61,7 @@ export class VersionController {
       'Liste paginée des versions de budget (filtres exerciceFiscal, statut, typeVersion).',
   })
   @ApiOkResponse({ type: PaginatedVersionsDto })
-  findAll(
-    @Query() query: ListVersionsQueryDto,
-  ): Promise<PaginatedVersionsDto> {
+  findAll(@Query() query: ListVersionsQueryDto): Promise<PaginatedVersionsDto> {
     return this.versionService.findAll(query);
   }
 
@@ -100,8 +98,10 @@ export class VersionController {
     @Body() dto: CreateVersionDto,
     @CurrentUser() user: AuthUser,
   ): Promise<CreateVersionResponseDto> {
-    const { version, scenarioAutoCreeCode } =
-      await this.versionService.create(dto, user.email);
+    const { version, scenarioAutoCreeCode } = await this.versionService.create(
+      dto,
+      user.email,
+    );
     return { ...version, scenarioAutoCreeCode };
   }
 
@@ -113,8 +113,7 @@ export class VersionController {
     extractIdCible: (req) => (req.params as { id?: string }).id ?? null,
   })
   @ApiOperation({
-    summary:
-      "Modifie une version (uniquement si statut='ouvert' au Lot 3.1).",
+    summary: "Modifie une version (uniquement si statut='ouvert' au Lot 3.1).",
   })
   @ApiOkResponse({ type: VersionResponseDto })
   @ApiNotFoundResponse()
@@ -161,7 +160,7 @@ export class VersionController {
   @RequirePermissions('BUDGET.SOUMETTRE')
   @ApiOperation({
     summary:
-      "Soumet une version Brouillon à validation (statut: ouvert → soumis). " +
+      'Soumet une version Brouillon à validation (statut: ouvert → soumis). ' +
       'Permission BUDGET.SOUMETTRE.',
   })
   @ApiOkResponse({ type: VersionResponseDto })
@@ -182,7 +181,7 @@ export class VersionController {
   @RequirePermissions('BUDGET.VALIDER')
   @ApiOperation({
     summary:
-      "Valide une version Soumise (statut: soumis → valide). " +
+      'Valide une version Soumise (statut: soumis → valide). ' +
       'Permission BUDGET.VALIDER.',
   })
   @ApiOkResponse({ type: VersionResponseDto })
@@ -200,7 +199,7 @@ export class VersionController {
   @RequirePermissions('BUDGET.VALIDER')
   @ApiOperation({
     summary:
-      "Rejette une version Soumise (statut: soumis → ouvert). " +
+      'Rejette une version Soumise (statut: soumis → ouvert). ' +
       'Commentaire obligatoire. Permission BUDGET.VALIDER.',
   })
   @ApiOkResponse({ type: VersionResponseDto })
@@ -219,7 +218,7 @@ export class VersionController {
   @RequirePermissions('BUDGET.PUBLIER')
   @ApiOperation({
     summary:
-      "Publie (gèle) une version Validée (statut: valide → gele). " +
+      'Publie (gèle) une version Validée (statut: valide → gele). ' +
       'Action irréversible. Permission BUDGET.PUBLIER.',
   })
   @ApiOkResponse({ type: VersionResponseDto })

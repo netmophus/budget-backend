@@ -8,9 +8,7 @@ import {
 const CHECK_NAME = 'ck_dim_version_type';
 const RECREATE_CHECK = `"type_version" IN ('budget_initial','reforecast_1','reforecast_2','atterrissage')`;
 
-export class AddFkDimVersionTypeVersion1779100000080
-  implements MigrationInterface
-{
+export class AddFkDimVersionTypeVersion1779100000080 implements MigrationInterface {
   name = 'AddFkDimVersionTypeVersion1779100000080';
 
   public async up(q: QueryRunner): Promise<void> {

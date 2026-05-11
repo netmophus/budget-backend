@@ -42,7 +42,9 @@ export class ListProduitsQueryDto {
   @IsIn(TYPE_PRODUIT_VALUES as readonly string[])
   typeProduit?: TypeProduit;
 
-  @ApiPropertyOptional({ description: 'Filtre LIKE %libelle% case-insensitive.' })
+  @ApiPropertyOptional({
+    description: 'Filtre LIKE %libelle% case-insensitive.',
+  })
   @IsOptional()
   @IsString()
   @MaxLength(200)
@@ -54,6 +56,7 @@ export class ListProduitsQueryDto {
     if (typeof value === 'boolean') return value;
     if (value === 'true') return true;
     if (value === 'false') return false;
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- @Transform({ value }) impose any (signature class-transformer)
     return value;
   })
   @IsBoolean()
@@ -65,6 +68,7 @@ export class ListProduitsQueryDto {
     if (typeof value === 'boolean') return value;
     if (value === 'true') return true;
     if (value === 'false') return false;
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- @Transform({ value }) impose any (signature class-transformer)
     return value;
   })
   @IsBoolean()

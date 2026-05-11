@@ -13,9 +13,7 @@ const CHECK_NAME = 'ck_dim_structure_pays';
  */
 const RECREATE_CHECK = `"code_pays" IS NULL OR "code_pays" IN ('BEN','BFA','CIV','GNB','MLI','NER','SEN','TGO')`;
 
-export class AddFkDimStructureCodePays1779100000020
-  implements MigrationInterface
-{
+export class AddFkDimStructureCodePays1779100000020 implements MigrationInterface {
   name = 'AddFkDimStructureCodePays1779100000020';
 
   public async up(q: QueryRunner): Promise<void> {

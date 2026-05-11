@@ -52,18 +52,48 @@ export const PRODUITS_INITIAUX: readonly ProduitSeedRow[] = [
 
   // ─── Niveau 2 : sous-types
   // Sous CREDIT_GRP
-  row('CREDIT_TRESORERIE', 'Crédits de trésorerie (CT)', 'credit', 2, 'CREDIT_GRP'),
-  row('CREDIT_INVESTISSEMENT', "Crédits d'investissement (MT/LT)", 'credit', 2, 'CREDIT_GRP'),
-  row('CREDIT_IMMOBILIER', 'Crédits immobiliers (LT)', 'credit', 2, 'CREDIT_GRP'),
+  row(
+    'CREDIT_TRESORERIE',
+    'Crédits de trésorerie (CT)',
+    'credit',
+    2,
+    'CREDIT_GRP',
+  ),
+  row(
+    'CREDIT_INVESTISSEMENT',
+    "Crédits d'investissement (MT/LT)",
+    'credit',
+    2,
+    'CREDIT_GRP',
+  ),
+  row(
+    'CREDIT_IMMOBILIER',
+    'Crédits immobiliers (LT)',
+    'credit',
+    2,
+    'CREDIT_GRP',
+  ),
   row('CREDIT_CONSO', 'Crédits à la consommation', 'credit', 2, 'CREDIT_GRP'),
   // Sous DEPOT_GRP
   row('DEPOT_VUE', 'Dépôts à vue', 'depot', 2, 'DEPOT_GRP'),
   row('DEPOT_TERME', 'Dépôts à terme', 'depot', 2, 'DEPOT_GRP'),
   row('DEPOT_EPARGNE', 'Épargne réglementée', 'depot', 2, 'DEPOT_GRP'),
   // Sous SERVICE_GRP
-  row('SERV_MOYENS_PAIEMENT', 'Moyens de paiement', 'service', 2, 'SERVICE_GRP'),
+  row(
+    'SERV_MOYENS_PAIEMENT',
+    'Moyens de paiement',
+    'service',
+    2,
+    'SERVICE_GRP',
+  ),
   row('SERV_BANQUE_DIGITALE', 'Banque digitale', 'service', 2, 'SERVICE_GRP'),
-  row('SERV_GESTION_PATRIMOINE', 'Gestion de patrimoine', 'service', 2, 'SERVICE_GRP'),
+  row(
+    'SERV_GESTION_PATRIMOINE',
+    'Gestion de patrimoine',
+    'service',
+    2,
+    'SERVICE_GRP',
+  ),
   // Sous MARCHE_GRP
   row('MARCHE_FOREX', 'Change (FOREX)', 'marche', 2, 'MARCHE_GRP'),
   row('MARCHE_TITRES', 'Titres', 'marche', 2, 'MARCHE_GRP'),
@@ -72,10 +102,31 @@ export const PRODUITS_INITIAUX: readonly ProduitSeedRow[] = [
   // ─── Niveau 3 : produits feuille
   // Crédits trésorerie
   row('CREDIT_DECOUVERT', 'Découverts', 'credit', 3, 'CREDIT_TRESORERIE', true),
-  row('CREDIT_ESCOMPTE', 'Escomptes commerciaux', 'credit', 3, 'CREDIT_TRESORERIE', true),
+  row(
+    'CREDIT_ESCOMPTE',
+    'Escomptes commerciaux',
+    'credit',
+    3,
+    'CREDIT_TRESORERIE',
+    true,
+  ),
   // Crédits immobiliers
-  row('CREDIT_IMMO_RESIDENTIEL', 'Crédit immobilier résidentiel', 'credit', 3, 'CREDIT_IMMOBILIER', true),
-  row('CREDIT_IMMO_LOCATIF', 'Crédit immobilier locatif', 'credit', 3, 'CREDIT_IMMOBILIER', true),
+  row(
+    'CREDIT_IMMO_RESIDENTIEL',
+    'Crédit immobilier résidentiel',
+    'credit',
+    3,
+    'CREDIT_IMMOBILIER',
+    true,
+  ),
+  row(
+    'CREDIT_IMMO_LOCATIF',
+    'Crédit immobilier locatif',
+    'credit',
+    3,
+    'CREDIT_IMMOBILIER',
+    true,
+  ),
   // Dépôts à terme
   row('DAT_3M', 'DAT 3 mois', 'depot', 3, 'DEPOT_TERME', true),
   row('DAT_12M', 'DAT 12 mois', 'depot', 3, 'DEPOT_TERME', true),
@@ -104,7 +155,9 @@ export const PRODUITS_INITIAUX: readonly ProduitSeedRow[] = [
   ),
 ];
 
-export async function seedProduits(ds: DataSource = AppDataSource): Promise<void> {
+export async function seedProduits(
+  ds: DataSource = AppDataSource,
+): Promise<void> {
   const ownsConnection = !ds.isInitialized;
   if (ownsConnection) {
     await ds.initialize();
@@ -113,9 +166,7 @@ export async function seedProduits(ds: DataSource = AppDataSource): Promise<void
     const force = process.argv.slice(2).includes('--force');
     if (force) {
       console.log('[seed:produits] --force : purge de dim_produit');
-      await ds.query(
-        `UPDATE dim_produit SET fk_produit_parent = NULL`,
-      );
+      await ds.query(`UPDATE dim_produit SET fk_produit_parent = NULL`);
       await ds.query(`DELETE FROM dim_produit`);
     }
 

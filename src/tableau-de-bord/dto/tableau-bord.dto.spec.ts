@@ -108,7 +108,7 @@ describe('FiltresEcartsDto — ValidationPipe (équivalent comportement controll
     expect(dto.ligneMetierIds).toEqual(['101']);
   });
 
-  it("rejette le format brackets ?crIds[]=14 (forbidNonWhitelisted) — protège contre une régression du fix1", async () => {
+  it('rejette le format brackets ?crIds[]=14 (forbidNonWhitelisted) — protège contre une régression du fix1', async () => {
     await expect(
       transformQuery({
         ...FILTRES_BASE,

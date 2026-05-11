@@ -90,8 +90,8 @@ export class CreateVersionResponseDto extends VersionResponseDto {
     example: 'MEDIAN_2027',
     nullable: true,
     description:
-      "Présent (non null) si la création de la version a déclenché " +
-      "le hook Q9 et créé automatiquement un scénario MEDIAN. " +
+      'Présent (non null) si la création de la version a déclenché ' +
+      'le hook Q9 et créé automatiquement un scénario MEDIAN. ' +
       "Null sinon (cas d'un exercice ayant déjà au moins un scénario).",
   })
   scenarioAutoCreeCode!: string | null;

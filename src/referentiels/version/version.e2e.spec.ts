@@ -95,9 +95,10 @@ async function seedRolesUsers(ds: DataSource): Promise<SeedIds> {
        ('controleur@miznas.local',  'placeholder', 'Contrôleur',   'X', true, 'system'),
        ('directeur@miznas.local',   'placeholder', 'Directeur',    'X', true, 'system')`,
   );
-  const users = (await ds.query(
-    `SELECT email, id FROM "user"`,
-  )) as Array<{ email: string; id: string | number }>;
+  const users = (await ds.query(`SELECT email, id FROM "user"`)) as Array<{
+    email: string;
+    id: string | number;
+  }>;
   const userIdByEmail = new Map(users.map((u) => [u.email, String(u.id)]));
   for (const [email, role] of [
     ['admin@miznas.local', 'ADMIN'],
@@ -311,9 +312,7 @@ describe('Version (e2e)', () => {
       `SELECT type_action, statut FROM audit_log WHERE entite_cible = 'dim_version'`,
     )) as Array<{ type_action: string; statut: string }>;
     expect(
-      audits.find(
-        (a) => a.type_action === 'CREATE' && a.statut === 'success',
-      ),
+      audits.find((a) => a.type_action === 'CREATE' && a.statut === 'success'),
     ).toBeDefined();
   });
 

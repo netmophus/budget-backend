@@ -26,9 +26,7 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
  * `TypeAction` dans `src/audit/entities/audit-log.entity.ts` (cf.
  * `scripts/check-audit-codes-coherence.js` exécuté en CI).
  */
-export class AjouterCodesAuditLot651779200000220
-  implements MigrationInterface
-{
+export class AjouterCodesAuditLot651779200000220 implements MigrationInterface {
   name = 'AjouterCodesAuditLot651779200000220';
 
   public async up(q: QueryRunner): Promise<void> {

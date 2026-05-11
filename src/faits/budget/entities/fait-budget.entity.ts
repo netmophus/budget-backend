@@ -103,10 +103,11 @@ export type ModeSaisieFaitBudget = 'MONTANT' | 'ENCOURS_TIE';
   { unique: true },
 )
 @Index('ix_fait_budget_version_temps', ['fkVersion', 'fkTemps'])
-@Index(
-  'ix_fait_budget_version_centre_temps',
-  ['fkVersion', 'fkCentre', 'fkTemps'],
-)
+@Index('ix_fait_budget_version_centre_temps', [
+  'fkVersion',
+  'fkCentre',
+  'fkTemps',
+])
 @Index('ix_fait_budget_temps_compte', ['fkTemps', 'fkCompte'])
 export class FaitBudget {
   @PrimaryGeneratedColumn('identity', { type: 'bigint' })

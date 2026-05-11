@@ -8,9 +8,7 @@ import {
 const CHECK_NAME = 'ck_dim_produit_type';
 const RECREATE_CHECK = `"type_produit" IN ('credit','depot','service','marche','autre')`;
 
-export class AddFkDimProduitTypeProduit1779100000060
-  implements MigrationInterface
-{
+export class AddFkDimProduitTypeProduit1779100000060 implements MigrationInterface {
   name = 'AddFkDimProduitTypeProduit1779100000060';
 
   public async up(q: QueryRunner): Promise<void> {

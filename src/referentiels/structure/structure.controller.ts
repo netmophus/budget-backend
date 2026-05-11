@@ -45,7 +45,8 @@ export class StructureController {
   @Get()
   @RequirePermissions('REFERENTIEL.LIRE')
   @ApiOperation({
-    summary: 'Liste paginée (filtres codePays, typeStructure, search, versionCouranteUniquement).',
+    summary:
+      'Liste paginée (filtres codePays, typeStructure, search, versionCouranteUniquement).',
   })
   @ApiOkResponse({ type: PaginatedStructuresDto })
   findAll(
@@ -56,7 +57,9 @@ export class StructureController {
 
   @Get('racines')
   @RequirePermissions('REFERENTIEL.LIRE')
-  @ApiOperation({ summary: 'Structures racines (sans parent — entités juridiques).' })
+  @ApiOperation({
+    summary: 'Structures racines (sans parent — entités juridiques).',
+  })
   @ApiOkResponse({ type: [StructureResponseDto] })
   async findRoots(): Promise<StructureResponseDto[]> {
     const rows = await this.structureService.findRoots();
@@ -82,7 +85,9 @@ export class StructureController {
 
   @Get('par-code/:codeStructure')
   @RequirePermissions('REFERENTIEL.LIRE')
-  @ApiOperation({ summary: 'Version courante par business key (code_structure).' })
+  @ApiOperation({
+    summary: 'Version courante par business key (code_structure).',
+  })
   @ApiOkResponse({ type: StructureResponseDto })
   @ApiNotFoundResponse()
   findByCode(
@@ -93,7 +98,9 @@ export class StructureController {
 
   @Get('par-code/:codeStructure/historique')
   @RequirePermissions('REFERENTIEL.LIRE')
-  @ApiOperation({ summary: "Historique chronologique d'une structure (toutes versions SCD2)." })
+  @ApiOperation({
+    summary: "Historique chronologique d'une structure (toutes versions SCD2).",
+  })
   @ApiOkResponse({ type: [StructureResponseDto] })
   findHistory(
     @Param('codeStructure') codeStructure: string,
@@ -138,7 +145,9 @@ export class StructureController {
 
   @Get(':id/descendants')
   @RequirePermissions('REFERENTIEL.LIRE')
-  @ApiOperation({ summary: 'Descendants récursifs (version courante uniquement).' })
+  @ApiOperation({
+    summary: 'Descendants récursifs (version courante uniquement).',
+  })
   @ApiOkResponse({ type: [StructureResponseDto] })
   async findDescendants(
     @Param('id') id: string,
@@ -166,7 +175,9 @@ export class StructureController {
 
   @Get(':id/ancetres')
   @RequirePermissions('REFERENTIEL.LIRE')
-  @ApiOperation({ summary: "Ancêtres de la structure (jusqu'à la racine, version courante)." })
+  @ApiOperation({
+    summary: "Ancêtres de la structure (jusqu'à la racine, version courante).",
+  })
   @ApiOkResponse({ type: [StructureResponseDto] })
   async findAncestors(
     @Param('id') id: string,
@@ -198,10 +209,13 @@ export class StructureController {
   @RequirePermissions('REFERENTIEL.GERER')
   @Auditable({ typeAction: 'CREATE', entiteCible: 'dim_structure' })
   @ApiOperation({
-    summary: 'Crée une nouvelle structure (1ʳᵉ version SCD2 — REFERENTIEL.GERER).',
+    summary:
+      'Crée une nouvelle structure (1ʳᵉ version SCD2 — REFERENTIEL.GERER).',
   })
   @ApiCreatedResponse({ type: StructureResponseDto })
-  @ApiConflictResponse({ description: 'codeStructure déjà existant en version courante.' })
+  @ApiConflictResponse({
+    description: 'codeStructure déjà existant en version courante.',
+  })
   @ApiUnprocessableEntityResponse({
     description: 'Parent inexistant, type/niveau incohérent ou cycle.',
   })
@@ -254,7 +268,8 @@ export class StructureController {
   @ApiNoContentResponse()
   @ApiNotFoundResponse()
   @ApiConflictResponse({
-    description: 'La structure a des enfants courants — fermer/transférer les enfants d\'abord.',
+    description:
+      "La structure a des enfants courants — fermer/transférer les enfants d'abord.",
   })
   async desactiver(
     @Param('codeStructure') codeStructure: string,

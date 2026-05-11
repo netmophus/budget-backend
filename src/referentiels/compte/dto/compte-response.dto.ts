@@ -32,7 +32,7 @@ export class CompteResponseDto {
 
   @ApiProperty({
     example: '6',
-    description: "Classe PCB UMOA stockée en varchar (Lot 2.5-bis-B).",
+    description: 'Classe PCB UMOA stockée en varchar (Lot 2.5-bis-B).',
   })
   classe!: string;
 
@@ -92,7 +92,7 @@ export class CompteResponseDto {
   @ApiPropertyOptional({
     example: 0,
     description:
-      "Nombre de comptes enfants repointés vers la nouvelle version (stratégie A auto-référence — cf. scd2-pattern.md §8).",
+      'Nombre de comptes enfants repointés vers la nouvelle version (stratégie A auto-référence — cf. scd2-pattern.md §8).',
   })
   comptesEnfantsRelinked?: number;
 }

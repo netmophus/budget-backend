@@ -41,7 +41,7 @@ export class UpdateFaitBudgetDto {
   @ApiPropertyOptional({
     enum: ['MONTANT', 'ENCOURS_TIE'],
     description:
-      "Bascule de mode. Si fourni, le service recalcule `montantDevise` quand " +
+      'Bascule de mode. Si fourni, le service recalcule `montantDevise` quand ' +
       "le nouveau mode est 'ENCOURS_TIE' et nettoie encoursMoyen/tie quand " +
       "le nouveau mode est 'MONTANT'.",
   })
@@ -62,7 +62,10 @@ export class UpdateFaitBudgetDto {
   @Max(1)
   tie?: number;
 
-  @ApiPropertyOptional({ example: 'Révision après comité ALCO Q2', maxLength: 2000 })
+  @ApiPropertyOptional({
+    example: 'Révision après comité ALCO Q2',
+    maxLength: 2000,
+  })
   @IsOptional()
   @IsString()
   @MaxLength(2000)

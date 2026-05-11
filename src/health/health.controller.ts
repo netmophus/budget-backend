@@ -1,9 +1,6 @@
 import { Controller, Get } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
-import {
-  HealthCheckService,
-  TypeOrmHealthIndicator,
-} from '@nestjs/terminus';
+import { HealthCheckService, TypeOrmHealthIndicator } from '@nestjs/terminus';
 
 import { Public } from '../auth/decorators/public.decorator';
 import { EmailQueueProducer } from '../notifications/email-queue.producer';

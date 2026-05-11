@@ -4,14 +4,14 @@ import { JwtService } from '@nestjs/jwt';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import * as bcrypt from 'bcrypt';
-import { IsNull, Repository } from 'typeorm';
+import { IsNull, ObjectLiteral, Repository } from 'typeorm';
 import { AuditService } from '../audit/audit.service';
 import { User } from '../users/entities/user.entity';
 import { UserRole } from '../users/entities/user-role.entity';
 import { AuthService } from './auth.service';
 import { RefreshToken } from './entities/refresh-token.entity';
 
-type Repo<T> = Pick<
+type Repo<T extends ObjectLiteral> = Pick<
   Repository<T>,
   'findOne' | 'find' | 'save' | 'create' | 'update'
 >;
@@ -60,8 +60,12 @@ describe('AuthService', () => {
     refreshRepo = {
       findOne: jest.fn(),
       find: jest.fn(),
-      save: jest.fn().mockImplementation((t: RefreshToken) => Promise.resolve(t)),
-      create: jest.fn().mockImplementation((t: Partial<RefreshToken>) => t as RefreshToken),
+      save: jest
+        .fn()
+        .mockImplementation((t: RefreshToken) => Promise.resolve(t)),
+      create: jest
+        .fn()
+        .mockImplementation((t: Partial<RefreshToken>) => t as RefreshToken),
       update: jest.fn().mockResolvedValue({ affected: 1 } as never),
     };
     jwtService = { signAsync: jest.fn().mockResolvedValue('signed.jwt.token') };
@@ -97,7 +101,10 @@ describe('AuthService', () => {
     it('returns the user when password matches and user is active', async () => {
       const hash = await bcrypt.hash('correct', 4);
       userRepo.findOne.mockResolvedValue(makeUser({ motDePasseHash: hash }));
-      const result = await service.validateUser('admin@miznas.local', 'correct');
+      const result = await service.validateUser(
+        'admin@miznas.local',
+        'correct',
+      );
       expect(result).not.toBeNull();
       expect(result?.email).toBe('admin@miznas.local');
     });
@@ -114,13 +121,19 @@ describe('AuthService', () => {
       userRepo.findOne.mockResolvedValue(
         makeUser({ motDePasseHash: hash, estActif: false }),
       );
-      const result = await service.validateUser('admin@miznas.local', 'correct');
+      const result = await service.validateUser(
+        'admin@miznas.local',
+        'correct',
+      );
       expect(result).toBeNull();
     });
 
     it('returns null when user does not exist', async () => {
       userRepo.findOne.mockResolvedValue(null);
-      const result = await service.validateUser('ghost@miznas.local', 'whatever');
+      const result = await service.validateUser(
+        'ghost@miznas.local',
+        'whatever',
+      );
       expect(result).toBeNull();
     });
   });
@@ -141,7 +154,10 @@ describe('AuthService', () => {
       expect(typeof result.tokens.refreshToken).toBe('string');
       expect(result.tokens.expiresIn).toBe(15 * 60);
       expect(userRepo.save).toHaveBeenCalledWith(
-        expect.objectContaining({ id: '1', dateDerniereConnexion: expect.any(Date) }),
+        expect.objectContaining({
+          id: '1',
+          dateDerniereConnexion: expect.any(Date),
+        }),
       );
       expect(refreshRepo.save).toHaveBeenCalled();
       expect(auditService.log).toHaveBeenCalledWith(
@@ -157,7 +173,10 @@ describe('AuthService', () => {
         service.login('admin@miznas.local', 'WRONG', '127.0.0.1', 'jest'),
       ).rejects.toThrow(UnauthorizedException);
       expect(auditService.log).toHaveBeenCalledWith(
-        expect.objectContaining({ typeAction: 'LOGIN_FAILED', statut: 'failure' }),
+        expect.objectContaining({
+          typeAction: 'LOGIN_FAILED',
+          statut: 'failure',
+        }),
       );
     });
 
@@ -285,7 +304,7 @@ describe('AuthService', () => {
       );
     });
 
-    it("rejette si nouveau mdp = ancien mdp", async () => {
+    it('rejette si nouveau mdp = ancien mdp', async () => {
       const hash = await bcrypt.hash('IdentiqueValide1!', 4);
       userRepo.findOne.mockResolvedValue(makeUser({ motDePasseHash: hash }));
 
@@ -311,7 +330,9 @@ describe('AuthService', () => {
   });
 
   describe('refresh', () => {
-    function existingActiveToken(overrides: Partial<RefreshToken> = {}): RefreshToken {
+    function existingActiveToken(
+      overrides: Partial<RefreshToken> = {},
+    ): RefreshToken {
       return {
         id: '10',
         fkUser: '1',
@@ -412,9 +433,19 @@ describe('AuthService', () => {
   describe('logout', () => {
     it('with refreshToken: targeted revocation (motif=logout) + LOGOUT audit', async () => {
       const clear = '00000000-0000-4000-8000-000000000010';
-      await service.logout('1', 'admin@miznas.local', clear, '127.0.0.1', 'jest');
+      await service.logout(
+        '1',
+        'admin@miznas.local',
+        clear,
+        '127.0.0.1',
+        'jest',
+      );
       expect(refreshRepo.update).toHaveBeenCalledWith(
-        { fkUser: '1', tokenHash: service.hashRefreshToken(clear), dateRevocation: IsNull() },
+        {
+          fkUser: '1',
+          tokenHash: service.hashRefreshToken(clear),
+          dateRevocation: IsNull(),
+        },
         expect.objectContaining({ motifRevocation: 'logout' }),
       );
       expect(auditService.log).toHaveBeenCalledWith(

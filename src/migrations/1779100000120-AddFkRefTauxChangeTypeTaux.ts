@@ -8,9 +8,7 @@ import {
 const CHECK_NAME = 'ck_ref_taux_change_type';
 const RECREATE_CHECK = `"type_taux" IN ('cloture','moyen_mensuel','fixe_budgetaire')`;
 
-export class AddFkRefTauxChangeTypeTaux1779100000120
-  implements MigrationInterface
-{
+export class AddFkRefTauxChangeTypeTaux1779100000120 implements MigrationInterface {
   name = 'AddFkRefTauxChangeTypeTaux1779100000120';
 
   public async up(q: QueryRunner): Promise<void> {

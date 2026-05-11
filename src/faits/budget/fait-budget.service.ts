@@ -52,7 +52,6 @@ import {
 import {
   FaitBudgetDimensionRef,
   FaitBudgetResponseDto,
-  FaitBudgetTempsRef,
 } from './dto/fait-budget-response.dto';
 import { ListFaitBudgetQueryDto } from './dto/list-fait-budget-query.dto';
 import { PaginatedFaitBudgetDto } from './dto/paginated-fait-budget.dto';
@@ -115,12 +114,12 @@ function toResponse(f: FaitBudget): FaitBudgetResponseDto {
     dateModification: f.dateModification,
     utilisateurModification: f.utilisateurModification,
     temps: f.temps
-      ? ({
+      ? {
           id: String(f.temps.id),
           date: f.temps.date,
           mois: f.temps.mois,
           annee: f.temps.annee,
-        } as FaitBudgetTempsRef)
+        }
       : undefined,
     compte: buildDimRef({
       id: f.compte?.id ?? '',
@@ -406,7 +405,7 @@ export class FaitBudgetService {
       // 23505 = unique violation (race condition après le findOne)
       if (pgErr.code === '23505') {
         throw new ConflictException(
-          'Conflit de grain (race condition entre la vérification applicative et l\'INSERT).',
+          "Conflit de grain (race condition entre la vérification applicative et l'INSERT).",
         );
       }
       throw err;
@@ -440,9 +439,7 @@ export class FaitBudgetService {
     //    un fait actuellement en ENCOURS_TIE, on rebascule via le
     //    helper. Sinon on reste sur l'ancien mode.
     const modeKeysTouched =
-      dto.modeSaisie !== undefined ||
-      'encoursMoyen' in dto ||
-      'tie' in dto;
+      dto.modeSaisie !== undefined || 'encoursMoyen' in dto || 'tie' in dto;
     if (modeKeysTouched) {
       const targetMode: ModeSaisieFaitBudget =
         dto.modeSaisie ?? current.modeSaisie;
@@ -480,8 +477,8 @@ export class FaitBudgetService {
       // correspondrait plus).
       if (current.modeSaisie === 'ENCOURS_TIE') {
         throw new BadRequestException(
-          "Impossible de changer montantDevise sur un fait en mode ENCOURS_TIE " +
-            "sans repasser par modeSaisie / encoursMoyen / tie. Utiliser une bascule explicite.",
+          'Impossible de changer montantDevise sur un fait en mode ENCOURS_TIE ' +
+            'sans repasser par modeSaisie / encoursMoyen / tie. Utiliser une bascule explicite.',
         );
       }
       current.montantDevise = dto.montantDevise;
@@ -890,10 +887,7 @@ export class FaitBudgetService {
       );
     }
 
-    const montantDevise = this.mensualiserMontant(
-      args.encoursMoyen,
-      args.tie,
-    );
+    const montantDevise = this.mensualiserMontant(args.encoursMoyen, args.tie);
     return {
       modeSaisie: 'ENCOURS_TIE',
       encoursMoyen: args.encoursMoyen,

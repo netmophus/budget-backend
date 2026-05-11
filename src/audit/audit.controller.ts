@@ -6,9 +6,7 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import type { Request } from 'express';
-import {
-  CurrentUser,
-} from '../auth/decorators/current-user.decorator';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { AuthUser } from '../auth/decorators/current-user.decorator';
 import { RequirePermissions } from '../auth/decorators/require-permissions.decorator';
 import { AuditService } from './audit.service';
@@ -37,7 +35,7 @@ export class AuditController {
     return this.auditService.findAll(query, {
       caller: user.email,
       ipSource: req.ip ?? null,
-      userAgent: (req.headers['user-agent'] as string | undefined) ?? null,
+      userAgent: req.headers['user-agent'] ?? null,
     });
   }
 

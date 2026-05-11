@@ -18,7 +18,7 @@ const SECRET_KEYS = new Set([
 const REDACTED = '***REDACTED***';
 
 function normalizeKey(key: string): string {
-  return key.toLowerCase().replace(/[_\-]/g, '');
+  return key.toLowerCase().replace(/[_-]/g, '');
 }
 
 export function sanitize(value: unknown): unknown {

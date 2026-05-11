@@ -67,10 +67,9 @@ async function insertDevise(
      VALUES ($1,$2,2,$3,true,'system')`,
     [codeIso, codeIso, estPivot],
   );
-  const r = (await ds.query(
-    `SELECT id FROM dim_devise WHERE code_iso = $1`,
-    [codeIso],
-  )) as Array<{ id: string | number }>;
+  const r = (await ds.query(`SELECT id FROM dim_devise WHERE code_iso = $1`, [
+    codeIso,
+  ])) as Array<{ id: string | number }>;
   return String(r[0]!.id);
 }
 
@@ -86,10 +85,9 @@ async function insertTemps(ds: DataSource, date: string): Promise<string> {
      VALUES ($1,$2,$3,$4,$5,true,false,false,false,$2,'')`,
     [date, y, Math.ceil(m! / 3), m, d],
   );
-  const r = (await ds.query(
-    `SELECT id FROM dim_temps WHERE date = $1`,
-    [date],
-  )) as Array<{ id: string | number }>;
+  const r = (await ds.query(`SELECT id FROM dim_temps WHERE date = $1`, [
+    date,
+  ])) as Array<{ id: string | number }>;
   return String(r[0]!.id);
 }
 
@@ -148,8 +146,20 @@ describe('TauxChangeService', () => {
       await insertTemps(dataSource, '2026-04-15');
       await insertTemps(dataSource, '2026-01-15');
 
-      await insertTaux(dataSource, fkEur, fkTemps0331, '655.95700000', 'cloture');
-      await insertTaux(dataSource, fkEur, fkTemps0630, '656.10000000', 'cloture');
+      await insertTaux(
+        dataSource,
+        fkEur,
+        fkTemps0331,
+        '655.95700000',
+        'cloture',
+      );
+      await insertTaux(
+        dataSource,
+        fkEur,
+        fkTemps0630,
+        '656.10000000',
+        'cloture',
+      );
     });
 
     // pg-mem normalise les numeric en supprimant les zéros de fin
@@ -157,27 +167,43 @@ describe('TauxChangeService', () => {
     // tolérant, l'important c'est la valeur numérique.
 
     it('date exacte → retourne le taux exact', async () => {
-      const r = await service.findTauxApplicable('EUR', '2026-03-31', 'cloture');
+      const r = await service.findTauxApplicable(
+        'EUR',
+        '2026-03-31',
+        'cloture',
+      );
       expect(r).not.toBeNull();
       expect(parseFloat(r!.tauxVersPivot)).toBeCloseTo(655.957, 5);
       expect(r!.dateApplicable).toBe('2026-03-31');
     });
 
     it('date entre deux taux → retourne le plus récent antérieur', async () => {
-      const r = await service.findTauxApplicable('EUR', '2026-04-15', 'cloture');
+      const r = await service.findTauxApplicable(
+        'EUR',
+        '2026-04-15',
+        'cloture',
+      );
       expect(r).not.toBeNull();
       expect(r!.dateApplicable).toBe('2026-03-31');
       expect(parseFloat(r!.tauxVersPivot)).toBeCloseTo(655.957, 5);
     });
 
     it('date après le dernier taux → retourne le dernier taux', async () => {
-      const r = await service.findTauxApplicable('EUR', '2026-06-30', 'cloture');
+      const r = await service.findTauxApplicable(
+        'EUR',
+        '2026-06-30',
+        'cloture',
+      );
       expect(r!.dateApplicable).toBe('2026-06-30');
       expect(parseFloat(r!.tauxVersPivot)).toBeCloseTo(656.1, 5);
     });
 
     it('date avant tout taux → null', async () => {
-      const r = await service.findTauxApplicable('EUR', '2026-01-15', 'cloture');
+      const r = await service.findTauxApplicable(
+        'EUR',
+        '2026-01-15',
+        'cloture',
+      );
       expect(r).toBeNull();
     });
 
@@ -200,7 +226,11 @@ describe('TauxChangeService', () => {
     });
 
     it('case-insensitive sur codeDevise', async () => {
-      const r = await service.findTauxApplicable('eur', '2026-03-31', 'cloture');
+      const r = await service.findTauxApplicable(
+        'eur',
+        '2026-03-31',
+        'cloture',
+      );
       expect(r).not.toBeNull();
     });
   });
@@ -321,9 +351,9 @@ describe('TauxChangeService', () => {
     });
 
     it('throws NotFoundException pour id inconnu', async () => {
-      await expect(
-        service.update('999', { tauxVersPivot: 1 }),
-      ).rejects.toThrow(NotFoundException);
+      await expect(service.update('999', { tauxVersPivot: 1 })).rejects.toThrow(
+        NotFoundException,
+      );
     });
   });
 

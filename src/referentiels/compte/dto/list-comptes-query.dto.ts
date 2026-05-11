@@ -11,7 +11,17 @@ import {
   Min,
 } from 'class-validator';
 
-const CLASSES_PCB: readonly string[] = ['1', '2', '3', '4', '5', '6', '7', '8', '9'];
+const CLASSES_PCB: readonly string[] = [
+  '1',
+  '2',
+  '3',
+  '4',
+  '5',
+  '6',
+  '7',
+  '8',
+  '9',
+];
 
 export class ListComptesQueryDto {
   @ApiPropertyOptional({ example: 1, default: 1, minimum: 1 })
@@ -43,24 +53,29 @@ export class ListComptesQueryDto {
    */
   @ApiPropertyOptional({
     example: '6,7',
-    description: 'Liste de classes (CSV `6,7` ou répété `classes=6&classes=7`).',
+    description:
+      'Liste de classes (CSV `6,7` ou répété `classes=6&classes=7`).',
   })
   @IsOptional()
   @Transform(({ value }) => {
-    if (Array.isArray(value)) return value.map((v) => String(v).trim()).filter((s) => s.length > 0);
+    if (Array.isArray(value))
+      return value.map((v) => String(v).trim()).filter((s) => s.length > 0);
     if (typeof value === 'string') {
       return value
         .split(',')
         .map((s) => s.trim())
         .filter((s) => s.length > 0);
     }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- @Transform({ value }) impose any (signature class-transformer)
     return value;
   })
   @IsString({ each: true })
   @IsIn(CLASSES_PCB, { each: true })
   classes?: string[];
 
-  @ApiPropertyOptional({ description: 'Filtre LIKE %libelle% case-insensitive.' })
+  @ApiPropertyOptional({
+    description: 'Filtre LIKE %libelle% case-insensitive.',
+  })
   @IsOptional()
   @IsString()
   @MaxLength(200)
@@ -78,6 +93,7 @@ export class ListComptesQueryDto {
     if (typeof value === 'boolean') return value;
     if (value === 'true') return true;
     if (value === 'false') return false;
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- @Transform({ value }) impose any (signature class-transformer)
     return value;
   })
   @IsBoolean()
@@ -89,6 +105,7 @@ export class ListComptesQueryDto {
     if (typeof value === 'boolean') return value;
     if (value === 'true') return true;
     if (value === 'false') return false;
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- @Transform({ value }) impose any (signature class-transformer)
     return value;
   })
   @IsBoolean()
@@ -100,6 +117,7 @@ export class ListComptesQueryDto {
     if (typeof value === 'boolean') return value;
     if (value === 'true') return true;
     if (value === 'false') return false;
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- @Transform({ value }) impose any (signature class-transformer)
     return value;
   })
   @IsBoolean()

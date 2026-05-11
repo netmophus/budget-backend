@@ -117,7 +117,7 @@ describe('EmailWorker', () => {
     expect(svc.traiterJob).toHaveBeenCalledWith('77', 5, undefined);
   });
 
-  it("erreur non-Error (ex: string) → message stringifié + bascule ECHEC en dernière tentative", async () => {
+  it('erreur non-Error (ex: string) → message stringifié + bascule ECHEC en dernière tentative', async () => {
     const svc = makeServiceMock();
     // Reject avec une valeur non-Error (cas pathologique mais possible).
     svc.traiterJob.mockRejectedValueOnce('plain string error');

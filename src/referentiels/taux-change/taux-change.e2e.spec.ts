@@ -275,9 +275,7 @@ describe('TauxChange (e2e)', () => {
       `SELECT type_action, statut FROM audit_log WHERE entite_cible = 'ref_taux_change'`,
     )) as Array<{ type_action: string; statut: string }>;
     expect(
-      audits.find(
-        (a) => a.type_action === 'CREATE' && a.statut === 'success',
-      ),
+      audits.find((a) => a.type_action === 'CREATE' && a.statut === 'success'),
     ).toBeDefined();
   });
 

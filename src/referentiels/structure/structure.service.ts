@@ -30,7 +30,7 @@ import {
   UnprocessableEntityException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, ILike, Repository } from 'typeorm';
+import { DataSource, Repository } from 'typeorm';
 
 import { Scd2Service } from '../../common/services/scd2.service';
 import { CentreResponsabiliteService } from '../centre-responsabilite/centre-responsabilite.service';
@@ -308,7 +308,7 @@ export class StructureService extends Scd2Service<DimStructure> {
         niveauHierarchique: dto.niveauHierarchique,
         fkStructureParent: dto.fkStructureParent ?? null,
         codePays: dto.codePays ?? null,
-      } as Partial<DimStructure>,
+      },
       utilisateur,
     );
     return toResponse(created);
@@ -447,7 +447,7 @@ export class StructureService extends Scd2Service<DimStructure> {
       if (wantsEstActifChange) {
         updates.estActif = dto.estActif;
       }
-      await this.repo.update({ id: current.id }, updates as never);
+      await this.repo.update({ id: current.id }, updates);
       const refreshed = await this.findCurrent(codeStructure);
       return { ...toResponse(refreshed!), modeMaj: 'ecrasement_intra_jour' };
     }

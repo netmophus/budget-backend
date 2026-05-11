@@ -18,11 +18,7 @@ import request from 'supertest';
 
 import { bootstrapApp } from './helpers/app';
 import { type AuthSession, bearer, login, PERSONAS } from './helpers/auth';
-import {
-  getCrId,
-  getScenarioId,
-  getVersionId,
-} from './fixtures/referentiels';
+import { getCrId, getScenarioId, getVersionId } from './fixtures/referentiels';
 
 describe('E2E.3 — Sérialisation crIds tableau de bord', () => {
   let app: INestApplication;

@@ -49,16 +49,10 @@ export class RefTypeTauxService extends BaseRefSecondaireService<RefTypeTaux> {
 const RefTypeTauxController = createRefSecondaireControllerClass<
   RefTypeTaux,
   RefTypeTauxService
->(
-  { routePath: 'type-taux', entiteCible: 'ref_type_taux' },
-  RefTypeTauxService,
-);
+>({ routePath: 'type-taux', entiteCible: 'ref_type_taux' }, RefTypeTauxService);
 
 @Module({
-  imports: [
-    TypeOrmModule.forFeature([RefTypeTaux, RefTauxChange]),
-    AuthModule,
-  ],
+  imports: [TypeOrmModule.forFeature([RefTypeTaux, RefTauxChange]), AuthModule],
   providers: [RefTypeTauxService],
   controllers: [RefTypeTauxController],
   exports: [RefTypeTauxService],

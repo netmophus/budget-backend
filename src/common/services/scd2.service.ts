@@ -127,7 +127,7 @@ export class Scd2Service<T extends Scd2Entity> {
           versionCourante: false,
           dateModification: () => 'CURRENT_TIMESTAMP',
           utilisateurModification: utilisateur,
-        } as never)
+        })
         .where(`${this.businessKeyProp} = :businessKey`, { businessKey })
         .andWhere('versionCourante = :true', { true: true })
         .execute();
@@ -156,9 +156,10 @@ export class Scd2Service<T extends Scd2Entity> {
         versionCourante: true,
         utilisateurCreation: utilisateur,
       } as never);
-      const saved = await manager.save(row);
-      // save() retourne T | T[] selon l'overload — ici on insère un seul.
-      return Array.isArray(saved) ? saved[0]! : saved;
+      // save() retourne T | T[] selon l overload, mais avec un seul argument
+      // d entree, le runtime garantit single T. Cast direct au lieu du ternary.
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion -- ESLint considere le cast inutile mais TS2352 sans le as unknown (overload typeorm mal infere)
+      return (await manager.save(row)) as unknown as T;
     });
   }
 

@@ -134,7 +134,11 @@ describe('CentreResponsabiliteService', () => {
     structureRepo = dataSource.getRepository(DimStructure);
     // crService est passé undefined ici — le hook de relink ne sera
     // pas exercé via StructureService (testé séparément en e2e).
-    structureService = new StructureService(structureRepo, dataSource, undefined);
+    structureService = new StructureService(
+      structureRepo,
+      dataSource,
+      undefined,
+    );
     service = new CentreResponsabiliteService(
       crRepo,
       dataSource,
@@ -171,7 +175,6 @@ describe('CentreResponsabiliteService', () => {
         libelle: 'V1',
         fkStructure: sId,
         dateDebutValidite: '2024-01-01',
-        dateFinValidite: '2025-01-01' as never,
         versionCourante: false,
       });
       await insertCr(dataSource, {
@@ -192,7 +195,9 @@ describe('CentreResponsabiliteService', () => {
       const sId = await insertStructure(dataSource, { codeStructure: 'SOC' });
       await insertCr(dataSource, { codeCr: 'A', fkStructure: sId });
       await insertCr(dataSource, { codeCr: 'B', fkStructure: sId });
-      const otherSId = await insertStructure(dataSource, { codeStructure: 'OTHER' });
+      const otherSId = await insertStructure(dataSource, {
+        codeStructure: 'OTHER',
+      });
       await insertCr(dataSource, { codeCr: 'C', fkStructure: otherSId });
 
       const crs = await service.findByStructure(sId);

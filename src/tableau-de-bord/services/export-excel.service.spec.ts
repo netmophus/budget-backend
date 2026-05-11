@@ -4,10 +4,7 @@
  */
 import ExcelJS from 'exceljs';
 
-import {
-  EcartsResponseDto,
-  type LigneEcartDto,
-} from '../dto/tableau-bord.dto';
+import { EcartsResponseDto, type LigneEcartDto } from '../dto/tableau-bord.dto';
 import { ExportExcelService } from './export-excel.service';
 
 function makeLigne(over: Partial<LigneEcartDto> = {}): LigneEcartDto {
@@ -85,11 +82,7 @@ describe('ExportExcelService', () => {
     expect(buf.length).toBeGreaterThan(1000);
     const wb = await loadXlsxFromBuffer(buf);
     const noms = wb.worksheets.map((w) => w.name).sort();
-    expect(noms).toEqual([
-      'Détail des écarts',
-      'Filtres',
-      'Synthèse',
-    ]);
+    expect(noms).toEqual(['Détail des écarts', 'Filtres', 'Synthèse']);
   });
 
   it('onglet Synthèse contient les KPI cohérents', async () => {
@@ -111,7 +104,7 @@ describe('ExportExcelService', () => {
     expect(vals[idxEcartTotal]).toBe(220_000);
   });
 
-  it("onglet Détail applique la couleur de fond conditionnelle sur la colonne Niveau", async () => {
+  it('onglet Détail applique la couleur de fond conditionnelle sur la colonne Niveau', async () => {
     const buf = await svc.genererXlsx(makeEcarts(), 'BI_2027');
     const wb = await loadXlsxFromBuffer(buf);
     const ws = wb.getWorksheet('Détail des écarts')!;
@@ -143,7 +136,7 @@ describe('ExportExcelService', () => {
     ws.eachRow((row, idx) => {
       if (idx === 1) return; // header
       lignes.push([
-        String(row.getCell(1).value),
+        String(row.getCell(1).value as string | number),
         row.getCell(2).value as string | number,
       ]);
     });

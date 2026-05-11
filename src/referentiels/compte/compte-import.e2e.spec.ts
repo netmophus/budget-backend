@@ -132,7 +132,7 @@ async function seedComptes(ds: DataSource): Promise<void> {
     parentCode: string | null,
     sens: string | null = null,
   ) {
-    const parentId = parentCode === null ? null : ids.get(parentCode) ?? null;
+    const parentId = parentCode === null ? null : (ids.get(parentCode) ?? null);
     await ds.query(
       `INSERT INTO dim_compte
         ("code_compte","libelle","classe","sous_classe","fk_compte_parent",
@@ -165,7 +165,8 @@ describe('Compte import (e2e) — POST /api/v1/referentiels/comptes/import', () 
 
   beforeAll(async () => {
     process.env.NODE_ENV = 'test';
-    process.env.JWT_SECRET = 'test-secret-compte-import-e2e-min-32-chars-aaaaaa';
+    process.env.JWT_SECRET =
+      'test-secret-compte-import-e2e-min-32-chars-aaaaaa';
     process.env.JWT_ACCESS_EXPIRES_IN = '15m';
     process.env.JWT_REFRESH_EXPIRES_IN = '7d';
     process.env.BCRYPT_ROUNDS = '4';
@@ -268,7 +269,11 @@ describe('Compte import (e2e) — POST /api/v1/referentiels/comptes/import', () 
   it('POST /import sans token → 401', async () => {
     await request(app.getHttpServer())
       .post('/api/v1/referentiels/comptes/import')
-      .attach('file', Buffer.from(`${HEADER}\n6,X,6,,,1,D,,false,false`), 'x.csv')
+      .attach(
+        'file',
+        Buffer.from(`${HEADER}\n6,X,6,,,1,D,,false,false`),
+        'x.csv',
+      )
       .expect(401);
   });
 
@@ -276,7 +281,11 @@ describe('Compte import (e2e) — POST /api/v1/referentiels/comptes/import', () 
     await request(app.getHttpServer())
       .post('/api/v1/referentiels/comptes/import')
       .set('Authorization', `Bearer ${lecteurToken}`)
-      .attach('file', Buffer.from(`${HEADER}\n6,X,6,,,1,D,,false,false`), 'x.csv')
+      .attach(
+        'file',
+        Buffer.from(`${HEADER}\n6,X,6,,,1,D,,false,false`),
+        'x.csv',
+      )
       .expect(403);
   });
 
@@ -378,7 +387,9 @@ describe('Compte import (e2e) — POST /api/v1/referentiels/comptes/import', () 
     expect(versions611100[0]!.version_courante).toBe(false);
     expect(versions611100[0]!.libelle).toBe('Salaires bruts');
     expect(versions611100[1]!.version_courante).toBe(true);
-    expect(versions611100[1]!.libelle).toBe('Salaires bruts (V2 — révisé 2026)');
+    expect(versions611100[1]!.libelle).toBe(
+      'Salaires bruts (V2 — révisé 2026)',
+    );
 
     // (e) audit_log : UNE entrée IMPORT avec le rapport complet en payload_apres.
     //     Note : l'UPDATE 611100 passe par CompteService.update qui n'est PAS

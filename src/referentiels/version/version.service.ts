@@ -233,8 +233,7 @@ export class VersionService {
     if (dto.typeVersion !== undefined) current.typeVersion = dto.typeVersion;
     if (dto.exerciceFiscal !== undefined)
       current.exerciceFiscal = dto.exerciceFiscal;
-    if (dto.commentaire !== undefined)
-      current.commentaire = dto.commentaire;
+    if (dto.commentaire !== undefined) current.commentaire = dto.commentaire;
 
     current.dateModification = new Date();
     current.utilisateurModification = utilisateur;

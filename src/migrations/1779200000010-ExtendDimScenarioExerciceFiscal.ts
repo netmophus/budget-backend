@@ -19,9 +19,7 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
  *
  * Cf. `docs/modele-donnees.md` §3.10 et `docs/audit.md`.
  */
-export class ExtendDimScenarioExerciceFiscal1779200000010
-  implements MigrationInterface
-{
+export class ExtendDimScenarioExerciceFiscal1779200000010 implements MigrationInterface {
   name = 'ExtendDimScenarioExerciceFiscal1779200000010';
 
   public async up(q: QueryRunner): Promise<void> {
@@ -69,9 +67,7 @@ export class ExtendDimScenarioExerciceFiscal1779200000010
       DELETE FROM "ref_type_action_audit"
        WHERE "code" = 'AUTO_CREATE_SCENARIO'
     `);
-    await q.query(
-      `DROP INDEX IF EXISTS "public"."ix_dim_scenario_exercice"`,
-    );
+    await q.query(`DROP INDEX IF EXISTS "public"."ix_dim_scenario_exercice"`);
     await q.query(
       `ALTER TABLE "dim_scenario" DROP CONSTRAINT IF EXISTS "ck_dim_scenario_exercice"`,
     );

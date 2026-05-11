@@ -96,7 +96,7 @@ export class RealiseController {
   ): Promise<FaitRealiseResponseDto[]> {
     if (!crId || !moisDebut || !moisFin) {
       throw new BadRequestException(
-        "Paramètres requis : crId, moisDebut, moisFin (format YYYY-MM).",
+        'Paramètres requis : crId, moisDebut, moisFin (format YYYY-MM).',
       );
     }
     return this.svc.getGrille({ crId, moisDebut, moisFin });
@@ -159,7 +159,7 @@ export class RealiseController {
   @RequirePermissions('REALISE.VALIDER')
   @ApiOperation({
     summary:
-      "Validation en lot (IMPORTE → VALIDE). Pas de filtrage périmètre — validateur transverse. Refus si une ligne est déjà VALIDE.",
+      'Validation en lot (IMPORTE → VALIDE). Pas de filtrage périmètre — validateur transverse. Refus si une ligne est déjà VALIDE.',
   })
   @ApiOkResponse()
   valider(
@@ -175,7 +175,7 @@ export class RealiseController {
   @UseInterceptors(FileInterceptor('file'))
   @ApiOperation({
     summary:
-      "Import CSV/XLSX de réalisé (6 colonnes obligatoires + 2 optionnelles). Filtrage périmètre appliqué pendant le traitement.",
+      'Import CSV/XLSX de réalisé (6 colonnes obligatoires + 2 optionnelles). Filtrage périmètre appliqué pendant le traitement.',
   })
   @ApiConsumes('multipart/form-data')
   @ApiBody({

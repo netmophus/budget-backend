@@ -94,10 +94,9 @@ async function addLignes(
   count: number,
 ): Promise<void> {
   for (let i = 0; i < count; i++) {
-    await ds.query(
-      `INSERT INTO fait_budget ("fk_version") VALUES ($1)`,
-      [versionId],
-    );
+    await ds.query(`INSERT INTO fait_budget ("fk_version") VALUES ($1)`, [
+      versionId,
+    ]);
   }
 }
 
@@ -177,9 +176,9 @@ describe('VersionWorkflowService', () => {
       const id = await rawInsertVersion(dataSource, {
         codeVersion: 'EMPTY_2026',
       });
-      await expect(
-        service.soumettre(id, {}, preparateur),
-      ).rejects.toThrow(UnprocessableEntityException);
+      await expect(service.soumettre(id, {}, preparateur)).rejects.toThrow(
+        UnprocessableEntityException,
+      );
     });
 
     it('refuse 409 si statut différent de ouvert', async () => {
@@ -188,9 +187,9 @@ describe('VersionWorkflowService', () => {
         statut: 'soumis',
       });
       await addLignes(dataSource, id, 1);
-      await expect(
-        service.soumettre(id, {}, preparateur),
-      ).rejects.toThrow(ConflictException);
+      await expect(service.soumettre(id, {}, preparateur)).rejects.toThrow(
+        ConflictException,
+      );
     });
 
     it('lève 404 si version introuvable', async () => {
@@ -204,11 +203,7 @@ describe('VersionWorkflowService', () => {
         codeVersion: 'BI_2026',
       });
       await addLignes(dataSource, id, 5);
-      await service.soumettre(
-        id,
-        { commentaire: 'OK' },
-        preparateur,
-      );
+      await service.soumettre(id, { commentaire: 'OK' }, preparateur);
 
       const audits = (await dataSource.query(
         `SELECT type_action, statut, utilisateur, id_cible,
@@ -263,9 +258,9 @@ describe('VersionWorkflowService', () => {
         codeVersion: 'BI_2026',
         statut: 'ouvert',
       });
-      await expect(
-        service.valider(id, {}, controleur),
-      ).rejects.toThrow(ConflictException);
+      await expect(service.valider(id, {}, controleur)).rejects.toThrow(
+        ConflictException,
+      );
     });
 
     it('écrit un audit VALIDER_BUDGET', async () => {
@@ -302,9 +297,7 @@ describe('VersionWorkflowService', () => {
         controleur,
       );
       expect(res.statut).toBe('ouvert');
-      expect(res.commentaireRejet).toBe(
-        'Frais de personnel sous-estimés.',
-      );
+      expect(res.commentaireRejet).toBe('Frais de personnel sous-estimés.');
       expect(res.utilisateurRejet).toBe(controleur.email);
       expect(res.dateRejet).not.toBeNull();
     });
@@ -319,11 +312,7 @@ describe('VersionWorkflowService', () => {
         { commentaire: 'Première soumission' },
         preparateur,
       );
-      await service.rejeter(
-        id,
-        { commentaire: 'À revoir' },
-        controleur,
-      );
+      await service.rejeter(id, { commentaire: 'À revoir' }, controleur);
 
       const v = (await dataSource.query(
         `SELECT commentaire_soumission, date_soumission, utilisateur_soumission
@@ -380,11 +369,7 @@ describe('VersionWorkflowService', () => {
       });
       await addLignes(dataSource, id, 1);
       await service.soumettre(id, {}, preparateur);
-      await service.rejeter(
-        id,
-        { commentaire: 'À revoir' },
-        controleur,
-      );
+      await service.rejeter(id, { commentaire: 'À revoir' }, controleur);
       // Re-soumission après correction.
       await service.soumettre(
         id,
@@ -432,9 +417,7 @@ describe('VersionWorkflowService', () => {
         directeur,
       );
       expect(res.statut).toBe('gele');
-      expect(res.commentairePublication).toBe(
-        'Publication officielle 2026',
-      );
+      expect(res.commentairePublication).toBe('Publication officielle 2026');
       expect(res.utilisateurGel).toBe(directeur.email);
       expect(res.dateGel).not.toBeNull();
     });
@@ -444,9 +427,9 @@ describe('VersionWorkflowService', () => {
         codeVersion: 'BI_2026',
         statut: 'soumis',
       });
-      await expect(
-        service.publier(id, {}, directeur),
-      ).rejects.toThrow(ConflictException);
+      await expect(service.publier(id, {}, directeur)).rejects.toThrow(
+        ConflictException,
+      );
     });
 
     it('refuse 409 si version déjà gelée (immuabilité)', async () => {
@@ -454,9 +437,9 @@ describe('VersionWorkflowService', () => {
         codeVersion: 'BI_2026',
         statut: 'gele',
       });
-      await expect(
-        service.publier(id, {}, directeur),
-      ).rejects.toThrow(ConflictException);
+      await expect(service.publier(id, {}, directeur)).rejects.toThrow(
+        ConflictException,
+      );
     });
 
     it('écrit un audit PUBLIER_BUDGET (commentaire BCEAO)', async () => {
@@ -519,7 +502,9 @@ describe('VersionWorkflowService', () => {
   // ─── Lot 4.2-fix.A : via_delegation_id dans le payload audit ─────
 
   describe('via_delegation_id (Lot 4.2-fix.A)', () => {
-    function getPayloadApres(rows: Array<{ payload_apres: unknown }>): Record<string, unknown> {
+    function getPayloadApres(
+      rows: Array<{ payload_apres: unknown }>,
+    ): Record<string, unknown> {
       return rows[0]!.payload_apres as Record<string, unknown>;
     }
 
@@ -615,7 +600,11 @@ describe('VersionWorkflowService', () => {
         statut: 'soumis',
       });
       permissionsServiceMock.getDelegationContextPour.mockResolvedValue('456');
-      await service.rejeter(id, { commentaire: 'Erreurs détectées' }, controleur);
+      await service.rejeter(
+        id,
+        { commentaire: 'Erreurs détectées' },
+        controleur,
+      );
       expect(
         permissionsServiceMock.getDelegationContextPour,
       ).toHaveBeenCalledWith('102', 'BUDGET.VALIDER');

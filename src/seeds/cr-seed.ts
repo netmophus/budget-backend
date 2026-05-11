@@ -121,14 +121,7 @@ export async function seedCrs(ds: DataSource = AppDataSource): Promise<void> {
             "date_debut_validite","date_fin_validite","version_courante",
             "est_actif","utilisateur_creation")
          VALUES ($1,$2,$3,$4,$5,$6,NULL,true,true,'system')`,
-        [
-          cr.codeCr,
-          cr.libelle,
-          cr.libelleCourt,
-          cr.typeCr,
-          fkStructure,
-          today,
-        ],
+        [cr.codeCr, cr.libelle, cr.libelleCourt, cr.typeCr, fkStructure, today],
       );
     }
 

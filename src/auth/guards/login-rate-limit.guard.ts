@@ -51,7 +51,7 @@ export class LoginRateLimitGuard implements CanActivate {
     const result = this.limiter.enregistrerEtVerifier(ip, email);
     if (!result.bloque) return true;
 
-    const userAgent = (req.headers['user-agent'] ?? null) as string | null;
+    const userAgent = req.headers['user-agent'] ?? null;
     await this.auditService.log({
       utilisateur: email,
       ipSource: ip,

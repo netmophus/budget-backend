@@ -12,9 +12,7 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
  * Migration idempotente : DROP IF EXISTS de la contrainte CHECK avant
  * recreation avec la valeur ajoutée.
  */
-export class AjoutStatutEnCoursEmailLog1779200000170
-  implements MigrationInterface
-{
+export class AjoutStatutEnCoursEmailLog1779200000170 implements MigrationInterface {
   name = 'AjoutStatutEnCoursEmailLog1779200000170';
 
   public async up(q: QueryRunner): Promise<void> {

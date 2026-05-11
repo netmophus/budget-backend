@@ -46,7 +46,7 @@ export class IndicateursController {
   @ApiOperation({
     summary:
       'Indicateurs consolidés sur le périmètre user (toutes classes, ' +
-      'tous CR autorisés). PNB / MNI / Coefficient d\'exploitation.',
+      "tous CR autorisés). PNB / MNI / Coefficient d'exploitation.",
   })
   @ApiOkResponse({ type: IndicateursGlobauxDto })
   getGlobaux(
@@ -61,7 +61,7 @@ export class IndicateursController {
   @ApiOperation({
     summary:
       'Indicateurs par CR (drill-down Q16) — 1 ligne par centre de ' +
-      'responsabilité accessible à l\'utilisateur.',
+      "responsabilité accessible à l'utilisateur.",
   })
   @ApiOkResponse({ type: IndicateursParCrDto, isArray: true })
   getParCr(

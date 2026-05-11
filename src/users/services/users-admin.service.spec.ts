@@ -47,7 +47,15 @@ async function createDataSource(): Promise<DataSource> {
   const db = buildMemDb();
   const ds = db.adapters.createTypeormDataSource({
     type: 'postgres',
-    entities: [User, UserRole, Role, Permission, RolePermission, AuditLog, EmailLog],
+    entities: [
+      User,
+      UserRole,
+      Role,
+      Permission,
+      RolePermission,
+      AuditLog,
+      EmailLog,
+    ],
     synchronize: true,
   }) as DataSource;
   await ds.initialize();
@@ -80,9 +88,10 @@ async function seed(ds: DataSource): Promise<SeedIds> {
      VALUES ('admin@test.local','h','A','Dmin',true,'system'),
             ('cible@test.local','h','C','Ible',true,'system')`,
   );
-  const users = (await ds.query(
-    `SELECT id, email FROM "user"`,
-  )) as Array<{ id: string; email: string }>;
+  const users = (await ds.query(`SELECT id, email FROM "user"`)) as Array<{
+    id: string;
+    email: string;
+  }>;
   const adminId = String(users.find((u) => u.email === 'admin@test.local')!.id);
   const ciblId = String(users.find((u) => u.email === 'cible@test.local')!.id);
 
@@ -108,8 +117,7 @@ function makeAuthMock(): AuthService {
     // Lot 6.4.A — utilisé par resetPassword pour calculer la date
     // d'expiration du mdp temporaire (now + 7 jours).
     nouvelleDateExpiration: jest.fn(
-      (jours?: number) =>
-        new Date(Date.now() + (jours ?? 90) * 86_400_000),
+      (jours?: number) => new Date(Date.now() + (jours ?? 90) * 86_400_000),
     ),
   } as unknown as AuthService;
 }
@@ -180,14 +188,19 @@ describe('UsersAdminService', () => {
         .getRepository(User)
         .findOne({ where: { email: 'nouveau@test.local' } });
       expect(persist).not.toBeNull();
-      expect(await bcrypt.compare('PassWord!2026', persist!.motDePasseHash)).toBe(true);
+      expect(
+        await bcrypt.compare('PassWord!2026', persist!.motDePasseHash),
+      ).toBe(true);
       const roles = await ds
         .getRepository(UserRole)
         .find({ where: { fkUser: r.id, estActif: true } });
       expect(roles).toHaveLength(1);
       const audits = (await ds.query(
         `SELECT type_action, payload_apres FROM audit_log WHERE type_action='CREER_USER'`,
-      )) as Array<{ type_action: string; payload_apres: Record<string, unknown> }>;
+      )) as Array<{
+        type_action: string;
+        payload_apres: Record<string, unknown>;
+      }>;
       expect(audits).toHaveLength(1);
       // Le mot de passe en clair ne doit JAMAIS apparaître dans l'audit.
       const payloadStr = JSON.stringify(audits[0]!.payload_apres);
@@ -248,7 +261,11 @@ describe('UsersAdminService', () => {
     it('modifie nom/prenom/email', async () => {
       const r = await svc.modifier(
         ids.ciblId,
-        { nom: 'NouveauNom', prenom: 'Nouveau', email: 'cible-modif@test.local' },
+        {
+          nom: 'NouveauNom',
+          prenom: 'Nouveau',
+          email: 'cible-modif@test.local',
+        },
         auteur(ids.adminId),
       );
       expect(r.nom).toBe('NouveauNom');
@@ -304,7 +321,7 @@ describe('UsersAdminService', () => {
   // ─── reset password ────────────────────────────────────────────
 
   describe('resetPassword', () => {
-    it("génère un mdp temporaire (≥12 chars, conforme à la policy), force doit_changer_mdp + expiration 7j, publie un job email avec mdp en secret (pas en payload), réponse API SANS mdp", async () => {
+    it('génère un mdp temporaire (≥12 chars, conforme à la policy), force doit_changer_mdp + expiration 7j, publie un job email avec mdp en secret (pas en payload), réponse API SANS mdp', async () => {
       const r = await svc.resetPassword(ids.ciblId, auteur(ids.adminId));
 
       // 1. Réponse API : success + message, PAS de motDePasseTemporaire
@@ -313,7 +330,10 @@ describe('UsersAdminService', () => {
         success: true,
         message: expect.stringContaining('cible@test.local'),
       });
-      expect((r as unknown as { motDePasseTemporaire?: string }).motDePasseTemporaire).toBeUndefined();
+      expect(
+        (r as unknown as { motDePasseTemporaire?: string })
+          .motDePasseTemporaire,
+      ).toBeUndefined();
 
       // 2. User en base : doit_changer_mdp=true, date_expiration_mdp posée,
       //    nouveau hash bcrypt.
@@ -353,7 +373,7 @@ describe('UsersAdminService', () => {
       // 4. email_log inséré statut EN_ATTENTE, payload SANS mdp.
       const log = await ds
         .getRepository(EmailLog)
-        .findOne({ where: { id: emailLogId } });
+        .findOne({ where: { id: String(emailLogId) } });
       expect(log).not.toBeNull();
       expect(log!.statut).toBe('EN_ATTENTE');
       expect(log!.evenement).toBe('RESET_PASSWORD_ADMIN');
@@ -506,12 +526,7 @@ describe('UsersAdminService', () => {
 
     it('retirer un rôle non attribué : NotFound', async () => {
       await expect(
-        svc.retirerRole(
-          ids.ciblId,
-          ids.roleAdminId,
-          {},
-          auteur(ids.adminId),
-        ),
+        svc.retirerRole(ids.ciblId, ids.roleAdminId, {}, auteur(ids.adminId)),
       ).rejects.toThrow(NotFoundException);
     });
   });

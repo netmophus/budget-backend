@@ -30,11 +30,7 @@ describe('E2E.4 — Workflow validation version', () => {
 
   beforeAll(async () => {
     app = await bootstrapApp();
-    session = await login(
-      app,
-      PERSONAS.ADMIN.email,
-      PERSONAS.ADMIN.motDePasse,
-    );
+    session = await login(app, PERSONAS.ADMIN.email, PERSONAS.ADMIN.motDePasse);
   });
 
   afterAll(async () => {

@@ -27,7 +27,10 @@ import type {
  * du toggle `estActif` seul (mise à jour en place).
  */
 export class UpdateStructureDto {
-  @ApiPropertyOptional({ example: 'Agence Abidjan Plateau (rénovée)', maxLength: 200 })
+  @ApiPropertyOptional({
+    example: 'Agence Abidjan Plateau (rénovée)',
+    maxLength: 200,
+  })
   @IsOptional()
   @IsString()
   @MaxLength(200)

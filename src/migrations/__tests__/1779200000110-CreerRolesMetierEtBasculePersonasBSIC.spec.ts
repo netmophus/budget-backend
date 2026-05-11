@@ -149,10 +149,9 @@ async function createDataSource(): Promise<DataSource> {
     return r[0]!.id;
   }
   async function uidOf(email: string): Promise<string> {
-    const u = (await ds.query(
-      `SELECT "id" FROM "user" WHERE email = $1`,
-      [email],
-    )) as Array<{ id: string }>;
+    const u = (await ds.query(`SELECT "id" FROM "user" WHERE email = $1`, [
+      email,
+    ])) as Array<{ id: string }>;
     return u[0]!.id;
   }
   const adminRoleId = await ridOf('ADMIN');
@@ -297,9 +296,7 @@ describe('Migration CreerRolesMetierEtBasculePersonasBSIC1779200000110', () => {
 
   it('dir.retail bascule sur VALIDATEUR (et plus LECTEUR)', async () => {
     await migration.up(q);
-    expect(await roleActifDuUser('dir.retail@miznas.local')).toBe(
-      'VALIDATEUR',
-    );
+    expect(await roleActifDuUser('dir.retail@miznas.local')).toBe('VALIDATEUR');
     // Ancien bridge LECTEUR désactivé
     const ancien = (await ds.query(
       `SELECT bur.est_actif
@@ -314,9 +311,7 @@ describe('Migration CreerRolesMetierEtBasculePersonasBSIC1779200000110', () => {
 
   it('adj.retail bascule sur SAISISSEUR', async () => {
     await migration.up(q);
-    expect(await roleActifDuUser('adj.retail@miznas.local')).toBe(
-      'SAISISSEUR',
-    );
+    expect(await roleActifDuUser('adj.retail@miznas.local')).toBe('SAISISSEUR');
   });
 
   it('dga.exploitation bascule sur PUBLICATEUR', async () => {
@@ -333,9 +328,9 @@ describe('Migration CreerRolesMetierEtBasculePersonasBSIC1779200000110', () => {
 
   it('controleur.gestion bascule sur VALIDATEUR', async () => {
     await migration.up(q);
-    expect(
-      await roleActifDuUser('controleur.gestion@miznas.local'),
-    ).toBe('VALIDATEUR');
+    expect(await roleActifDuUser('controleur.gestion@miznas.local')).toBe(
+      'VALIDATEUR',
+    );
   });
 
   it('admin et lecteur globaux NE sont PAS touchés', async () => {

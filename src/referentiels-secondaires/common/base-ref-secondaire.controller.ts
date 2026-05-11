@@ -72,10 +72,7 @@ interface FactoryOptions {
 export function createRefSecondaireControllerClass<
   T extends RefSecondaireWithId,
   S extends BaseRefSecondaireService<T>,
->(
-  options: FactoryOptions,
-  ServiceCtor: Type<S>,
-): Type<unknown> {
+>(options: FactoryOptions, ServiceCtor: Type<S>): Type<unknown> {
   const tag = options.swaggerTag ?? `configuration-${options.entiteCible}`;
   const path = `configuration/${options.routePath}`;
 
@@ -99,7 +96,9 @@ export function createRefSecondaireControllerClass<
 
     @Get('par-code/:code')
     @RequirePermissions('CONFIGURATION.LIRE')
-    @ApiOperation({ summary: `Récupère ${options.entiteCible} par code business.` })
+    @ApiOperation({
+      summary: `Récupère ${options.entiteCible} par code business.`,
+    })
     @ApiOkResponse()
     @ApiNotFoundResponse()
     findByCode(@Param('code') code: string): Promise<T> {
@@ -118,7 +117,9 @@ export function createRefSecondaireControllerClass<
     @Post()
     @RequirePermissions('CONFIGURATION.GERER')
     @Auditable({ typeAction: 'CREATE', entiteCible: options.entiteCible })
-    @ApiOperation({ summary: `Crée une nouvelle valeur ${options.entiteCible}.` })
+    @ApiOperation({
+      summary: `Crée une nouvelle valeur ${options.entiteCible}.`,
+    })
     @ApiCreatedResponse()
     @ApiConflictResponse({ description: 'Code déjà existant.' })
     create(

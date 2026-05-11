@@ -79,9 +79,8 @@ export class PermissionsGuard implements CanActivate {
 
       await this.auditService.log({
         utilisateur: user.email,
-        ipSource: (req.ip ?? null) as string | null,
-        userAgent:
-          ((req.headers['user-agent'] as string | undefined) ?? null) ?? null,
+        ipSource: req.ip ?? null,
+        userAgent: req.headers['user-agent'] ?? null,
         typeAction: 'PERMISSION_DENIED',
         entiteCible: 'auth',
         idCible: user.userId,

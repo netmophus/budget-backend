@@ -219,9 +219,8 @@ export class RejeterReforecastDto {
   @IsString()
   @IsNotEmpty()
   @MaxLength(2000)
-  @Transform(({ value }) =>
-    typeof value === 'string' ? value.trim() : value,
-  )
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- @Transform({ value }) impose any (signature class-transformer)
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
   commentaire!: string;
 }
 

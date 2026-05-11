@@ -52,11 +52,15 @@ describe('compte-seed (data shape)', () => {
   });
 
   it('charges (classe 6) have sens=D and produits (classe 7) sens=C on collective accounts', () => {
-    const charges = COMPTES_INITIAUX.filter((c) => c.classe === 6 && c.estCompteCollectif);
+    const charges = COMPTES_INITIAUX.filter(
+      (c) => c.classe === 6 && c.estCompteCollectif,
+    );
     for (const c of charges) {
       expect(c.sens).toBe('D');
     }
-    const produits = COMPTES_INITIAUX.filter((c) => c.classe === 7 && c.estCompteCollectif);
+    const produits = COMPTES_INITIAUX.filter(
+      (c) => c.classe === 7 && c.estCompteCollectif,
+    );
     for (const p of produits) {
       expect(p.sens).toBe('C');
     }

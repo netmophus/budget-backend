@@ -2,18 +2,12 @@
  * Tests unitaires ScenarioService via pg-mem.
  * Couvre CRUD + transition unique d'archivage (actif → archive).
  */
-import {
-  ConflictException,
-  NotFoundException,
-} from '@nestjs/common';
+import { ConflictException, NotFoundException } from '@nestjs/common';
 import { DataType, IMemoryDb, newDb } from 'pg-mem';
 import { DataSource, Repository } from 'typeorm';
 
 import { ScenarioService } from './scenario.service';
-import {
-  DimScenario,
-  TypeScenario,
-} from './entities/dim-scenario.entity';
+import { DimScenario, TypeScenario } from './entities/dim-scenario.entity';
 
 function buildMemDb(): IMemoryDb {
   const db = newDb({ autoCreateForeignKeyIndices: true });
@@ -157,11 +151,7 @@ describe('ScenarioService', () => {
   describe('update', () => {
     it('updates libelle when statut=actif', async () => {
       const id = await rawInsert(dataSource, { codeScenario: 'CENTRAL' });
-      const updated = await service.update(
-        id,
-        { libelle: 'Renommé' },
-        'admin',
-      );
+      const updated = await service.update(id, { libelle: 'Renommé' }, 'admin');
       expect(updated.libelle).toBe('Renommé');
     });
 

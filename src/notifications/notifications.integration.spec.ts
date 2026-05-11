@@ -33,6 +33,7 @@ import {
   EVENT_DELEGATION_EXPIRED,
   EVENT_DELEGATION_REVOKED,
 } from './notifications.events';
+import { EmailQueueProducer } from './email-queue.producer';
 import { NotificationsListeners } from './notifications.listeners';
 import { NotificationsService } from './notifications.service';
 
@@ -125,12 +126,20 @@ describe('Notifications — intégration listener (Lot 4.3)', () => {
       ds.getRepository(User),
       {
         get: (k: string, def?: string) =>
-          k === 'EMAIL_DRY_RUN' ? 'true' : def ?? '',
+          k === 'EMAIL_DRY_RUN' ? 'true' : (def ?? ''),
       } as unknown as ConfigService,
       makePermsMock(perms),
+      {
+        publier: jest.fn().mockResolvedValue(undefined),
+      } as unknown as EmailQueueProducer,
     );
     listeners = new NotificationsListeners(service);
     // Câblage manuel des @OnEvent (nécessaire hors NestJS module).
+    // EventEmitter2 supporte les listeners async via emitAsync(), que les
+    // tests utilisent (cf. emitAsync + helper attendreLogs plus bas). Le
+    // typage strict de .on() déclare le callback comme void et ne reflète
+    // pas cette capacité — d'où la désactivation locale ciblée.
+    /* eslint-disable @typescript-eslint/no-misused-promises */
     events.on(EVENT_BUDGET_SUBMITTED, (p) => listeners.onBudgetSubmitted(p));
     events.on(EVENT_BUDGET_VALIDATED, (p) => listeners.onBudgetValidated(p));
     events.on(EVENT_BUDGET_REJECTED, (p) => listeners.onBudgetRejected(p));
@@ -147,6 +156,7 @@ describe('Notifications — intégration listener (Lot 4.3)', () => {
     events.on(EVENT_AFFECTATION_CREATED, (p) =>
       listeners.onAffectationCreated(p),
     );
+    /* eslint-enable @typescript-eslint/no-misused-promises */
   }
 
   async function attendreLogs(timeoutMs = 500): Promise<void> {
@@ -156,7 +166,7 @@ describe('Notifications — intégration listener (Lot 4.3)', () => {
 
   // ─── 1. budget.submitted déclenche email_log E1 ──────────────────
 
-  it("budget.submitted → email_log BUDGET_SOUMIS pour les VALIDATEUR", async () => {
+  it('budget.submitted → email_log BUDGET_SOUMIS pour les VALIDATEUR', async () => {
     const auteur = await seedUser(ds, 'sais@miznas.local');
     const valid = await seedUser(ds, 'valid@miznas.local');
     setupAvecPerms({ [valid.id]: ['BUDGET.VALIDER'] });
@@ -179,7 +189,7 @@ describe('Notifications — intégration listener (Lot 4.3)', () => {
 
   // ─── 2. budget.validated → soumetteur + publieurs ────────────────
 
-  it("budget.validated → email_log BUDGET_VALIDE pour soumetteur + PUBLIER", async () => {
+  it('budget.validated → email_log BUDGET_VALIDE pour soumetteur + PUBLIER', async () => {
     const soum = await seedUser(ds, 'soum@miznas.local');
     const pub = await seedUser(ds, 'pub@miznas.local');
     await ds.query(
@@ -210,7 +220,7 @@ describe('Notifications — intégration listener (Lot 4.3)', () => {
 
   // ─── 3. budget.rejected → soumetteur uniquement ──────────────────
 
-  it("budget.rejected → email_log BUDGET_REJETE soumetteur seul", async () => {
+  it('budget.rejected → email_log BUDGET_REJETE soumetteur seul', async () => {
     const soum = await seedUser(ds, 'soum@miznas.local');
     await seedUser(ds, 'autre@miznas.local');
     await ds.query(
@@ -239,7 +249,7 @@ describe('Notifications — intégration listener (Lot 4.3)', () => {
 
   // ─── 4. budget.published → soum + valid + saisisseurs ────────────
 
-  it("budget.published → email_log BUDGET_PUBLIE multi-destinataires", async () => {
+  it('budget.published → email_log BUDGET_PUBLIE multi-destinataires', async () => {
     const soum = await seedUser(ds, 'soum@miznas.local');
     const valid = await seedUser(ds, 'valid@miznas.local');
     const sais = await seedUser(ds, 'sais@miznas.local');
@@ -267,7 +277,7 @@ describe('Notifications — intégration listener (Lot 4.3)', () => {
 
   // ─── 5. delegation.created → délégataire seul ────────────────────
 
-  it("delegation.created → email_log DELEGATION_CREEE pour délégataire", async () => {
+  it('delegation.created → email_log DELEGATION_CREEE pour délégataire', async () => {
     const dlg = await seedUser(ds, 'dlg@miznas.local');
     setupAvecPerms({});
 
@@ -290,7 +300,7 @@ describe('Notifications — intégration listener (Lot 4.3)', () => {
 
   // ─── 6. delegation.expired → délégant + délégataire ──────────────
 
-  it("delegation.expired → email_log pour délégant ET délégataire", async () => {
+  it('delegation.expired → email_log pour délégant ET délégataire', async () => {
     const a = await seedUser(ds, 'a@miznas.local');
     const b = await seedUser(ds, 'b@miznas.local');
     setupAvecPerms({});
@@ -315,7 +325,7 @@ describe('Notifications — intégration listener (Lot 4.3)', () => {
 
   // ─── 7. affectation.created → user affecté ───────────────────────
 
-  it("affectation.created → email_log AFFECTATION_CREEE pour le user", async () => {
+  it('affectation.created → email_log AFFECTATION_CREEE pour le user', async () => {
     const u = await seedUser(ds, 'newbie@miznas.local');
     setupAvecPerms({});
 
@@ -338,7 +348,7 @@ describe('Notifications — intégration listener (Lot 4.3)', () => {
 
   // ─── 8. delegation.revoked → délégataire ─────────────────────────
 
-  it("delegation.revoked → email_log DELEGATION_REVOQUEE pour délégataire", async () => {
+  it('delegation.revoked → email_log DELEGATION_REVOQUEE pour délégataire', async () => {
     const dlg = await seedUser(ds, 'dlg@miznas.local');
     setupAvecPerms({});
 

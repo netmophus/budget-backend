@@ -72,10 +72,7 @@ const ligneSchema = z
     code_ligne_metier: z.string().min(1, 'Obligatoire'),
     mois: z
       .string()
-      .regex(
-        /^\d{4}-\d{2}(-\d{2})?$/,
-        'Format attendu YYYY-MM ou YYYY-MM-DD',
-      ),
+      .regex(/^\d{4}-\d{2}(-\d{2})?$/, 'Format attendu YYYY-MM ou YYYY-MM-DD'),
     mode_saisie: z.enum(['MONTANT', 'ENCOURS_TIE']),
     montant: z
       .string()
@@ -164,7 +161,7 @@ export class BudgetImportService {
         'Fichier vide ou aucune ligne de données après le header.',
       );
     }
-    const colonnesPresentes = Object.keys(rowsBrutes[0]!);
+    const colonnesPresentes = Object.keys(rowsBrutes[0]);
     const manquantes = HEADER_ORDONNE.filter(
       (c) => !colonnesPresentes.includes(c),
     );
@@ -189,7 +186,7 @@ export class BudgetImportService {
     for (let i = 0; i < rowsBrutes.length; i++) {
       const ligneNumero = i + 2; // i=0 → ligne 2 du fichier (header=1)
       await this.validerLigne(
-        rowsBrutes[i]!,
+        rowsBrutes[i],
         ligneNumero,
         versionId,
         scenarioId,
@@ -253,10 +250,11 @@ export class BudgetImportService {
     // 9. Audit (succès ou rollback : toujours consigné)
     // Lot 4.2-fix.A : enrichissement via_delegation_id si l'import
     // s'appuie sur une permission BUDGET.SAISIR reçue par délégation.
-    const viaDelegationId = await this.permissionsService.getDelegationContextPour(
-      user.userId,
-      'BUDGET.SAISIR',
-    );
+    const viaDelegationId =
+      await this.permissionsService.getDelegationContextPour(
+        user.userId,
+        'BUDGET.SAISIR',
+      );
     await this.auditService.log({
       utilisateur: user.email,
       typeAction: 'IMPORT_BUDGET_BULK',
@@ -311,6 +309,7 @@ export class BudgetImportService {
     // csv-parse auto-détecte point-virgule ou virgule via le sniffing
     // sur le header (option `delimiter: [',', ';', '\t']`). UTF-8 BOM
     // consommé via `bom: true`.
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion -- csv-parse retourne unknown[], le cast porte le typage RowBrute pour la signature de retour
     const rows = parseCsv(buffer, {
       columns: true,
       skip_empty_lines: true,
@@ -326,9 +325,7 @@ export class BudgetImportService {
     await workbook.xlsx.load(buffer as unknown as ArrayBuffer);
     const sheet = workbook.worksheets[0];
     if (!sheet) {
-      throw new BadRequestException(
-        'Fichier XLSX sans onglet exploitable.',
-      );
+      throw new BadRequestException('Fichier XLSX sans onglet exploitable.');
     }
     const headers: string[] = [];
     const rows: RowBrute[] = [];
@@ -339,7 +336,7 @@ export class BudgetImportService {
       for (let i = 1; i < raw.length; i++) values.push(raw[i]);
       if (rowNumber === 1) {
         for (const v of values) {
-          headers.push(String(v ?? '').trim());
+          headers.push(String((v as string | number | null) ?? '').trim());
         }
         return;
       }
@@ -349,11 +346,23 @@ export class BudgetImportService {
         // Les dates Excel arrivent comme objets Date — on normalise
         // au format ISO YYYY-MM-DD pour la suite.
         if (cellVal instanceof Date) {
-          obj[headers[c]!] = cellVal.toISOString().slice(0, 10);
+          obj[headers[c]] = cellVal.toISOString().slice(0, 10);
         } else if (cellVal === null || cellVal === undefined) {
-          obj[headers[c]!] = '';
+          obj[headers[c]] = '';
         } else {
-          obj[headers[c]!] = String(cellVal).trim();
+          // ExcelJS retourne { formula, result } pour les cellules avec formule.
+          // Sans cette extraction, String({formula, result}) donnerait
+          // '[object Object]' au lieu de la valeur calculee.
+          const raw: unknown =
+            typeof cellVal === 'object' &&
+            cellVal !== null &&
+            'result' in cellVal
+              ? cellVal.result
+              : cellVal;
+          if (typeof raw === 'string') obj[headers[c]] = raw.trim();
+          else if (typeof raw === 'number' || typeof raw === 'boolean')
+            obj[headers[c]] = String(raw);
+          else obj[headers[c]] = '';
         }
       }
       // Ignore les lignes vides (toutes cellules vides).
@@ -405,8 +414,8 @@ export class BudgetImportService {
       });
       return;
     }
-    const fkCentre = String(cr[0]!.id);
-    const fkStructureCr = String(cr[0]!.fk_structure);
+    const fkCentre = String(cr[0].id);
+    const fkStructureCr = String(cr[0].fk_structure);
 
     // Périmètre user
     if (crAutorises !== null && !crAutorises.includes(fkCentre)) {
@@ -440,7 +449,7 @@ export class BudgetImportService {
       });
       return;
     }
-    if (compte[0]!.est_compte_collectif) {
+    if (compte[0].est_compte_collectif) {
       erreurs.push({
         ligneNumero,
         code: 'COMPTE_AGREGE',
@@ -451,7 +460,7 @@ export class BudgetImportService {
       });
       return;
     }
-    const fkCompte = String(compte[0]!.id);
+    const fkCompte = String(compte[0].id);
 
     // Résolution FK Ligne métier
     const lm = await this.dataSource.query<Array<{ id: string }>>(
@@ -469,16 +478,14 @@ export class BudgetImportService {
       });
       return;
     }
-    const fkLigneMetier = String(lm[0]!.id);
+    const fkLigneMetier = String(lm[0].id);
 
     // Résolution FK Temps (ramener au 1er du mois)
     const moisIso = data.mois.length === 7 ? `${data.mois}-01` : data.mois;
     const moisPremier = moisIso.slice(0, 7) + '-01';
     const temps = await this.dataSource.query<
       Array<{ id: string; jour: number }>
-    >(`SELECT id, jour FROM dim_temps WHERE date = $1 LIMIT 1`, [
-      moisPremier,
-    ]);
+    >(`SELECT id, jour FROM dim_temps WHERE date = $1 LIMIT 1`, [moisPremier]);
     if (temps.length === 0) {
       erreurs.push({
         ligneNumero,
@@ -488,7 +495,7 @@ export class BudgetImportService {
       });
       return;
     }
-    if (temps[0]!.jour !== 1) {
+    if (temps[0].jour !== 1) {
       erreurs.push({
         ligneNumero,
         code: 'TEMPS_PAS_PREMIER_DU_MOIS',
@@ -497,7 +504,7 @@ export class BudgetImportService {
       });
       return;
     }
-    const fkTemps = String(temps[0]!.id);
+    const fkTemps = String(temps[0].id);
 
     // Cohérence mode + montants
     let montant: number;
@@ -599,17 +606,16 @@ export class BudgetImportService {
   private async assertVersionOuverte(versionId: string): Promise<void> {
     const rows = await this.dataSource.query<
       Array<{ statut: string; code_version: string }>
-    >(
-      `SELECT statut, code_version FROM dim_version WHERE id = $1`,
-      [versionId],
-    );
+    >(`SELECT statut, code_version FROM dim_version WHERE id = $1`, [
+      versionId,
+    ]);
     if (rows.length === 0) {
       throw new NotFoundException(`Version ${versionId} introuvable.`);
     }
-    if (rows[0]!.statut !== 'ouvert') {
+    if (rows[0].statut !== 'ouvert') {
       throw new ConflictException(
-        `Import refusé : la version ${rows[0]!.code_version} est au statut ` +
-          `'${rows[0]!.statut}'. Seul le statut 'ouvert' (Brouillon) autorise l'import.`,
+        `Import refusé : la version ${rows[0].code_version} est au statut ` +
+          `'${rows[0].statut}'. Seul le statut 'ouvert' (Brouillon) autorise l'import.`,
       );
     }
   }
@@ -627,7 +633,9 @@ export class BudgetImportService {
     fkSegment: string;
   } | null = null;
 
-  private async resoudreFkDefaults(_versionId: string): Promise<
+  private async resoudreFkDefaults(
+    _versionId: string,
+  ): Promise<
     | { ok: true; fkDevise: string; fkProduit: string; fkSegment: string }
     | { ok: false; message: string }
   > {
@@ -662,9 +670,9 @@ export class BudgetImportService {
       return { ok: false, message: 'Aucun segment courant disponible.' };
     }
     this.defaultsCache = {
-      fkDevise: String(xof[0]!.id),
+      fkDevise: String(xof[0].id),
       fkProduit: String(fkProduit),
-      fkSegment: String(segment[0]!.id),
+      fkSegment: String(segment[0].id),
     };
     return { ok: true, ...this.defaultsCache };
   }
@@ -752,16 +760,14 @@ export class BudgetImportService {
         );
         inserees++;
       } else {
-        const e = existing[0]!;
+        const e = existing[0];
         const inchange =
           Number(e.montant_devise) === op.montant &&
           e.mode_saisie === op.modeSaisie &&
           (e.encours_moyen === null
             ? op.encoursMoyen === null
             : Number(e.encours_moyen) === op.encoursMoyen) &&
-          (e.tie === null
-            ? op.tie === null
-            : Number(e.tie) === op.tie) &&
+          (e.tie === null ? op.tie === null : Number(e.tie) === op.tie) &&
           (e.commentaire ?? null) === (op.commentaire ?? null);
         if (inchange) {
           ignorees++;

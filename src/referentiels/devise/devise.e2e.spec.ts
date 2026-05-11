@@ -111,14 +111,10 @@ async function seedAccessControl(ds: DataSource): Promise<{
        ('noperms@miznas.local','placeholder', 'NoPerm', 'Test',   true, 'system')`,
   );
 
-  const ids = await ds.query(
+  const ids = (await ds.query(
     `SELECT email, id FROM "user" WHERE email IN ($1, $2, $3)`,
-    [
-      'admin@miznas.local',
-      'lecteur@miznas.local',
-      'noperms@miznas.local',
-    ],
-  ) as Array<{ email: string; id: string }>;
+    ['admin@miznas.local', 'lecteur@miznas.local', 'noperms@miznas.local'],
+  )) as Array<{ email: string; id: string }>;
 
   const idByEmail = new Map(ids.map((r) => [r.email, r.id]));
 
@@ -167,7 +163,6 @@ describe('Devise (e2e) — premier usage réel de @Auditable', () => {
   let dataSource: DataSource;
   let adminToken: string;
   let lecteurToken: string;
-  let noPermsToken: string;
   let xofId: string;
 
   beforeAll(async () => {
@@ -258,11 +253,6 @@ describe('Devise (e2e) — premier usage réel de @Auditable', () => {
       sub: ids.lecteurId,
       email: 'lecteur@miznas.local',
       jti: 'jti-lecteur',
-    });
-    noPermsToken = await jwtService.signAsync({
-      sub: ids.noPermsId,
-      email: 'noperms@miznas.local',
-      jti: 'jti-noperms',
     });
   });
 

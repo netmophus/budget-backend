@@ -7,9 +7,7 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
  *
  * Idempotent via ON CONFLICT.
  */
-export class AddRefTypeActionImportBudget1779200000030
-  implements MigrationInterface
-{
+export class AddRefTypeActionImportBudget1779200000030 implements MigrationInterface {
   name = 'AddRefTypeActionImportBudget1779200000030';
 
   public async up(q: QueryRunner): Promise<void> {
@@ -29,6 +27,8 @@ export class AddRefTypeActionImportBudget1779200000030
   }
 
   public async down(q: QueryRunner): Promise<void> {
-    await q.query(`DELETE FROM "ref_type_action_audit" WHERE "code" = 'IMPORT_BUDGET'`);
+    await q.query(
+      `DELETE FROM "ref_type_action_audit" WHERE "code" = 'IMPORT_BUDGET'`,
+    );
   }
 }

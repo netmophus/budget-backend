@@ -73,14 +73,12 @@ async function seedMinimal(ds: DataSource): Promise<{
     ['lecteur@test.local', 'noperms@test.local'],
   );
 
-  const lecteur = (await ds.query(
-    `SELECT id FROM "user" WHERE email = $1`,
-    ['lecteur@test.local'],
-  )) as Array<{ id: string }>;
-  const noPerms = (await ds.query(
-    `SELECT id FROM "user" WHERE email = $1`,
-    ['noperms@test.local'],
-  )) as Array<{ id: string }>;
+  const lecteur = (await ds.query(`SELECT id FROM "user" WHERE email = $1`, [
+    'lecteur@test.local',
+  ])) as Array<{ id: string }>;
+  const noPerms = (await ds.query(`SELECT id FROM "user" WHERE email = $1`, [
+    'noperms@test.local',
+  ])) as Array<{ id: string }>;
 
   // 5. Affectation rôle global au lecteur uniquement (sous-requête
   //    scalaire pour le rôle, pour rester compatible pg-mem)

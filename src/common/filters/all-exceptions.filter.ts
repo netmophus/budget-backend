@@ -109,8 +109,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
         // Lot 6.4.A — un `code` applicatif posé par l'exception prime
         // sur le mapping HTTP générique (cf. PasswordExpiredGuard
         // qui distingue MDP_TEMPORAIRE de MDP_EXPIRE).
-        errorCode:
-          codeApplicatif ?? this.errorCodeForHttpStatus(statusCode),
+        errorCode: codeApplicatif ?? this.errorCodeForHttpStatus(statusCode),
       };
     }
 
@@ -125,6 +124,12 @@ export class AllExceptionsFilter implements ExceptionFilter {
   }
 
   private errorCodeForHttpStatus(status: number): string {
+    // Switch sur predicate numerique (status code HTTP). Les case literals
+    // sont des HttpStatus enum values mais ESLint flag faussement le case
+    // car le predicate "status: number" n est pas typeof enum HttpStatus.
+    // Pattern lisible et idiomatique, refactor en Number() ou type guard
+    // apporterait de la complexite sans gain runtime.
+    /* eslint-disable @typescript-eslint/no-unsafe-enum-comparison */
     switch (status) {
       case HttpStatus.BAD_REQUEST:
         return 'VALIDATION_ERROR';
@@ -146,5 +151,6 @@ export class AllExceptionsFilter implements ExceptionFilter {
         }
         return 'HTTP_ERROR';
     }
+    /* eslint-enable @typescript-eslint/no-unsafe-enum-comparison */
   }
 }

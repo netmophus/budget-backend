@@ -68,7 +68,7 @@ async function seedAll(ds: DataSource): Promise<SeedIds> {
   for (const [code, libelle] of [
     ['ADMIN', 'Admin'],
     ['LECTEUR', 'Lecteur'],
-    ['PREPARATEUR_CIV', 'Préparateur Côte d\'Ivoire'],
+    ['PREPARATEUR_CIV', "Préparateur Côte d'Ivoire"],
   ]) {
     await ds.query(
       `INSERT INTO ref_role (code_role, libelle, est_actif, utilisateur_creation)
@@ -100,9 +100,10 @@ async function seedAll(ds: DataSource): Promise<SeedIds> {
        ('preparateur-civ@miznas.local','placeholder','PrepCIV','X', true, 'system'),
        ('lecteur@miznas.local',       'placeholder','Lecteur','X', true, 'system')`,
   );
-  const users = (await ds.query(
-    `SELECT email, id FROM "user"`,
-  )) as Array<{ email: string; id: string }>;
+  const users = (await ds.query(`SELECT email, id FROM "user"`)) as Array<{
+    email: string;
+    id: string;
+  }>;
   const userIdByEmail = new Map(users.map((u) => [u.email, String(u.id)]));
 
   // Structures + CR (pour le périmètre PREPARATEUR_CIV)
@@ -153,7 +154,14 @@ async function seedAll(ds: DataSource): Promise<SeedIds> {
      VALUES
        ($1, $2, 'branche', $3, true, true, '2026-01-01', 'system'),
        ($4, $5, 'branche', $6, true, true, '2026-01-01', 'system')`,
-    ['BR_CIV', 'Branche CIV', civStructFromInsert, 'BR_BFA', 'Branche BFA', bfaStructId],
+    [
+      'BR_CIV',
+      'Branche CIV',
+      civStructFromInsert,
+      'BR_BFA',
+      'Branche BFA',
+      bfaStructId,
+    ],
   );
   const crs = (await ds.query(
     `SELECT code_cr, id FROM dim_centre_responsabilite`,
@@ -166,7 +174,12 @@ async function seedAll(ds: DataSource): Promise<SeedIds> {
   for (const [email, role, ptype, pid] of [
     ['admin@miznas.local', 'ADMIN', 'global', null],
     ['lecteur@miznas.local', 'LECTEUR', 'global', null],
-    ['preparateur-civ@miznas.local', 'PREPARATEUR_CIV', 'structure', String(civStructureId)],
+    [
+      'preparateur-civ@miznas.local',
+      'PREPARATEUR_CIV',
+      'structure',
+      String(civStructureId),
+    ],
   ] as Array<[string, string, string, string | null]>) {
     const roleRows = (await ds.query(
       `SELECT id FROM ref_role WHERE code_role = $1`,
@@ -201,7 +214,9 @@ async function seedAll(ds: DataSource): Promise<SeedIds> {
   const scs = (await ds.query(
     `SELECT code_scenario, id FROM dim_scenario`,
   )) as Array<{ code_scenario: string; id: string }>;
-  const scenarioIdByCode = new Map(scs.map((s) => [s.code_scenario, String(s.id)]));
+  const scenarioIdByCode = new Map(
+    scs.map((s) => [s.code_scenario, String(s.id)]),
+  );
 
   return {
     adminId: userIdByEmail.get('admin@miznas.local')!,
@@ -256,7 +271,8 @@ describe('IndicateursController (e2e)', () => {
 
   beforeAll(async () => {
     process.env.NODE_ENV = 'test';
-    process.env.JWT_SECRET = 'test-secret-indicateurs-e2e-min-32-chars-aaaaaaaaaa';
+    process.env.JWT_SECRET =
+      'test-secret-indicateurs-e2e-min-32-chars-aaaaaaaaaa';
     process.env.JWT_ACCESS_EXPIRES_IN = '15m';
     process.env.JWT_REFRESH_EXPIRES_IN = '7d';
     process.env.BCRYPT_ROUNDS = '4';
@@ -420,14 +436,22 @@ describe('IndicateursController (e2e)', () => {
   it('GET /indicateurs/globaux sans token → 401', async () => {
     await request(app.getHttpServer())
       .get('/api/v1/budget/indicateurs/globaux')
-      .query({ versionId: ids.versionId, scenarioId: ids.scenarioMedianId, exerciceFiscal: 2027 })
+      .query({
+        versionId: ids.versionId,
+        scenarioId: ids.scenarioMedianId,
+        exerciceFiscal: 2027,
+      })
       .expect(401);
   });
 
   it('GET /indicateurs/globaux avec admin → somme des 2 CR', async () => {
     const res = await request(app.getHttpServer())
       .get('/api/v1/budget/indicateurs/globaux')
-      .query({ versionId: ids.versionId, scenarioId: ids.scenarioMedianId, exerciceFiscal: 2027 })
+      .query({
+        versionId: ids.versionId,
+        scenarioId: ids.scenarioMedianId,
+        exerciceFiscal: 2027,
+      })
       .set('Authorization', `Bearer ${adminToken}`)
       .expect(200);
     // PNB = (100-20) + (50-10) = 120
@@ -439,7 +463,11 @@ describe('IndicateursController (e2e)', () => {
   it('GET /indicateurs/globaux avec preparateur_civ → seul BR_CIV', async () => {
     const res = await request(app.getHttpServer())
       .get('/api/v1/budget/indicateurs/globaux')
-      .query({ versionId: ids.versionId, scenarioId: ids.scenarioMedianId, exerciceFiscal: 2027 })
+      .query({
+        versionId: ids.versionId,
+        scenarioId: ids.scenarioMedianId,
+        exerciceFiscal: 2027,
+      })
       .set('Authorization', `Bearer ${preparateurCivToken}`)
       .expect(200);
     expect(Number(res.body.pnb)).toBe(80); // 100-20
@@ -449,14 +477,22 @@ describe('IndicateursController (e2e)', () => {
   it('GET /indicateurs/par-cr avec admin → 2 lignes triées par CR', async () => {
     const res = await request(app.getHttpServer())
       .get('/api/v1/budget/indicateurs/par-cr')
-      .query({ versionId: ids.versionId, scenarioId: ids.scenarioMedianId, exerciceFiscal: 2027 })
+      .query({
+        versionId: ids.versionId,
+        scenarioId: ids.scenarioMedianId,
+        exerciceFiscal: 2027,
+      })
       .set('Authorization', `Bearer ${adminToken}`)
       .expect(200);
     expect(Array.isArray(res.body)).toBe(true);
     expect(res.body).toHaveLength(2);
-    const civ = (res.body as Array<{ codeCr: string; pnb: number; coefExploitation: number | null }>).find(
-      (r) => r.codeCr === 'BR_CIV',
-    )!;
+    const civ = (
+      res.body as Array<{
+        codeCr: string;
+        pnb: number;
+        coefExploitation: number | null;
+      }>
+    ).find((r) => r.codeCr === 'BR_CIV')!;
     expect(Number(civ.pnb)).toBe(80);
     // coef = 40 / 80 × 100 = 50
     expect(Number(civ.coefExploitation)).toBe(50);
@@ -479,7 +515,11 @@ describe('IndicateursController (e2e)', () => {
   it('GET /indicateurs/globaux avec lecteur → 200 (BUDGET.LIRE suffit)', async () => {
     await request(app.getHttpServer())
       .get('/api/v1/budget/indicateurs/globaux')
-      .query({ versionId: ids.versionId, scenarioId: ids.scenarioMedianId, exerciceFiscal: 2027 })
+      .query({
+        versionId: ids.versionId,
+        scenarioId: ids.scenarioMedianId,
+        exerciceFiscal: 2027,
+      })
       .set('Authorization', `Bearer ${lecteurToken}`)
       .expect(200);
   });

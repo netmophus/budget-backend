@@ -22,13 +22,10 @@
  *  - La réponse `ForgotPasswordResult` est strictement identique
  *    pour email connu et inconnu.
  */
-import {
-  BadRequestException,
-  GoneException,
-} from '@nestjs/common';
+import { BadRequestException, GoneException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
-import { createHash, randomUUID } from 'node:crypto';
+import { createHash } from 'node:crypto';
 import { LessThan } from 'typeorm';
 
 import { AuditService } from '../audit/audit.service';
@@ -160,9 +157,11 @@ function buildService(opts: BuildOpts = {}): {
   const userRepo = {
     findOne: jest.fn(async () => opts.user ?? null),
     manager: {
-      transaction: jest.fn(async (cb: (tx: typeof txManager) => Promise<void>) => {
-        await cb(txManager);
-      }),
+      transaction: jest.fn(
+        async (cb: (tx: typeof txManager) => Promise<void>) => {
+          await cb(txManager);
+        },
+      ),
     },
   };
 
@@ -184,11 +183,9 @@ function buildService(opts: BuildOpts = {}): {
   };
 
   const emailQueue = {
-    publier: jest.fn(
-      async (id: string, secrets?: Record<string, string>) => {
-        capt.jobs.push({ emailLogId: id, secrets });
-      },
-    ),
+    publier: jest.fn(async (id: string, secrets?: Record<string, string>) => {
+      capt.jobs.push({ emailLogId: id, secrets });
+    }),
   };
 
   const config = {
@@ -214,7 +211,11 @@ function buildService(opts: BuildOpts = {}): {
 
 describe('PasswordResetService — demanderReset', () => {
   it('email connu actif → INSERT token + email publié + audit DEMANDE_RESET_MDP_USER', async () => {
-    const user = buildUser({ id: '42', email: 'jean@miznas.local', estActif: true });
+    const user = buildUser({
+      id: '42',
+      email: 'jean@miznas.local',
+      estActif: true,
+    });
     const { service, capt } = buildService({ user });
 
     const r = await service.demanderReset(user.email, '1.2.3.4', 'Mozilla');
@@ -280,11 +281,11 @@ describe('PasswordResetService — demanderReset', () => {
 
   it('réponse forgot-password EXACTEMENT identique pour connu vs inconnu (anti-énumération)', async () => {
     const userConnu = buildUser();
-    const r1 = (await buildService({ user: userConnu }).service.demanderReset(
+    const r1 = await buildService({ user: userConnu }).service.demanderReset(
       userConnu.email,
       '1.2.3.4',
       null,
-    ));
+    );
     const r2 = await buildService({ user: null }).service.demanderReset(
       'autre@miznas.local',
       '1.2.3.4',
@@ -295,7 +296,9 @@ describe('PasswordResetService — demanderReset', () => {
 });
 
 describe('PasswordResetService — executerReset', () => {
-  function tokenInBase(overrides: Partial<PasswordResetToken> = {}): PasswordResetToken {
+  function tokenInBase(
+    overrides: Partial<PasswordResetToken> = {},
+  ): PasswordResetToken {
     return {
       id: '1',
       fkUser: '42',
@@ -324,7 +327,9 @@ describe('PasswordResetService — executerReset', () => {
     expect(capt.userSaved).toHaveLength(1);
     const u = capt.userSaved[0]!;
     expect(u.motDePasseHash).not.toBe('old-hash');
-    expect(await bcrypt.compare('NewPassword!2026', u.motDePasseHash)).toBe(true);
+    expect(await bcrypt.compare('NewPassword!2026', u.motDePasseHash)).toBe(
+      true,
+    );
     expect(u.doitChangerMdp).toBe(false);
     expect(capt.tokenSaved).toHaveLength(1);
     expect(capt.tokenSaved[0]!.utilise).toBe(true);

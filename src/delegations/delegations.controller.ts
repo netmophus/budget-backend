@@ -54,7 +54,7 @@ export class DelegationsController {
   @Post('delegations')
   @ApiOperation({
     summary:
-      'Créer une délégation (le délégant est l\'utilisateur courant). Anti-chaînage strict (D2) — un périmètre déjà reçu par délégation ne peut pas être re-délégué.',
+      "Créer une délégation (le délégant est l'utilisateur courant). Anti-chaînage strict (D2) — un périmètre déjà reçu par délégation ne peut pas être re-délégué.",
   })
   @ApiCreatedResponse({ type: CreerDelegationResponseDto })
   @ApiBadRequestResponse({
@@ -71,20 +71,23 @@ export class DelegationsController {
       id: String(delegation.id),
       fkDelegant: String(delegation.fkDelegant),
       fkDelegataire: String(delegation.fkDelegataire),
-      perimetreUserPerimetreIds: delegation.perimetreUserPerimetreIds.map(String),
+      perimetreUserPerimetreIds:
+        delegation.perimetreUserPerimetreIds.map(String),
       permissions: delegation.permissions,
       motif: delegation.motif,
       dateDebut: delegation.dateDebut,
       dateFin: delegation.dateFin,
       actif: delegation.actif,
-      revoqueeLe: delegation.revoqueeLe ? delegation.revoqueeLe.toISOString() : null,
+      revoqueeLe: delegation.revoqueeLe
+        ? delegation.revoqueeLe.toISOString()
+        : null,
       fkRevoquePar:
-        delegation.fkRevoquePar === null ? null : String(delegation.fkRevoquePar),
+        delegation.fkRevoquePar === null
+          ? null
+          : String(delegation.fkRevoquePar),
       motifRevocation: delegation.motifRevocation,
       statut:
-        delegation.actif && delegation.dateFin >= today
-          ? 'ACTIVE'
-          : 'EXPIREE',
+        delegation.actif && delegation.dateFin >= today ? 'ACTIVE' : 'EXPIREE',
       warnings,
     };
   }
@@ -102,10 +105,9 @@ export class DelegationsController {
     @Body() dto: RevoquerDelegationDto,
     @CurrentUser() user: AuthUser,
   ): Promise<DelegationResponseDto> {
-    const isAdmin = await this.permissionsService.hasPermission(
-      user.userId,
-      ['DELEGATION.GERER'],
-    );
+    const isAdmin = await this.permissionsService.hasPermission(user.userId, [
+      'DELEGATION.GERER',
+    ]);
     const d = await this.service.revoquer(id, dto, user, isAdmin);
     const today = new Date().toISOString().slice(0, 10);
     return {
@@ -131,7 +133,7 @@ export class DelegationsController {
 
   @Get('delegations/recues')
   @ApiOperation({
-    summary: 'Liste les délégations reçues par l\'utilisateur courant.',
+    summary: "Liste les délégations reçues par l'utilisateur courant.",
   })
   @ApiOkResponse({ type: DelegationResponseDto, isArray: true })
   async mesRecues(
@@ -146,7 +148,7 @@ export class DelegationsController {
 
   @Get('delegations/emises')
   @ApiOperation({
-    summary: 'Liste les délégations émises par l\'utilisateur courant.',
+    summary: "Liste les délégations émises par l'utilisateur courant.",
   })
   @ApiOkResponse({ type: DelegationResponseDto, isArray: true })
   async mesEmises(

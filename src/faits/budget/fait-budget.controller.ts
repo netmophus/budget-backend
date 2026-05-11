@@ -108,7 +108,9 @@ export class FaitBudgetController {
 
   @Get(':id')
   @RequirePermissions('BUDGET.LIRE')
-  @ApiOperation({ summary: 'Récupère un fait budget par son id (filtré par périmètre).' })
+  @ApiOperation({
+    summary: 'Récupère un fait budget par son id (filtré par périmètre).',
+  })
   @ApiOkResponse({ type: FaitBudgetResponseDto })
   @ApiNotFoundResponse()
   async findById(
@@ -125,14 +127,16 @@ export class FaitBudgetController {
   @Auditable({ typeAction: 'CREATE', entiteCible: 'fait_budget' })
   @ApiOperation({
     summary:
-      "Crée un fait budget à partir des 10 FK techniques (réservé imports/scripts). Pour la saisie utilisateur, préférer POST /from-business-keys.",
+      'Crée un fait budget à partir des 10 FK techniques (réservé imports/scripts). Pour la saisie utilisateur, préférer POST /from-business-keys.',
   })
   @ApiCreatedResponse({ type: FaitBudgetResponseDto })
   @ApiConflictResponse({
     description:
       'Grain unique violé (un fait existe déjà pour ce 10-uplet) ou version cible figée.',
   })
-  @ApiNotFoundResponse({ description: 'Une des FK pointe vers une dimension inexistante.' })
+  @ApiNotFoundResponse({
+    description: 'Une des FK pointe vers une dimension inexistante.',
+  })
   @ApiBadRequestResponse({ description: 'Validation DTO invalide.' })
   async create(
     @Body() dto: CreateFaitBudgetDto,
@@ -146,8 +150,7 @@ export class FaitBudgetController {
   @RequirePermissions('BUDGET.SAISIR')
   @Auditable({ typeAction: 'CREATE', entiteCible: 'fait_budget' })
   @ApiOperation({
-    summary:
-      'Saisie budget — endpoint principal pour saisie utilisateur',
+    summary: 'Saisie budget — endpoint principal pour saisie utilisateur',
     description: `Crée un fait budget à partir des codes business des 9 dimensions + une date métier.
 
 **Algorithme (Option B, cf. modele-donnees.md §6.3)** :
@@ -190,7 +193,7 @@ L'audit_log capture la requête + la réponse (y compris \`resolutionDetails\`),
   })
   @ApiUnprocessableEntityResponse({
     description:
-      "Aucune version SCD2 valide à la date métier pour une dimension, ou cohérence devise/taux/montant violée.",
+      'Aucune version SCD2 valide à la date métier pour une dimension, ou cohérence devise/taux/montant violée.',
   })
   async createFromBusinessKeys(
     @Body() dto: CreateFaitBudgetFromBusinessKeysDto,
@@ -201,12 +204,10 @@ L'audit_log capture la requête + la réponse (y compris \`resolutionDetails\`),
     // service le fait déjà via création — mais on ré-arme ici une
     // garde minimale : si le user n'a aucun CR autorisé (= []),
     // refuser tout d'office.
-    const crs = await this.perimetreService.getCrAutorisesPourUser(
-      user.userId,
-    );
+    const crs = await this.perimetreService.getCrAutorisesPourUser(user.userId);
     if (crs !== null && crs.length === 0) {
       throw new ForbiddenException(
-        "Aucun centre de responsabilité dans votre périmètre. Saisie refusée.",
+        'Aucun centre de responsabilité dans votre périmètre. Saisie refusée.',
       );
     }
     const result = await this.service.createFromBusinessKeys(dto, user.email);
@@ -224,7 +225,7 @@ L'audit_log capture la requête + la réponse (y compris \`resolutionDetails\`),
   })
   @ApiOperation({
     summary:
-      'Modifie les mesures d\'un fait (montantDevise / montantFcfa / tauxChangeApplique). Aucune FK modifiable (un fait modifié = supprimé + recréé).',
+      "Modifie les mesures d'un fait (montantDevise / montantFcfa / tauxChangeApplique). Aucune FK modifiable (un fait modifié = supprimé + recréé).",
   })
   @ApiOkResponse({ type: FaitBudgetResponseDto })
   @ApiNotFoundResponse()
@@ -232,8 +233,7 @@ L'audit_log capture la requête + la réponse (y compris \`resolutionDetails\`),
     description: 'Une FK est présente dans le payload (interdit).',
   })
   @ApiConflictResponse({
-    description:
-      "La version cible est figée (statut != 'ouvert').",
+    description: "La version cible est figée (statut != 'ouvert').",
   })
   async update(
     @Param('id') id: string,
@@ -264,7 +264,7 @@ L'audit_log capture la requête + la réponse (y compris \`resolutionDetails\`),
   @ApiNoContentResponse()
   @ApiNotFoundResponse()
   @ApiConflictResponse({
-    description: "Version cible figée — suppression refusée.",
+    description: 'Version cible figée — suppression refusée.',
   })
   async remove(
     @Param('id') id: string,

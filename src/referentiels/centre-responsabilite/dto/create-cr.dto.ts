@@ -46,7 +46,7 @@ export class CreateCrDto {
   @ApiPropertyOptional({
     example: '12',
     description:
-      "Surrogate key (id technique) de la structure parente. Préférer codeStructure côté UI.",
+      'Surrogate key (id technique) de la structure parente. Préférer codeStructure côté UI.',
   })
   @IsOptional()
   @IsString()

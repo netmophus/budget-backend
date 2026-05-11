@@ -281,9 +281,7 @@ describe('Segment (e2e) — SCD2 plat (sans hiérarchie)', () => {
       `SELECT type_action, statut FROM audit_log WHERE entite_cible = 'dim_segment'`,
     )) as Array<{ type_action: string; statut: string }>;
     expect(
-      audits.find(
-        (a) => a.type_action === 'CREATE' && a.statut === 'success',
-      ),
+      audits.find((a) => a.type_action === 'CREATE' && a.statut === 'success'),
     ).toBeDefined();
   });
 

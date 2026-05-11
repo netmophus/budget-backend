@@ -46,7 +46,7 @@ async function waitForStatut(
   timeoutMs = 25_000,
 ): Promise<EmailLog> {
   const start = Date.now();
-  // eslint-disable-next-line no-constant-condition
+
   while (true) {
     const row = await repo.findOne({ where: { id: emailLogId } });
     if (row && (attendus as readonly string[]).includes(row.statut)) return row;
@@ -114,7 +114,7 @@ describe('E2E.7 — Flux complet emails async (queue + worker)', () => {
     expect(sendMailMock).toHaveBeenCalled();
   });
 
-  it("FAILED : SMTP rejette, après attempts épuisés email_log passe en ECHEC", async () => {
+  it('FAILED : SMTP rejette, après attempts épuisés email_log passe en ECHEC', async () => {
     sendMailMock.mockRejectedValue(new Error('SMTP DOWN test'));
 
     const log = await emailLogRepo.save(

@@ -17,15 +17,41 @@ export interface SegmentSeedRow {
 }
 
 export const SEGMENTS_INITIAUX: readonly SegmentSeedRow[] = [
-  { codeSegment: 'PARTICULIER', libelle: 'Particuliers', categorie: 'particulier' },
-  { codeSegment: 'PROFESSIONNEL', libelle: 'Professionnels (artisans, commerçants)', categorie: 'professionnel' },
-  { codeSegment: 'PME', libelle: 'Petites et moyennes entreprises', categorie: 'pme' },
-  { codeSegment: 'GRANDE_ENTREPRISE', libelle: 'Grandes entreprises', categorie: 'grande_entreprise' },
-  { codeSegment: 'INSTITUTIONNEL', libelle: 'Institutionnels (banques, assurances, OPCVM)', categorie: 'institutionnel' },
-  { codeSegment: 'SECTEUR_PUBLIC', libelle: 'Secteur public et collectivités', categorie: 'secteur_public' },
+  {
+    codeSegment: 'PARTICULIER',
+    libelle: 'Particuliers',
+    categorie: 'particulier',
+  },
+  {
+    codeSegment: 'PROFESSIONNEL',
+    libelle: 'Professionnels (artisans, commerçants)',
+    categorie: 'professionnel',
+  },
+  {
+    codeSegment: 'PME',
+    libelle: 'Petites et moyennes entreprises',
+    categorie: 'pme',
+  },
+  {
+    codeSegment: 'GRANDE_ENTREPRISE',
+    libelle: 'Grandes entreprises',
+    categorie: 'grande_entreprise',
+  },
+  {
+    codeSegment: 'INSTITUTIONNEL',
+    libelle: 'Institutionnels (banques, assurances, OPCVM)',
+    categorie: 'institutionnel',
+  },
+  {
+    codeSegment: 'SECTEUR_PUBLIC',
+    libelle: 'Secteur public et collectivités',
+    categorie: 'secteur_public',
+  },
 ];
 
-export async function seedSegments(ds: DataSource = AppDataSource): Promise<void> {
+export async function seedSegments(
+  ds: DataSource = AppDataSource,
+): Promise<void> {
   const ownsConnection = !ds.isInitialized;
   if (ownsConnection) {
     await ds.initialize();

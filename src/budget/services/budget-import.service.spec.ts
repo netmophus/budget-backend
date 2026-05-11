@@ -11,10 +11,7 @@
  * Fixtures : générées inline en mémoire (Buffer.from pour CSV,
  * exceljs pour XLSX) — pas de fichiers sur disque.
  */
-import {
-  BadRequestException,
-  ConflictException,
-} from '@nestjs/common';
+import { BadRequestException, ConflictException } from '@nestjs/common';
 import ExcelJS from 'exceljs';
 import { DataType, IMemoryDb, newDb } from 'pg-mem';
 import { DataSource } from 'typeorm';
@@ -270,7 +267,11 @@ async function seedAll(ds: DataSource): Promise<SeedIds> {
 
 // ─── Helpers fichiers ────────────────────────────────────────────────
 
-function csv(lignes: string[]): { buffer: Buffer; originalname: string; size: number } {
+function csv(lignes: string[]): {
+  buffer: Buffer;
+  originalname: string;
+  size: number;
+} {
   const text = lignes.join('\n') + '\n';
   const buffer = Buffer.from(text, 'utf-8');
   return { buffer, originalname: 'budget.csv', size: buffer.length };
@@ -477,30 +478,57 @@ describe('BudgetImportService', () => {
     expect(r.transactionRollback).toBe(false);
   });
 
-  it('header invalide → BadRequestException', async () => {
-    const file = csv([
-      'colA,colB,colC',
-      'BR_CIV,611100,2027-01',
+  it('XLSX cellule formule → extraction valeur calculée (régression Lot 6.6.B-8.3)', async () => {
+    // ExcelJS retourne { formula, result } pour les cellules avec formule.
+    // Avant le fix : String({formula, result}).trim() donnait '[object Object]'
+    // → Zod rejetait la ligne avec erreur incompréhensible.
+    // Après fix : extraction de .result.
+    const wb = new ExcelJS.Workbook();
+    const ws = wb.addWorksheet('Budget');
+    ws.addRow(HEADER.split(','));
+    const dataRow = ws.addRow([
+      'BR_CIV',
+      '611100',
+      'RETAIL_PARTICULIERS',
+      '2027-01-01',
+      'MONTANT',
+      '',
+      '',
+      '',
+      'Test cellule formule',
     ]);
+    // Cellule montant (6ème colonne) = formule avec result précalculé.
+    dataRow.getCell(6).value = { formula: '500+500', result: 1000 };
+    const buf = (await wb.xlsx.writeBuffer()) as ArrayBuffer;
+    const buffer = Buffer.from(new Uint8Array(buf));
+    const file = {
+      buffer,
+      originalname: 'budget-formule.xlsx',
+      size: buffer.length,
+    };
+
+    const r = await service.importFichier(
+      file,
+      ids.versionId,
+      ids.scenarioId,
+      adminUser,
+    );
+    expect(r.lignesValides).toBe(1);
+    expect(r.lignesRejetees).toBe(0);
+    expect(r.lignesInserees).toBe(1);
+  });
+
+  it('header invalide → BadRequestException', async () => {
+    const file = csv(['colA,colB,colC', 'BR_CIV,611100,2027-01']);
     await expect(
-      service.importFichier(
-        file,
-        ids.versionId,
-        ids.scenarioId,
-        adminUser,
-      ),
+      service.importFichier(file, ids.versionId, ids.scenarioId, adminUser),
     ).rejects.toThrow(BadRequestException);
   });
 
   it('fichier vide (header seul) → BadRequestException', async () => {
     const file = csv([HEADER]);
     await expect(
-      service.importFichier(
-        file,
-        ids.versionId,
-        ids.scenarioId,
-        adminUser,
-      ),
+      service.importFichier(file, ids.versionId, ids.scenarioId, adminUser),
     ).rejects.toThrow(BadRequestException);
   });
 
@@ -562,7 +590,12 @@ describe('BudgetImportService', () => {
       HEADER,
       'BR_CIV,611100,RETAIL_PARTICULIERS,2027-01,MONTANT,1000,,,',
     ]);
-    await service.importFichier(file1, ids.versionId, ids.scenarioId, adminUser);
+    await service.importFichier(
+      file1,
+      ids.versionId,
+      ids.scenarioId,
+      adminUser,
+    );
     const file2 = csv([
       HEADER,
       'BR_CIV,611100,RETAIL_PARTICULIERS,2027-01,MONTANT,1500,,,Modifié',
@@ -587,7 +620,12 @@ describe('BudgetImportService', () => {
       HEADER,
       'BR_CIV,611100,RETAIL_PARTICULIERS,2027-01,MONTANT,1000,,,',
     ]);
-    await service.importFichier(fileA, ids.versionId, ids.scenarioId, adminUser);
+    await service.importFichier(
+      fileA,
+      ids.versionId,
+      ids.scenarioId,
+      adminUser,
+    );
     const fileB = csv([
       HEADER,
       'BR_CIV,611100,RETAIL_PARTICULIERS,2027-01,MONTANT,1000,,,',
@@ -609,8 +647,9 @@ describe('BudgetImportService', () => {
       HEADER,
       'BR_CIV,611100,RETAIL_PARTICULIERS,2027-01,MONTANT,1,,,',
       'BR_CIV,611100,RETAIL_PARTICULIERS,2027-02,MONTANT,2,,,',
-      ...Array.from({ length: 8 }, (_, i) =>
-        `BR_CIV,99${i}000,RETAIL_PARTICULIERS,2027-01,MONTANT,1,,,`,
+      ...Array.from(
+        { length: 8 },
+        (_, i) => `BR_CIV,99${i}000,RETAIL_PARTICULIERS,2027-01,MONTANT,1,,,`,
       ),
     ]);
     const r = await service.importFichier(
@@ -715,7 +754,10 @@ describe('BudgetImportService', () => {
     expect(r.transactionRollback).toBe(false);
     // Invariant : insérées + modifiées + ignorées + rejetées = total
     expect(
-      r.lignesInserees + r.lignesModifiees + r.lignesIgnorees + r.lignesRejetees,
+      r.lignesInserees +
+        r.lignesModifiees +
+        r.lignesIgnorees +
+        r.lignesRejetees,
     ).toBe(r.lignesTotal);
     // Vérification SQL : 100 lignes en base.
     const cnt = (await dataSource.query(
@@ -757,7 +799,10 @@ describe('BudgetImportService', () => {
     expect(r2.lignesModifiees).toBe(0);
     // Invariant
     expect(
-      r2.lignesInserees + r2.lignesModifiees + r2.lignesIgnorees + r2.lignesRejetees,
+      r2.lignesInserees +
+        r2.lignesModifiees +
+        r2.lignesIgnorees +
+        r2.lignesRejetees,
     ).toBe(r2.lignesTotal);
   });
 
@@ -773,14 +818,18 @@ describe('BudgetImportService', () => {
        VALUES ('OPTIMISTE_2027'), ('PESSIMISTE_2027')`,
     );
     const scOpt = String(
-      ((await dataSource.query(
-        `SELECT id FROM dim_scenario WHERE code_scenario='OPTIMISTE_2027'`,
-      )) as Array<{ id: string }>)[0]!.id,
+      (
+        (await dataSource.query(
+          `SELECT id FROM dim_scenario WHERE code_scenario='OPTIMISTE_2027'`,
+        )) as Array<{ id: string }>
+      )[0]!.id,
     );
     const scPess = String(
-      ((await dataSource.query(
-        `SELECT id FROM dim_scenario WHERE code_scenario='PESSIMISTE_2027'`,
-      )) as Array<{ id: string }>)[0]!.id,
+      (
+        (await dataSource.query(
+          `SELECT id FROM dim_scenario WHERE code_scenario='PESSIMISTE_2027'`,
+        )) as Array<{ id: string }>
+      )[0]!.id,
     );
 
     // Mêmes (CR × compte × ligne_metier × mois) — seul le scénario

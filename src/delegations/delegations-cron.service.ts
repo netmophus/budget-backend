@@ -40,9 +40,7 @@ export class DelegationsCronService implements OnApplicationBootstrap {
     try {
       const r = await this.delegationsService.expirerAutomatiquement();
       if (r.nbExpirees > 0) {
-        this.logger.log(
-          `[Cron] ${r.nbExpirees} délégation(s) expirée(s).`,
-        );
+        this.logger.log(`[Cron] ${r.nbExpirees} délégation(s) expirée(s).`);
       }
     } catch (err) {
       this.logger.error(

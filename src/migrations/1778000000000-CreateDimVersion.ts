@@ -42,7 +42,9 @@ export class CreateDimVersion1778000000000 implements MigrationInterface {
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
-    await queryRunner.query(`DROP INDEX IF EXISTS "public"."ix_dim_version_type"`);
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "public"."ix_dim_version_type"`,
+    );
     await queryRunner.query(
       `DROP INDEX IF EXISTS "public"."ix_dim_version_exercice_statut"`,
     );

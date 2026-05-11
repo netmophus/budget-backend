@@ -300,7 +300,7 @@ export class ProduitService extends Scd2Service<DimProduit> {
         fkProduitParent: parent ? String(parent.id) : null,
         niveau: dto.niveau,
         estPorteurInterets: dto.estPorteurInterets ?? false,
-      } as Partial<DimProduit>,
+      },
       utilisateur,
     );
     return this.findCurrentByCode(dto.codeProduit).catch(() =>
@@ -403,7 +403,7 @@ export class ProduitService extends Scd2Service<DimProduit> {
       if (wantsEstActifChange) {
         updates.estActif = dto.estActif;
       }
-      await this.repo.update({ id: current.id }, updates as never);
+      await this.repo.update({ id: current.id }, updates);
       const refreshed = await this.findCurrentByCode(codeProduit);
       return { ...refreshed, modeMaj: 'ecrasement_intra_jour' };
     }
@@ -472,7 +472,7 @@ export class ProduitService extends Scd2Service<DimProduit> {
         fkProduitParent: nouvelId,
         utilisateurModification: utilisateur,
         dateModification: () => 'CURRENT_TIMESTAMP',
-      } as never)
+      })
       .where('fk_produit_parent = :ancien', { ancien: ancienId })
       .execute();
     return { count: result.affected ?? 0 };

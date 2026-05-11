@@ -145,10 +145,7 @@ export class ScenarioService {
    * Transition unique : actif → archive. Idempotent : si déjà
    * archivé, retourne 409 (rien à faire).
    */
-  async archive(
-    id: string,
-    utilisateur: string,
-  ): Promise<ScenarioResponseDto> {
+  async archive(id: string, utilisateur: string): Promise<ScenarioResponseDto> {
     const current = await this.repo.findOne({ where: { id } });
     if (!current) throw new NotFoundException('Scenario introuvable');
     if (current.statut === 'archive') {

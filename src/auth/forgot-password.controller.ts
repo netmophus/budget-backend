@@ -36,10 +36,7 @@ import type { Request } from 'express';
 
 import { AllowExpiredPassword } from './decorators/allow-expired-password.decorator';
 import { Public } from './decorators/public.decorator';
-import {
-  ForgotPasswordDto,
-  ResetPasswordDto,
-} from './dto/forgot-password.dto';
+import { ForgotPasswordDto, ResetPasswordDto } from './dto/forgot-password.dto';
 import { ForgotPasswordRateLimitGuard } from './guards/forgot-password-rate-limit.guard';
 import {
   ForgotPasswordResult,
@@ -85,7 +82,7 @@ export class ForgotPasswordController {
     @Ip() ip: string,
     @Req() req: Request,
   ): Promise<ForgotPasswordResult> {
-    const userAgent = (req.headers['user-agent'] ?? null) as string | null;
+    const userAgent = req.headers['user-agent'] ?? null;
     return this.passwordResetService.demanderReset(dto.email, ip, userAgent);
   }
 

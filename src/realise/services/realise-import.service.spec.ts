@@ -10,6 +10,7 @@
  *  - Rapport : compteurs corrects
  *  - Audit IMPORTER_REALISE généré
  */
+import ExcelJS from 'exceljs';
 import { DataType, IMemoryDb, newDb } from 'pg-mem';
 import { DataSource } from 'typeorm';
 
@@ -89,9 +90,10 @@ async function seed(ds: DataSource): Promise<SeedRefs> {
     `INSERT INTO "user" (email, mot_de_passe_hash, nom, prenom, est_actif)
      VALUES ('admin@m.io','h','A','D',true), ('sai@m.io','h','S','I',true)`,
   );
-  const users = (await ds.query(
-    `SELECT id, email FROM "user"`,
-  )) as Array<{ id: string; email: string }>;
+  const users = (await ds.query(`SELECT id, email FROM "user"`)) as Array<{
+    id: string;
+    email: string;
+  }>;
   const adminId = String(users.find((u) => u.email === 'admin@m.io')!.id);
   const saiId = String(users.find((u) => u.email === 'sai@m.io')!.id);
 
@@ -360,7 +362,7 @@ describe('RealiseImportService', () => {
     expect(r.nbLignesCreees + r.nbLignesMisesAJour).toBe(0);
   });
 
-  it("audit IMPORTER_REALISE généré (1 par fichier)", async () => {
+  it('audit IMPORTER_REALISE généré (1 par fichier)', async () => {
     const file = csv([
       HEADER,
       `${refs.cr1Code},${refs.compteCode},${refs.ligneMetierCode},2027-01,${refs.deviseCode},111`,
@@ -372,7 +374,7 @@ describe('RealiseImportService', () => {
     expect(audits).toHaveLength(1);
   });
 
-  it("header invalide → BadRequestException", async () => {
+  it('header invalide → BadRequestException', async () => {
     const file = csv([
       'col1,col2,col3',
       `${refs.cr1Code},${refs.compteCode},foo`,
@@ -380,5 +382,38 @@ describe('RealiseImportService', () => {
     await expect(svc.importFichier(file, admin())).rejects.toThrow(
       /Header invalide/,
     );
+  });
+
+  it('XLSX cellule formule → extraction valeur calculée (régression Lot 6.6.B-8.3)', async () => {
+    // ExcelJS retourne { formula, result } pour les cellules avec formule.
+    // Avant le fix : String({formula, result}).trim() donnait '[object Object]'
+    // → Zod rejetait la ligne avec erreur incompréhensible.
+    // Après fix : extraction de .result.
+    const wb = new ExcelJS.Workbook();
+    const ws = wb.addWorksheet('Realise');
+    ws.addRow(HEADER.split(','));
+    const dataRow = ws.addRow([
+      refs.cr1Code,
+      refs.compteCode,
+      refs.ligneMetierCode,
+      '2027-01-01',
+      refs.deviseCode,
+      '',
+    ]);
+    // Cellule montant (6ème colonne) = formule avec result précalculé.
+    dataRow.getCell(6).value = { formula: '750000+750000', result: 1500000 };
+    const buf = (await wb.xlsx.writeBuffer()) as ArrayBuffer;
+    const buffer = Buffer.from(new Uint8Array(buf));
+    const file = {
+      buffer,
+      originalname: 'realise-formule.xlsx',
+      mimetype:
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      size: buffer.length,
+    };
+
+    const r = await svc.importFichier(file, admin());
+    expect(r.nbLignesCreees).toBe(1);
+    expect(r.nbErreurs).toBe(0);
   });
 });

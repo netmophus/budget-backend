@@ -1,6 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
-  IsBoolean,
   IsInt,
   IsOptional,
   IsString,
@@ -21,7 +20,7 @@ export class CreateRefSecondaireDto {
   @MinLength(1)
   @MaxLength(50)
   @Matches(/^[A-Za-z0-9_-]+$/, {
-    message: "code doit contenir uniquement lettres, chiffres, _ ou -",
+    message: 'code doit contenir uniquement lettres, chiffres, _ ou -',
   })
   code!: string;
 
@@ -31,7 +30,7 @@ export class CreateRefSecondaireDto {
   libelle!: string;
 
   @ApiPropertyOptional({
-    example: "Point de vente sans personnel permanent.",
+    example: 'Point de vente sans personnel permanent.',
     description: 'Description libre (markdown autorisé en lecture).',
   })
   @IsOptional()
@@ -41,7 +40,7 @@ export class CreateRefSecondaireDto {
   @ApiPropertyOptional({
     example: 60,
     default: 0,
-    description: 'Ordre d\'affichage dans les selects UI (croissant).',
+    description: "Ordre d'affichage dans les selects UI (croissant).",
   })
   @IsOptional()
   @IsInt()

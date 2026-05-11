@@ -20,7 +20,8 @@ const SEEDS: RefSecondaireSeed[] = [
   {
     code: 'branche',
     libelle: 'Branche',
-    description: "Subdivision géographique ou métier directement sous l'entité.",
+    description:
+      "Subdivision géographique ou métier directement sous l'entité.",
     ordre: 20,
     estSysteme: true,
   },

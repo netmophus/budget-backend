@@ -50,7 +50,9 @@ export class ListStructuresQueryDto {
   @IsEnum(TYPES_STRUCTURE)
   typeStructure?: TypeStructure;
 
-  @ApiPropertyOptional({ description: 'Filtre LIKE %libelle% case-insensitive.' })
+  @ApiPropertyOptional({
+    description: 'Filtre LIKE %libelle% case-insensitive.',
+  })
   @IsOptional()
   @IsString()
   @MaxLength(200)
@@ -60,13 +62,14 @@ export class ListStructuresQueryDto {
     example: true,
     default: true,
     description:
-      "Si true (défaut), ne retourne que les versions courantes. Si false, inclut toutes les versions historisées.",
+      'Si true (défaut), ne retourne que les versions courantes. Si false, inclut toutes les versions historisées.',
   })
   @IsOptional()
   @Transform(({ value }) => {
     if (typeof value === 'boolean') return value;
     if (value === 'true') return true;
     if (value === 'false') return false;
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- @Transform({ value }) impose any (signature class-transformer)
     return value;
   })
   @IsBoolean()

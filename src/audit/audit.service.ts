@@ -16,11 +16,7 @@ import { Between, LessThanOrEqual, MoreThanOrEqual, Repository } from 'typeorm';
 import { AuditLogResponseDto } from './dto/audit-log-response.dto';
 import { ListAuditLogsQueryDto } from './dto/list-audit-logs-query.dto';
 import { PaginatedAuditLogsDto } from './dto/paginated-audit-logs.dto';
-import {
-  AuditLog,
-  AuditStatut,
-  TypeAction,
-} from './entities/audit-log.entity';
+import { AuditLog, AuditStatut, TypeAction } from './entities/audit-log.entity';
 
 export interface AuditLogEntry {
   utilisateur: string;
@@ -85,8 +81,8 @@ export class AuditService {
       typeAction: entry.typeAction,
       entiteCible: entry.entiteCible,
       idCible: entry.idCible ?? null,
-      payloadAvant: (entry.payloadAvant ?? null) as object | null,
-      payloadApres: (entry.payloadApres ?? null) as object | null,
+      payloadAvant: entry.payloadAvant ?? null,
+      payloadApres: entry.payloadApres ?? null,
       commentaire: entry.commentaire ?? null,
       statut: entry.statut,
       dureeMs: entry.dureeMs ?? null,

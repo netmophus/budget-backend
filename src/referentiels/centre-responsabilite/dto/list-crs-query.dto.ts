@@ -30,7 +30,9 @@ export class ListCrsQueryDto {
   @Max(200)
   limit: number = 50;
 
-  @ApiPropertyOptional({ description: 'Filtre sur le code de la structure parente.' })
+  @ApiPropertyOptional({
+    description: 'Filtre sur le code de la structure parente.',
+  })
   @IsOptional()
   @IsString()
   @MaxLength(50)
@@ -41,7 +43,9 @@ export class ListCrsQueryDto {
   @IsEnum(TYPES_CR)
   typeCr?: TypeCr;
 
-  @ApiPropertyOptional({ description: 'Filtre LIKE %libelle% case-insensitive.' })
+  @ApiPropertyOptional({
+    description: 'Filtre LIKE %libelle% case-insensitive.',
+  })
   @IsOptional()
   @IsString()
   @MaxLength(200)
@@ -53,6 +57,7 @@ export class ListCrsQueryDto {
     if (typeof value === 'boolean') return value;
     if (value === 'true') return true;
     if (value === 'false') return false;
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- @Transform({ value }) impose any (signature class-transformer)
     return value;
   })
   @IsBoolean()

@@ -67,11 +67,12 @@ const ALPHA_MAJUSCULE = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
 const ALPHA_MINUSCULE = 'abcdefghijkmnpqrstuvwxyz';
 const ALPHA_CHIFFRE = '23456789';
 const ALPHA_SPECIAL = '!@#$%&*?';
-const ALPHA_TOUS = ALPHA_MAJUSCULE + ALPHA_MINUSCULE + ALPHA_CHIFFRE + ALPHA_SPECIAL;
+const ALPHA_TOUS =
+  ALPHA_MAJUSCULE + ALPHA_MINUSCULE + ALPHA_CHIFFRE + ALPHA_SPECIAL;
 
 function pickChar(alphabet: string): string {
-  const idx = randomBytes(1)[0]! % alphabet.length;
-  return alphabet[idx]!;
+  const idx = randomBytes(1)[0] % alphabet.length;
+  return alphabet[idx];
 }
 
 /**
@@ -102,8 +103,8 @@ export function genererMotDePasseTemporaire(longueur = 32): string {
   // Fisher-Yates shuffle avec randomBytes pour ne pas figer l'ordre
   // maj-min-chiffre-spécial-... au début.
   for (let i = chars.length - 1; i > 0; i--) {
-    const j = randomBytes(1)[0]! % (i + 1);
-    [chars[i], chars[j]] = [chars[j]!, chars[i]!];
+    const j = randomBytes(1)[0] % (i + 1);
+    [chars[i], chars[j]] = [chars[j], chars[i]];
   }
   return chars.join('');
 }

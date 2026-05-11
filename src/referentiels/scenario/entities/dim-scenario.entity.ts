@@ -1,6 +1,10 @@
 import { Column, Entity, Index, PrimaryGeneratedColumn } from 'typeorm';
 
-export type TypeScenario = 'central' | 'optimiste' | 'pessimiste' | 'alternatif';
+export type TypeScenario =
+  | 'central'
+  | 'optimiste'
+  | 'pessimiste'
+  | 'alternatif';
 export type StatutScenario = 'actif' | 'archive';
 
 /**

@@ -35,7 +35,7 @@ describe('Doc Lot 4 — sanity check (Lot 4.4)', () => {
         contenu = lireDoc(fichier);
       });
 
-      it("ne contient pas de placeholder Handlebars laissé ({{xxx}})", () => {
+      it('ne contient pas de placeholder Handlebars laissé ({{xxx}})', () => {
         // On EXCLUT les blocs de code (entre ``` ```) qui peuvent
         // contenir {{var}} légitime à des fins de documentation.
         const sansBlocsCode = contenu.split(/```[\s\S]*?```/g).join('');
@@ -44,7 +44,7 @@ describe('Doc Lot 4 — sanity check (Lot 4.4)', () => {
         expect(placeholders).toBeNull();
       });
 
-      it("ses liens internes [text](./xxx.md) pointent vers des fichiers existants", () => {
+      it('ses liens internes [text](./xxx.md) pointent vers des fichiers existants', () => {
         const regex = /\[[^\]]+\]\((\.\.?\/[^)#]+\.md)(#[^)]+)?\)/g;
         const liens = [...contenu.matchAll(regex)].map((m) => m[1]!);
         const baseDir = dirname(join(DOCS_DIR, fichier));
@@ -59,7 +59,7 @@ describe('Doc Lot 4 — sanity check (Lot 4.4)', () => {
     });
   }
 
-  it("recette.md contient bien la grille de suivi vide (chantier 4.4.C)", () => {
+  it('recette.md contient bien la grille de suivi vide (chantier 4.4.C)', () => {
     const contenu = lireDoc('recette.md');
     expect(contenu).toContain("Suivi d'exécution");
     expect(contenu).toContain('| **R1**');

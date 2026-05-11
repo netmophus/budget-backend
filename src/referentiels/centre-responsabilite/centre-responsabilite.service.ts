@@ -28,15 +28,12 @@ import {
   UnprocessableEntityException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, ILike, Repository } from 'typeorm';
+import { DataSource, Repository } from 'typeorm';
 
 import { Scd2Service } from '../../common/services/scd2.service';
 import { StructureService } from '../structure/structure.service';
 import { CreateCrDto } from './dto/create-cr.dto';
-import {
-  CrResponseDto,
-  StructureCouranteDto,
-} from './dto/cr-response.dto';
+import { CrResponseDto, StructureCouranteDto } from './dto/cr-response.dto';
 import { ListCrsQueryDto } from './dto/list-crs-query.dto';
 import { PaginatedCrsDto } from './dto/paginated-crs.dto';
 import { UpdateCrDto } from './dto/update-cr.dto';
@@ -96,9 +93,7 @@ export class CentreResponsabiliteService extends Scd2Service<DimCentreResponsabi
 
   // ─── Lecture / liste ──────────────────────────────────────────────
 
-  async findAllPaginated(
-    query: ListCrsQueryDto,
-  ): Promise<PaginatedCrsDto> {
+  async findAllPaginated(query: ListCrsQueryDto): Promise<PaginatedCrsDto> {
     const qb = this.repo
       .createQueryBuilder('cr')
       .leftJoinAndSelect('cr.structure', 'structure');
@@ -220,10 +215,7 @@ export class CentreResponsabiliteService extends Scd2Service<DimCentreResponsabi
 
   // ─── Mutation ─────────────────────────────────────────────────────
 
-  async create(
-    dto: CreateCrDto,
-    utilisateur: string,
-  ): Promise<CrResponseDto> {
+  async create(dto: CreateCrDto, utilisateur: string): Promise<CrResponseDto> {
     const existing = await this.findCurrent(dto.codeCr);
     if (existing) {
       throw new ConflictException(
@@ -240,7 +232,7 @@ export class CentreResponsabiliteService extends Scd2Service<DimCentreResponsabi
         libelleCourt: dto.libelleCourt ?? null,
         typeCr: dto.typeCr,
         fkStructure,
-      } as Partial<DimCentreResponsabilite>,
+      },
       utilisateur,
     );
     return this.findCurrentByCode(dto.codeCr).catch(() => toResponse(created));
@@ -319,7 +311,7 @@ export class CentreResponsabiliteService extends Scd2Service<DimCentreResponsabi
       if (wantsEstActifChange) {
         updates.estActif = dto.estActif;
       }
-      await this.repo.update({ id: current.id }, updates as never);
+      await this.repo.update({ id: current.id }, updates);
       const refreshed = await this.findCurrentByCode(codeCr);
       return { ...refreshed, modeMaj: 'ecrasement_intra_jour' };
     }
@@ -370,7 +362,7 @@ export class CentreResponsabiliteService extends Scd2Service<DimCentreResponsabi
         fkStructure: nouvelIdStructure,
         utilisateurModification: utilisateur,
         dateModification: () => 'CURRENT_TIMESTAMP',
-      } as never)
+      })
       .where('fk_structure = :ancien', { ancien: ancienIdStructure })
       .execute();
     return { count: result.affected ?? 0 };

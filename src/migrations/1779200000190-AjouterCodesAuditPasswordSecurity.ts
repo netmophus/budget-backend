@@ -20,9 +20,7 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
  * `TypeAction` dans `src/audit/entities/audit-log.entity.ts`,
  * sinon `tsc --noEmit` casse (cf. dette TS2322 Lot Administration).
  */
-export class AjouterCodesAuditPasswordSecurity1779200000190
-  implements MigrationInterface
-{
+export class AjouterCodesAuditPasswordSecurity1779200000190 implements MigrationInterface {
   name = 'AjouterCodesAuditPasswordSecurity1779200000190';
 
   public async up(q: QueryRunner): Promise<void> {

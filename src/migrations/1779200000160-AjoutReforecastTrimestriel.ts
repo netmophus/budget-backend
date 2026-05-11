@@ -31,9 +31,7 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
  * NOTHING pour permissions / codes audit / référentiel, INSERT
  * WHERE NOT EXISTS pour bridges_role_permission.
  */
-export class AjoutReforecastTrimestriel1779200000160
-  implements MigrationInterface
-{
+export class AjoutReforecastTrimestriel1779200000160 implements MigrationInterface {
   name = 'AjoutReforecastTrimestriel1779200000160';
 
   public async up(q: QueryRunner): Promise<void> {

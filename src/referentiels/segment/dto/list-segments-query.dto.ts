@@ -43,7 +43,9 @@ export class ListSegmentsQueryDto {
   @IsIn(CATEGORIE_VALUES as readonly string[])
   categorie?: CategorieSegment;
 
-  @ApiPropertyOptional({ description: 'Filtre LIKE %libelle% case-insensitive.' })
+  @ApiPropertyOptional({
+    description: 'Filtre LIKE %libelle% case-insensitive.',
+  })
   @IsOptional()
   @IsString()
   @MaxLength(200)
@@ -55,6 +57,7 @@ export class ListSegmentsQueryDto {
     if (typeof value === 'boolean') return value;
     if (value === 'true') return true;
     if (value === 'false') return false;
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- @Transform({ value }) impose any (signature class-transformer)
     return value;
   })
   @IsBoolean()

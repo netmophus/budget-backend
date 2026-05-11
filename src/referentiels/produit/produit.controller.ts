@@ -116,9 +116,7 @@ export class ProduitController {
   @RequirePermissions('REFERENTIEL.LIRE')
   @ApiOperation({ summary: "Ancêtres jusqu'à la racine (version courante)." })
   @ApiOkResponse({ type: [ProduitResponseDto] })
-  async findAncestors(
-    @Param('id') id: string,
-  ): Promise<ProduitResponseDto[]> {
+  async findAncestors(@Param('id') id: string): Promise<ProduitResponseDto[]> {
     const rows = await this.produitService.findAncestors(id);
     return rows.map((r) => this.mapRow(r));
   }
@@ -181,7 +179,8 @@ export class ProduitController {
   @ApiNoContentResponse()
   @ApiNotFoundResponse()
   @ApiConflictResponse({
-    description: "Le produit a des enfants courants — fermer/transférer d'abord.",
+    description:
+      "Le produit a des enfants courants — fermer/transférer d'abord.",
   })
   async desactiver(
     @Param('codeProduit') codeProduit: string,

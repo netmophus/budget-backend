@@ -95,9 +95,11 @@ async function seed(ds: DataSource): Promise<SeedIds> {
      VALUES ('preparateur@miznas.local', 'h', 'Aïcha', 'Diallo', true, 'system')`,
   );
   const userId = String(
-    ((await ds.query(
-      `SELECT id FROM "user" WHERE email='preparateur@miznas.local'`,
-    )) as Array<{ id: string }>)[0]!.id,
+    (
+      (await ds.query(
+        `SELECT id FROM "user" WHERE email='preparateur@miznas.local'`,
+      )) as Array<{ id: string }>
+    )[0]!.id,
   );
   await ds.query(
     `INSERT INTO dim_structure (code_structure) VALUES ('CIV'), ('BFA')`,
@@ -352,7 +354,9 @@ describe('UserPerimetreService', () => {
       { cibleType: 'CR', cibleId: ids.crBfaId, origine: 'AFFECTATION' },
       'admin',
     );
-    const principal = await service.lister(ids.userId, { origine: 'PRINCIPAL' });
+    const principal = await service.lister(ids.userId, {
+      origine: 'PRINCIPAL',
+    });
     expect(principal).toHaveLength(1);
   });
 
@@ -367,7 +371,7 @@ describe('UserPerimetreService', () => {
   //  2) auditService.log est appelé avec un EntityManager (2e arg)
   //     pour permettre le rollback solidaire en prod.
 
-  it('Lot 4.1-fix2.B : creer — si audit échoue, l\'erreur remonte au caller', async () => {
+  it("Lot 4.1-fix2.B : creer — si audit échoue, l'erreur remonte au caller", async () => {
     const auditSpy = jest
       .spyOn(auditService, 'log')
       .mockRejectedValueOnce(new Error('audit_log INSERT failed'));

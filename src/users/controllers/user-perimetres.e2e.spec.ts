@@ -81,19 +81,19 @@ async function seedRolesUsers(ds: DataSource): Promise<SeedIds> {
        ('lecteur@miznas.local','h','Lecteur','X',true,'system'),
        ('prep-civ@miznas.local','h','Aïcha','Diallo',true,'system')`,
   );
-  const users = (await ds.query(
-    `SELECT email, id FROM "user"`,
-  )) as Array<{ email: string; id: string }>;
+  const users = (await ds.query(`SELECT email, id FROM "user"`)) as Array<{
+    email: string;
+    id: string;
+  }>;
   const userIdByEmail = new Map(users.map((u) => [u.email, String(u.id)]));
   for (const [email, role] of [
     ['admin@miznas.local', 'ADMIN'],
     ['lecteur@miznas.local', 'LECTEUR'],
     ['prep-civ@miznas.local', 'LECTEUR'],
   ]) {
-    const r = (await ds.query(
-      `SELECT id FROM ref_role WHERE code_role=$1`,
-      [role],
-    )) as Array<{ id: string }>;
+    const r = (await ds.query(`SELECT id FROM ref_role WHERE code_role=$1`, [
+      role,
+    ])) as Array<{ id: string }>;
     await ds.query(
       `INSERT INTO bridge_user_role (fk_user, fk_role, perimetre_type, est_actif, utilisateur_creation)
        VALUES ($1, $2, 'global', true, 'system')`,
@@ -109,9 +109,11 @@ async function seedRolesUsers(ds: DataSource): Promise<SeedIds> {
      VALUES ('CIV', 'Côte CIV', 'filiale', 2, true, true, '2026-01-01', 'system')`,
   );
   const sid = String(
-    ((await ds.query(
-      `SELECT id FROM dim_structure WHERE code_structure='CIV'`,
-    )) as Array<{ id: string }>)[0]!.id,
+    (
+      (await ds.query(
+        `SELECT id FROM dim_structure WHERE code_structure='CIV'`,
+      )) as Array<{ id: string }>
+    )[0]!.id,
   );
   await ds.query(
     `INSERT INTO dim_centre_responsabilite

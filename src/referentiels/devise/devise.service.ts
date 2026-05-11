@@ -205,7 +205,7 @@ export class DeviseService {
       const pgErr = e as PgError;
       if (pgErr.code === PG_UNIQUE_VIOLATION) {
         throw new ConflictException(
-          'Conflit d\'unicité sur l\'invariant pivot (race condition).',
+          "Conflit d'unicité sur l'invariant pivot (race condition).",
         );
       }
       throw e;

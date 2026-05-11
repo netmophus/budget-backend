@@ -8,7 +8,9 @@ import {
 } from '../permissions.service';
 import { PermissionsGuard } from './permissions.guard';
 
-function makeContext(reqUser: { userId: string; email: string } | undefined): ExecutionContext {
+function makeContext(
+  reqUser: { userId: string; email: string } | undefined,
+): ExecutionContext {
   const req: {
     user?: typeof reqUser;
     ip: string;
@@ -41,6 +43,7 @@ function makeGuard(opts: {
 }): {
   guard: PermissionsGuard;
   permService: jest.Mocked<Pick<PermissionsService, 'getEffectivePermissions'>>;
+  auditService: jest.Mocked<AuditService>;
 } {
   const reflector = {
     getAllAndOverride: jest.fn().mockImplementation((key: string) => {
@@ -52,7 +55,9 @@ function makeGuard(opts: {
 
   const permService = {
     getEffectivePermissions: jest.fn().mockResolvedValue(opts.effective),
-  } as unknown as jest.Mocked<Pick<PermissionsService, 'getEffectivePermissions'>>;
+  } as unknown as jest.Mocked<
+    Pick<PermissionsService, 'getEffectivePermissions'>
+  >;
 
   const config = {
     get: () => (opts.prod ? 'production' : 'development'),
@@ -90,7 +95,11 @@ describe('PermissionsGuard', () => {
   });
 
   it('allows on @Public() endpoints (short-circuits before reading user)', async () => {
-    const { guard } = makeGuard({ meta: undefined, isPublic: true, effective: [] });
+    const { guard } = makeGuard({
+      meta: undefined,
+      isPublic: true,
+      effective: [],
+    });
     expect(await guard.canActivate(makeContext(undefined))).toBe(true);
   });
 

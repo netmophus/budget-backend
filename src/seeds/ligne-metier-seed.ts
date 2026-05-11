@@ -53,7 +53,9 @@ export const LIGNES_METIER_INITIALES: readonly LigneMetierSeedRow[] = [
   row('SUPPORT_RH', 'Ressources humaines', 2, 'SUPPORT'),
 ];
 
-export async function seedLignesMetier(ds: DataSource = AppDataSource): Promise<void> {
+export async function seedLignesMetier(
+  ds: DataSource = AppDataSource,
+): Promise<void> {
   const ownsConnection = !ds.isInitialized;
   if (ownsConnection) {
     await ds.initialize();

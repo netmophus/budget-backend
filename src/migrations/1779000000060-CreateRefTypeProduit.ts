@@ -20,7 +20,7 @@ const SEEDS: RefSecondaireSeed[] = [
   {
     code: 'depot',
     libelle: 'Dépôt',
-    description: 'Produits de collecte de l\'épargne.',
+    description: "Produits de collecte de l'épargne.",
     ordre: 20,
     estSysteme: true,
   },

@@ -45,7 +45,12 @@ export class DimCentreResponsabilite extends Scd2Entity {
   @Column({ name: 'libelle', type: 'varchar', length: 200 })
   libelle!: string;
 
-  @Column({ name: 'libelle_court', type: 'varchar', length: 50, nullable: true })
+  @Column({
+    name: 'libelle_court',
+    type: 'varchar',
+    length: 50,
+    nullable: true,
+  })
   libelleCourt!: string | null;
 
   @Column({ name: 'type_cr', type: 'varchar', length: 20 })

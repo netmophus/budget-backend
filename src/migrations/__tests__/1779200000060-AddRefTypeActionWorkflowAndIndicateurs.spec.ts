@@ -87,7 +87,7 @@ describe('Migration AddRefTypeActionWorkflowAndIndicateurs', () => {
     }
   });
 
-  it("migration up est idempotente (2x up sans erreur, pas de doublon)", async () => {
+  it('migration up est idempotente (2x up sans erreur, pas de doublon)', async () => {
     await migration.up(queryRunner);
     await migration.up(queryRunner); // 2e appel — ON CONFLICT DO NOTHING
     const count = (await dataSource.query(

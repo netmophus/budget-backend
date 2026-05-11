@@ -15,10 +15,7 @@ import {
 } from '@nestjs/common';
 import { ILike, Repository, type FindOptionsWhere } from 'typeorm';
 
-import {
-  type BaseRefSecondaire,
-  type RefSecondaireWithId,
-} from './entities/base-ref-secondaire.entity';
+import { type RefSecondaireWithId } from './entities/base-ref-secondaire.entity';
 import { CreateRefSecondaireDto } from './dto/create-ref-secondaire.dto';
 import {
   ListRefSecondaireDto,
@@ -49,7 +46,7 @@ export class BaseRefSecondaireService<T extends RefSecondaireWithId> {
    *  - dans `softDelete` (refus si true)
    *  - dans `toggleActif` (warning si on passe à false)
    */
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  // eslint-disable-next-line @typescript-eslint/require-await -- signature async pour overrides dans sous-classes (qui peuvent etre async)
   async isReferenced(_code: string): Promise<boolean> {
     return false;
   }
@@ -68,7 +65,7 @@ export class BaseRefSecondaireService<T extends RefSecondaireWithId> {
   async findAll(
     query: ListRefSecondaireDto,
   ): Promise<PaginatedRefSecondaireDto<T>> {
-    const where: FindOptionsWhere<T> = {} as FindOptionsWhere<T>;
+    const where: FindOptionsWhere<T> = {};
     if (typeof query.estActif === 'boolean') {
       (where as Record<string, unknown>).estActif = query.estActif;
     }
@@ -125,8 +122,7 @@ export class BaseRefSecondaireService<T extends RefSecondaireWithId> {
       estSysteme: false,
       utilisateurCreation: utilisateur,
     } as never);
-    const saved = await this.repo.save(row);
-    return Array.isArray(saved) ? saved[0]! : saved;
+    return (await this.repo.save(row)) as unknown as T;
   }
 
   async update(
@@ -164,8 +160,8 @@ export class BaseRefSecondaireService<T extends RefSecondaireWithId> {
     current.dateModification = new Date();
     current.utilisateurModification = utilisateur;
 
-    const saved = await this.repo.save(current);
-    return Array.isArray(saved) ? saved[0]! : saved;
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion -- ESLint considere le cast inutile mais TS2352 sans le as unknown (overload typeorm mal infere)
+    return (await this.repo.save(current)) as unknown as T;
   }
 
   /**
@@ -183,16 +179,14 @@ export class BaseRefSecondaireService<T extends RefSecondaireWithId> {
     current.estActif = newValue;
     current.dateModification = new Date();
     current.utilisateurModification = utilisateur;
-    const saved = await this.repo.save(current);
-    const entity = Array.isArray(saved) ? saved[0]! : saved;
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion -- ESLint considere le cast inutile mais TS2352 sans le as unknown (overload typeorm mal infere)
+    const entity = (await this.repo.save(current)) as unknown as T;
 
     let warning: string | null = null;
     if (newValue === false) {
       const referenced = await this.isReferenced(entity.code);
       if (referenced) {
-        const cl = this.consumerLabel
-          ? ` ${this.consumerLabel}`
-          : '';
+        const cl = this.consumerLabel ? ` ${this.consumerLabel}` : '';
         warning =
           `La valeur '${entity.code}' est utilisée par des lignes${cl}. ` +
           `Les saisies existantes restent intactes, mais la valeur ne pourra ` +
@@ -227,6 +221,6 @@ export class BaseRefSecondaireService<T extends RefSecondaireWithId> {
           `des futurs selects.`,
       );
     }
-    await this.repo.delete(id as never);
+    await this.repo.delete(id);
   }
 }

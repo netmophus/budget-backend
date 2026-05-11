@@ -88,7 +88,9 @@ export class ReforecastController {
 
   @Get(':id')
   @RequirePermissions('BUDGET.LIRE')
-  @ApiOperation({ summary: "Détail d'un reforecast (avec métadonnées source)." })
+  @ApiOperation({
+    summary: "Détail d'un reforecast (avec métadonnées source).",
+  })
   getById(@Param('id') id: string): Promise<ReforecastResponseDto> {
     return this.reforecastService.getById(id);
   }
@@ -97,7 +99,7 @@ export class ReforecastController {
   @RequirePermissions('BUDGET.LIRE')
   @ApiOperation({
     summary:
-      "Grille de saisie du reforecast (matrice compte × 12 mois). Délègue à BudgetSaisieService.",
+      'Grille de saisie du reforecast (matrice compte × 12 mois). Délègue à BudgetSaisieService.',
   })
   async getGrille(
     @Param('id') id: string,
@@ -167,7 +169,9 @@ export class ReforecastController {
   @Post(':id/rejeter')
   @HttpCode(HttpStatus.OK)
   @RequirePermissions('BUDGET.VALIDER')
-  @ApiOperation({ summary: 'Rejette un reforecast soumis (motif obligatoire).' })
+  @ApiOperation({
+    summary: 'Rejette un reforecast soumis (motif obligatoire).',
+  })
   async rejeter(
     @Param('id') id: string,
     @Body() dto: RejeterReforecastDto,
@@ -183,7 +187,7 @@ export class ReforecastController {
   @RequirePermissions('BUDGET.PUBLIER')
   @ApiOperation({
     summary:
-      "Publie un reforecast validé (action irréversible — la version devient IMMUABLE).",
+      'Publie un reforecast validé (action irréversible — la version devient IMMUABLE).',
   })
   async publier(
     @Param('id') id: string,

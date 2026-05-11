@@ -67,7 +67,9 @@ describe('DelegationsController', () => {
   it('POST /delegations délègue au service avec currentUser et propage warnings', async () => {
     svc.creer.mockResolvedValue({
       delegation: makeDelegation(),
-      warnings: ['Chevauchement avec délégation #5 (perms VALIDATION, 1 périmètre(s)).'],
+      warnings: [
+        'Chevauchement avec délégation #5 (perms VALIDATION, 1 périmètre(s)).',
+      ],
     });
     const dto = {
       fkDelegataire: '11',
@@ -98,10 +100,16 @@ describe('DelegationsController', () => {
   it('POST /:id/revoquer : passe isAdmin=true si DELEGATION.GERER', async () => {
     perms.hasPermission.mockResolvedValue(true);
     svc.revoquer.mockResolvedValue(
-      makeDelegation({ actif: false, revoqueeLe: new Date(), motifRevocation: 'm' }),
+      makeDelegation({
+        actif: false,
+        revoqueeLe: new Date(),
+        motifRevocation: 'm',
+      }),
     );
     const r = await controller.revoquer('42', { motif: 'm' }, currentUser);
-    expect(perms.hasPermission).toHaveBeenCalledWith('10', ['DELEGATION.GERER']);
+    expect(perms.hasPermission).toHaveBeenCalledWith('10', [
+      'DELEGATION.GERER',
+    ]);
     expect(svc.revoquer).toHaveBeenCalledWith(
       '42',
       { motif: 'm' },
@@ -178,7 +186,11 @@ describe('DelegationsController', () => {
 
   it('sérialise les bigint en string et inclut delegantEmail/delegataireEmail', async () => {
     svc.creer.mockResolvedValue({
-      delegation: makeDelegation({ id: '99', fkDelegant: '10', fkDelegataire: '11' }),
+      delegation: makeDelegation({
+        id: '99',
+        fkDelegant: '10',
+        fkDelegataire: '11',
+      }),
       warnings: [],
     });
     const r = await controller.creer({} as never, currentUser);

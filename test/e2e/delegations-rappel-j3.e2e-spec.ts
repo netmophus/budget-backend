@@ -57,9 +57,7 @@ describe('E2E.11 — Cron rappel J-3 délégation', () => {
   beforeEach(async () => {
     publishedIds.length = 0;
     // Purge les délégations de test précédentes (test isolé).
-    await ds.query(
-      `DELETE FROM delegations WHERE motif LIKE 'E2E.11 %'`,
-    );
+    await ds.query(`DELETE FROM delegations WHERE motif LIKE 'E2E.11 %'`);
     // Purge les email_log liés à ce type d'événement.
     await ds.query(
       `DELETE FROM email_log
@@ -75,10 +73,9 @@ describe('E2E.11 — Cron rappel J-3 délégation', () => {
   });
 
   async function getUserId(email: string): Promise<string> {
-    const r = (await ds.query(
-      `SELECT id FROM "user" WHERE email = $1`,
-      [email],
-    )) as Array<{ id: string }>;
+    const r = (await ds.query(`SELECT id FROM "user" WHERE email = $1`, [
+      email,
+    ])) as Array<{ id: string }>;
     return String(r[0]!.id);
   }
 

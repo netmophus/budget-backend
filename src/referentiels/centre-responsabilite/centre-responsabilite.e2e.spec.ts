@@ -125,7 +125,8 @@ async function seedAll(ds: DataSource): Promise<SeedIds> {
     parentCode: string | null,
     pays: string | null,
   ): Promise<void> {
-    const parentId = parentCode === null ? null : sIds.get(parentCode) ?? null;
+    const parentId =
+      parentCode === null ? null : (sIds.get(parentCode) ?? null);
     await ds.query(
       `INSERT INTO dim_structure
         ("code_structure","libelle","type_structure","niveau_hierarchique",
@@ -142,7 +143,14 @@ async function seedAll(ds: DataSource): Promise<SeedIds> {
   }
   await insStruct('SOC', 'Société', 'entite_juridique', 1, null, null);
   await insStruct('BR_CIV', 'Branche CIV', 'branche', 2, 'SOC', 'CIV');
-  await insStruct('DIR_RETAIL', 'Direction Retail', 'direction', 3, 'BR_CIV', 'CIV');
+  await insStruct(
+    'DIR_RETAIL',
+    'Direction Retail',
+    'direction',
+    3,
+    'BR_CIV',
+    'CIV',
+  );
 
   // CR rattaché à DIR_RETAIL
   await ds.query(
@@ -172,7 +180,8 @@ describe('CR (e2e) — 2ᵉ dimension SCD2 + relink stratégie A', () => {
 
   beforeAll(async () => {
     process.env.NODE_ENV = 'test';
-    process.env.JWT_SECRET = 'test-secret-cr-e2e-min-32-chars-dddddddddddddddddd';
+    process.env.JWT_SECRET =
+      'test-secret-cr-e2e-min-32-chars-dddddddddddddddddd';
     process.env.JWT_ACCESS_EXPIRES_IN = '15m';
     process.env.JWT_REFRESH_EXPIRES_IN = '7d';
     process.env.BCRYPT_ROUNDS = '4';
@@ -273,7 +282,9 @@ describe('CR (e2e) — 2ᵉ dimension SCD2 + relink stratégie A', () => {
     // pour le test suivant).
     await dataSource.query('DELETE FROM dim_centre_responsabilite');
     // Casser la FK auto-référente avant DELETE FROM dim_structure.
-    await dataSource.query('UPDATE dim_structure SET fk_structure_parent = NULL');
+    await dataSource.query(
+      'UPDATE dim_structure SET fk_structure_parent = NULL',
+    );
     await dataSource.query('DELETE FROM dim_structure');
 
     const pastDate = new Date(Date.now() - 30 * 86_400_000)
@@ -290,7 +301,8 @@ describe('CR (e2e) — 2ᵉ dimension SCD2 + relink stratégie A', () => {
       parentCode: string | null,
       pays: string | null,
     ) {
-      const parentId = parentCode === null ? null : structIds.get(parentCode) ?? null;
+      const parentId =
+        parentCode === null ? null : (structIds.get(parentCode) ?? null);
       await dataSource.query(
         `INSERT INTO dim_structure
           ("code_structure","libelle","type_structure","niveau_hierarchique",
@@ -307,7 +319,14 @@ describe('CR (e2e) — 2ᵉ dimension SCD2 + relink stratégie A', () => {
     }
     await seedStruct('SOC', 'Société', 'entite_juridique', 1, null, null);
     await seedStruct('BR_CIV', 'Branche CIV', 'branche', 2, 'SOC', 'CIV');
-    await seedStruct('DIR_RETAIL', 'Direction Retail', 'direction', 3, 'BR_CIV', 'CIV');
+    await seedStruct(
+      'DIR_RETAIL',
+      'Direction Retail',
+      'direction',
+      3,
+      'BR_CIV',
+      'CIV',
+    );
 
     ids.socId = structIds.get('SOC')!;
     ids.brCivId = structIds.get('BR_CIV')!;
@@ -327,7 +346,9 @@ describe('CR (e2e) — 2ᵉ dimension SCD2 + relink stratégie A', () => {
   // ─── Permissions
 
   it('GET /cr without token → 401', async () => {
-    await request(app.getHttpServer()).get('/api/v1/referentiels/cr').expect(401);
+    await request(app.getHttpServer())
+      .get('/api/v1/referentiels/cr')
+      .expect(401);
   });
 
   it('GET /cr with LECTEUR → 200', async () => {
@@ -368,7 +389,9 @@ describe('CR (e2e) — 2ᵉ dimension SCD2 + relink stratégie A', () => {
     const audits = (await dataSource.query(
       `SELECT type_action, statut FROM audit_log WHERE entite_cible = 'dim_centre_responsabilite'`,
     )) as Array<{ type_action: string; statut: string }>;
-    expect(audits.find((a) => a.type_action === 'CREATE' && a.statut === 'success')).toBeDefined();
+    expect(
+      audits.find((a) => a.type_action === 'CREATE' && a.statut === 'success'),
+    ).toBeDefined();
   });
 
   it('POST /cr with codeStructure inexistant → 422', async () => {
@@ -455,7 +478,11 @@ describe('CR (e2e) — 2ᵉ dimension SCD2 + relink stratégie A', () => {
     const versionsStruct = (await dataSource.query(
       `SELECT id, libelle, version_courante FROM dim_structure
        WHERE code_structure = 'DIR_RETAIL' ORDER BY date_debut_validite ASC`,
-    )) as Array<{ id: string | number; libelle: string; version_courante: boolean }>;
+    )) as Array<{
+      id: string | number;
+      libelle: string;
+      version_courante: boolean;
+    }>;
     expect(versionsStruct).toHaveLength(2);
     const newStructIdRow = versionsStruct.find((v) => v.version_courante);
     const nouvelId = String(newStructIdRow!.id);
@@ -480,9 +507,13 @@ describe('CR (e2e) — 2ᵉ dimension SCD2 + relink stratégie A', () => {
       `SELECT type_action, entite_cible, statut, payload_apres
        FROM audit_log WHERE entite_cible = 'dim_structure'`,
     )) as AuditRow[];
-    const update = audits.find((a) => a.type_action === 'UPDATE' && a.statut === 'success');
+    const update = audits.find(
+      (a) => a.type_action === 'UPDATE' && a.statut === 'success',
+    );
     expect(update).toBeDefined();
-    const payload = update!.payload_apres as { response?: { crsRelinked?: number } };
+    const payload = update!.payload_apres as {
+      response?: { crsRelinked?: number };
+    };
     expect(payload.response?.crsRelinked).toBe(1);
   });
 });

@@ -35,7 +35,10 @@ export type ImportBudgetWarningCode =
   | 'COMMENTAIRE_TRONQUE';
 
 export class ImportBudgetErrorDto {
-  @ApiProperty({ example: 12, description: 'Numéro de ligne dans le fichier (1=header).' })
+  @ApiProperty({
+    example: 12,
+    description: 'Numéro de ligne dans le fichier (1=header).',
+  })
   ligneNumero!: number;
 
   @ApiProperty({ example: 'CR_INTROUVABLE' })
@@ -45,7 +48,8 @@ export class ImportBudgetErrorDto {
   message!: string;
 
   @ApiPropertyOptional({
-    description: 'Valeur fournie qui a déclenché l\'erreur (utile pour le diagnostic UI).',
+    description:
+      "Valeur fournie qui a déclenché l'erreur (utile pour le diagnostic UI).",
   })
   valeurFournie?: string;
 }
@@ -85,7 +89,7 @@ export class ImportBudgetRapportDto {
 
   @ApiProperty({
     description:
-      'Lignes valides mais identiques à l\'existant (no-op, pas de bruit historique).',
+      "Lignes valides mais identiques à l'existant (no-op, pas de bruit historique).",
   })
   lignesIgnorees!: number;
 
@@ -110,7 +114,9 @@ export class ImportBudgetRapportDto {
 
 /** Body multipart (le fichier est passé via FileInterceptor). */
 export class ImportBudgetRequestDto {
-  @ApiProperty({ description: 'Id de la version cible (statut=ouvert obligatoire).' })
+  @ApiProperty({
+    description: 'Id de la version cible (statut=ouvert obligatoire).',
+  })
   @IsString()
   versionId!: string;
 

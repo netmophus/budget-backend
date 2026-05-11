@@ -22,7 +22,7 @@ describe('JwtAuthGuard', () => {
     const getter = jest.fn().mockReturnValue(true);
     const reflector = { getAllAndOverride: getter } as unknown as Reflector;
     const guard = new JwtAuthGuard(reflector);
-    guard.canActivate(makeContext());
+    void guard.canActivate(makeContext());
     expect(getter).toHaveBeenCalledWith(
       'isPublic',
       expect.arrayContaining([expect.any(Function)]),

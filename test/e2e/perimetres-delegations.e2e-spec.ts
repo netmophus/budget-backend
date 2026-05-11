@@ -146,10 +146,9 @@ describe('E2E.6 — Multi-périmètres + délégations', () => {
   it('nouveau user crée une délégation à lecteur via POST /delegations', async () => {
     // fkDelegataire = lecteur (sera la cible de la délégation).
     const ds = app.get<DataSource>(getDataSourceToken());
-    const rows = (await ds.query(
-      `SELECT id FROM "user" WHERE email = $1`,
-      [PERSONAS.LECTEUR.email],
-    )) as Array<{ id: string }>;
+    const rows = (await ds.query(`SELECT id FROM "user" WHERE email = $1`, [
+      PERSONAS.LECTEUR.email,
+    ])) as Array<{ id: string }>;
     const fkDelegataire = String(rows[0]!.id);
 
     const res = await request(app.getHttpServer())

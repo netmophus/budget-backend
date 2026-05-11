@@ -71,10 +71,7 @@ const SEED_USERS: SeedUser[] = [
  * Exporté pour test isolé dans `auth-seed.spec.ts`.
  */
 export function assertProductionPasswordPolicy(envVarName: string): void {
-  if (
-    process.env.NODE_ENV === 'production' &&
-    !process.env[envVarName]
-  ) {
+  if (process.env.NODE_ENV === 'production' && !process.env[envVarName]) {
     throw new Error(
       `${envVarName} doit être défini en production. ` +
         `Le mot de passe par défaut est public (cf. .env.example) ` +
@@ -117,7 +114,8 @@ export const PERMISSIONS: PermissionSeed[] = [
     code: 'ROLE.GERER',
     libelle: 'Gérer les rôles et permissions',
     module: 'ROLE',
-    description: 'Créer, modifier, supprimer des rôles ; affecter des permissions.',
+    description:
+      'Créer, modifier, supprimer des rôles ; affecter des permissions.',
   },
   {
     code: 'AUDIT.LIRE',
@@ -133,25 +131,29 @@ export const PERMISSIONS: PermissionSeed[] = [
     code: 'REFERENTIEL.GERER',
     libelle: 'Gérer les référentiels',
     module: 'REFERENTIEL',
-    description: 'Créer, modifier, désactiver les éléments des référentiels (devises, calendrier, etc.).',
+    description:
+      'Créer, modifier, désactiver les éléments des référentiels (devises, calendrier, etc.).',
   },
   {
     code: 'BUDGET.LIRE',
     libelle: 'Lire les faits budget',
     module: 'BUDGET',
-    description: 'Consulter les lignes de fait_budget (toutes versions et scénarios).',
+    description:
+      'Consulter les lignes de fait_budget (toutes versions et scénarios).',
   },
   {
     code: 'BUDGET.SAISIR',
     libelle: 'Saisir / modifier les faits budget',
     module: 'BUDGET',
-    description: "Créer et modifier les mesures d'un fait_budget tant que la version est ouverte.",
+    description:
+      "Créer et modifier les mesures d'un fait_budget tant que la version est ouverte.",
   },
   {
     code: 'BUDGET.SUPPRIMER',
     libelle: 'Supprimer les faits budget',
     module: 'BUDGET',
-    description: 'Supprimer une ligne de fait_budget (autorisé uniquement si la version est ouverte).',
+    description:
+      'Supprimer une ligne de fait_budget (autorisé uniquement si la version est ouverte).',
   },
   {
     code: 'BUDGET.SOUMETTRE',
@@ -167,7 +169,7 @@ export const PERMISSIONS: PermissionSeed[] = [
     module: 'BUDGET',
     description:
       "Valider une version 'soumis' (transition soumis → valide) ou la rejeter " +
-      "(transition soumis → ouvert avec commentaire). Permission consommée par le workflow Lot 3.5.",
+      '(transition soumis → ouvert avec commentaire). Permission consommée par le workflow Lot 3.5.',
   },
   {
     code: 'BUDGET.PUBLIER',
@@ -182,14 +184,14 @@ export const PERMISSIONS: PermissionSeed[] = [
     libelle: 'Lire la configuration (référentiels secondaires)',
     module: 'CONFIGURATION',
     description:
-      "Consulter les énumérations métier (types structure / pays / classes compte / etc.).",
+      'Consulter les énumérations métier (types structure / pays / classes compte / etc.).',
   },
   {
     code: 'CONFIGURATION.GERER',
     libelle: 'Gérer la configuration (référentiels secondaires)',
     module: 'CONFIGURATION',
     description:
-      "Créer, modifier, désactiver, supprimer les valeurs des référentiels secondaires.",
+      'Créer, modifier, désactiver, supprimer les valeurs des référentiels secondaires.',
   },
 ];
 

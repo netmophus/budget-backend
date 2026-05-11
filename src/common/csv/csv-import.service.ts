@@ -58,7 +58,9 @@ export class CsvImportService {
       }),
     );
 
-    for await (const rawRow of parser as AsyncIterable<Record<string, string>>) {
+    for await (const rawRow of parser as AsyncIterable<
+      Record<string, string>
+    >) {
       lineNo++;
       totalLines++;
 

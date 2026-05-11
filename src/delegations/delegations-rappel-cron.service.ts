@@ -44,9 +44,7 @@ export class DelegationsRappelCronService implements OnApplicationBootstrap {
     try {
       await this.rappelService.notifierJ3();
     } catch (err) {
-      this.logger.error(
-        `[Cron] Échec rappel J-3 : ${(err as Error).message}`,
-      );
+      this.logger.error(`[Cron] Échec rappel J-3 : ${(err as Error).message}`);
     }
   }
 }
