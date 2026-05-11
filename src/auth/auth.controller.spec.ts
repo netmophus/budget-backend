@@ -54,7 +54,12 @@ describe('AuthController', () => {
   });
 
   it('login delegates and returns tokens + user', async () => {
-    service.login.mockResolvedValue({ tokens: fakeTokens, user: fakeUser });
+    service.login.mockResolvedValue({
+      tokens: fakeTokens,
+      user: fakeUser,
+      mdpExpire: false,
+      doitChangerMdp: false,
+    });
 
     const result = await controller.login(
       { email: 'admin@miznas.local', motDePasse: 'ChangeMe!2026' },
@@ -69,6 +74,8 @@ describe('AuthController', () => {
         nom: 'Admin',
         prenom: 'MIZNAS',
       },
+      mdpExpire: false,
+      doitChangerMdp: false,
     });
     expect(service.login).toHaveBeenCalledWith(
       'admin@miznas.local',

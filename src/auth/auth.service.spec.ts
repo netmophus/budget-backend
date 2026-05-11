@@ -4,14 +4,14 @@ import { JwtService } from '@nestjs/jwt';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import * as bcrypt from 'bcrypt';
-import { IsNull, Repository } from 'typeorm';
+import { IsNull, ObjectLiteral, Repository } from 'typeorm';
 import { AuditService } from '../audit/audit.service';
 import { User } from '../users/entities/user.entity';
 import { UserRole } from '../users/entities/user-role.entity';
 import { AuthService } from './auth.service';
 import { RefreshToken } from './entities/refresh-token.entity';
 
-type Repo<T> = Pick<
+type Repo<T extends ObjectLiteral> = Pick<
   Repository<T>,
   'findOne' | 'find' | 'save' | 'create' | 'update'
 >;

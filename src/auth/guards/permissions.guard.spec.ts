@@ -43,6 +43,7 @@ function makeGuard(opts: {
 }): {
   guard: PermissionsGuard;
   permService: jest.Mocked<Pick<PermissionsService, 'getEffectivePermissions'>>;
+  auditService: jest.Mocked<AuditService>;
 } {
   const reflector = {
     getAllAndOverride: jest.fn().mockImplementation((key: string) => {
