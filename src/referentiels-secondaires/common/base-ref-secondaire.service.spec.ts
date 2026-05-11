@@ -12,7 +12,6 @@ import {
 } from '@nestjs/common';
 import { DataType, IMemoryDb, newDb } from 'pg-mem';
 import {
-  Column,
   DataSource,
   Entity,
   Index,

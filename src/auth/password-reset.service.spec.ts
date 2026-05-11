@@ -25,7 +25,7 @@
 import { BadRequestException, GoneException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
-import { createHash, randomUUID } from 'node:crypto';
+import { createHash } from 'node:crypto';
 import { LessThan } from 'typeorm';
 
 import { AuditService } from '../audit/audit.service';

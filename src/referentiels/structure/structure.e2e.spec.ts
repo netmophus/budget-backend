@@ -263,7 +263,6 @@ describe('Structure (e2e) — première dimension SCD2 réelle', () => {
   let ids: SeedIds;
   let adminToken: string;
   let lecteurToken: string;
-  let noPermsToken: string;
 
   beforeAll(async () => {
     process.env.NODE_ENV = 'test';
@@ -352,11 +351,6 @@ describe('Structure (e2e) — première dimension SCD2 réelle', () => {
       sub: ids.lecteurId,
       email: 'lecteur@miznas.local',
       jti: 'jti-lecteur',
-    });
-    noPermsToken = await jwtService.signAsync({
-      sub: ids.noPermsId,
-      email: 'noperms@miznas.local',
-      jti: 'jti-noperms',
     });
   });
 

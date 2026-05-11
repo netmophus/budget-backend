@@ -1,6 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { IsInt, IsOptional, IsString, Min } from 'class-validator';
+import { IsInt, IsString, Min } from 'class-validator';
 
 /**
  * Filtres communs aux endpoints GET /budget/indicateurs/{globaux,par-cr}.

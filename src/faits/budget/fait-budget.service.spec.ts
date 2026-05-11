@@ -292,14 +292,12 @@ async function seedDimensions(
 describe('FaitBudgetService', () => {
   let dataSource: DataSource;
   let repo: Repository<FaitBudget>;
-  let versionRepo: Repository<DimVersion>;
   let service: FaitBudgetService;
   let ids: SeededIds;
 
   beforeAll(async () => {
     dataSource = await createDataSource();
     repo = dataSource.getRepository(FaitBudget);
-    versionRepo = dataSource.getRepository(DimVersion);
     service = buildService(dataSource);
   });
 

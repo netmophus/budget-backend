@@ -205,7 +205,6 @@ export async function seedTemps(ds: DataSource = AppDataSource): Promise<void> {
 
     // Insert par lots pour éviter une requête de plusieurs Mo.
     const BATCH = 500;
-    let inserted = 0;
     for (let i = 0; i < rows.length; i += BATCH) {
       const slice = rows.slice(i, i + BATCH);
       const values: string[] = [];
@@ -230,7 +229,7 @@ export async function seedTemps(ds: DataSource = AppDataSource): Promise<void> {
           r.libelleMois,
         );
       }
-      const result = await ds.query(
+      await ds.query(
         `INSERT INTO "dim_temps"
          ("date","annee","trimestre","mois","jour","semaine_iso",
           "jour_ouvre","est_fin_de_mois","est_fin_de_trimestre",
@@ -239,10 +238,6 @@ export async function seedTemps(ds: DataSource = AppDataSource): Promise<void> {
          ON CONFLICT ("date") DO NOTHING`,
         params,
       );
-      const affected = Array.isArray(result)
-        ? slice.length
-        : (result ?? slice.length);
-      inserted += typeof affected === 'number' ? affected : slice.length;
     }
 
     const stats = await ds.query(

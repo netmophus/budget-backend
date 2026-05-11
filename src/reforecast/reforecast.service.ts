@@ -285,7 +285,6 @@ export class ReforecastService {
     // imbriqués qui font tomber pg-mem (bug connu) — un pour les
     // mois consolidés (T <= consolide), un pour les mois futurs.
     const moisFinConsolide = p.trimestreConsolide * 3;
-    const moisDebutConsolide = (p.trimestreConsolide - 1) * 3 + 1;
 
     // ─── 1. Mois consolidés (T <= consolide) : montant = réalisé ──
     const sqlConsolide = `
@@ -635,7 +634,6 @@ export class ReforecastService {
   }> {
     const v = await this.getEntityById(id);
     const trim = v.trimestreConsolide!;
-    const annee = v.anneeConsolide!;
     const methode = v.methodeExtrapolation!;
 
     const rows = (await this.dataSource.query(

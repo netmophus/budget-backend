@@ -6,9 +6,8 @@ import type { StartedPostgreSqlContainer } from '@testcontainers/postgresql';
 import type { StartedTestContainer } from 'testcontainers';
 
 declare global {
-  // eslint-disable-next-line no-var
   var __E2E_PG_CONTAINER__: StartedPostgreSqlContainer | undefined;
-  // eslint-disable-next-line no-var
+
   var __E2E_REDIS_CONTAINER__: StartedTestContainer | undefined;
 }
 

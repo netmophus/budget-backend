@@ -53,15 +53,14 @@ function migrationTimestamp(m: {
 }
 
 declare global {
-  // eslint-disable-next-line no-var
   var __E2E_PG_CONTAINER__: StartedPostgreSqlContainer | undefined;
-  // eslint-disable-next-line no-var
+
   var __E2E_REDIS_CONTAINER__: StartedTestContainer | undefined;
 }
 
 export default async function globalSetup(): Promise<void> {
   const t0 = Date.now();
-  // eslint-disable-next-line no-console
+
   console.log(
     '[e2e:setup] démarrage containers Postgres 18 + Redis 7 (testcontainers)',
   );
@@ -148,7 +147,7 @@ export default async function globalSetup(): Promise<void> {
   const phase2 = allMigrations.filter(
     (m) => migrationTimestamp(m) >= SEED_AUTH_BEFORE_TIMESTAMP,
   );
-  // eslint-disable-next-line no-console
+
   console.log(
     `[e2e:setup] migrations chargées : ${allMigrations.length} (phase1=${phase1.length}, phase2=${phase2.length})`,
   );
@@ -191,7 +190,7 @@ export default async function globalSetup(): Promise<void> {
   globalThis.__E2E_REDIS_CONTAINER__ = redisContainer;
 
   const dt = ((Date.now() - t0) / 1000).toFixed(1);
-  // eslint-disable-next-line no-console
+
   console.log(
     `[e2e:setup] prêt en ${dt}s (pg=${host}:${port}/${database} redis=${redisHost}:${redisPort})`,
   );

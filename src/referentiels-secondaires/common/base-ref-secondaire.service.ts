@@ -15,10 +15,7 @@ import {
 } from '@nestjs/common';
 import { ILike, Repository, type FindOptionsWhere } from 'typeorm';
 
-import {
-  type BaseRefSecondaire,
-  type RefSecondaireWithId,
-} from './entities/base-ref-secondaire.entity';
+import { type RefSecondaireWithId } from './entities/base-ref-secondaire.entity';
 import { CreateRefSecondaireDto } from './dto/create-ref-secondaire.dto';
 import {
   ListRefSecondaireDto,
@@ -49,7 +46,6 @@ export class BaseRefSecondaireService<T extends RefSecondaireWithId> {
    *  - dans `softDelete` (refus si true)
    *  - dans `toggleActif` (warning si on passe à false)
    */
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   async isReferenced(_code: string): Promise<boolean> {
     return false;
   }

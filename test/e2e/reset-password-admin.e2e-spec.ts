@@ -42,7 +42,7 @@ async function waitForStatut(
 ): Promise<EmailLog> {
   const repo = ds.getRepository(EmailLog);
   const start = Date.now();
-  // eslint-disable-next-line no-constant-condition
+
   while (true) {
     const row = await repo.findOne({ where: { id: emailLogId } });
     if (row && (attendus as readonly string[]).includes(row.statut)) return row;

@@ -616,7 +616,6 @@ describe('ReforecastService.lancer', () => {
     expect(elapsed).toBeLessThan(2000);
     // Diagnostic visible
     if (elapsed > 500) {
-      // eslint-disable-next-line no-console
       console.warn(`[perf reforecast] 240 lignes générées en ${elapsed}ms`);
     }
   }, 30000); // timeout test = 30s pour absorber la lenteur du seed pg-mem

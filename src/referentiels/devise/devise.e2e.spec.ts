@@ -163,7 +163,6 @@ describe('Devise (e2e) — premier usage réel de @Auditable', () => {
   let dataSource: DataSource;
   let adminToken: string;
   let lecteurToken: string;
-  let noPermsToken: string;
   let xofId: string;
 
   beforeAll(async () => {
@@ -254,11 +253,6 @@ describe('Devise (e2e) — premier usage réel de @Auditable', () => {
       sub: ids.lecteurId,
       email: 'lecteur@miznas.local',
       jti: 'jti-lecteur',
-    });
-    noPermsToken = await jwtService.signAsync({
-      sub: ids.noPermsId,
-      email: 'noperms@miznas.local',
-      jti: 'jti-noperms',
     });
   });
 

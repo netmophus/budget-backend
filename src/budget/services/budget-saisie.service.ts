@@ -138,7 +138,7 @@ export class BudgetSaisieService {
       ligneMetierId: string;
       classeCompte?: string;
     },
-    userId: string,
+    _userId: string,
   ): Promise<GrilleSaisieReponseDto> {
     // Lot 3.4-bis : ligneMetierId est obligatoire — la grille est
     // désormais construite from-scratch sur (CR × ligne_metier ×

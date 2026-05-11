@@ -8,11 +8,7 @@
  *  3. assertCrAutorise — rejette si CR hors périmètre RBAC
  *  4. Service composite avec PerimetreService réel (cas admin null)
  */
-import {
-  BadRequestException,
-  ForbiddenException,
-  NotFoundException,
-} from '@nestjs/common';
+import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import { DataType, IMemoryDb, newDb } from 'pg-mem';
 import { DataSource } from 'typeorm';
 

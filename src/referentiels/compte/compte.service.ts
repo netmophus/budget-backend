@@ -21,7 +21,7 @@ import {
   UnprocessableEntityException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, ILike, IsNull, Repository } from 'typeorm';
+import { DataSource, IsNull, Repository } from 'typeorm';
 
 import { Scd2Service } from '../../common/services/scd2.service';
 import { CreateCompteDto } from './dto/create-compte.dto';

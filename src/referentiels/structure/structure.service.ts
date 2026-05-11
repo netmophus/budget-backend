@@ -30,7 +30,7 @@ import {
   UnprocessableEntityException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, ILike, Repository } from 'typeorm';
+import { DataSource, Repository } from 'typeorm';
 
 import { Scd2Service } from '../../common/services/scd2.service';
 import { CentreResponsabiliteService } from '../centre-responsabilite/centre-responsabilite.service';

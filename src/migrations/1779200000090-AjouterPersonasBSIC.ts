@@ -102,7 +102,7 @@ export class AjouterPersonasBSIC1779200000090 implements MigrationInterface {
       ])) as Array<{ id: string }>;
       if (userRow.length === 0) {
         // Cas improbable (INSERT a échoué silencieusement) — on log et on continue.
-        // eslint-disable-next-line no-console
+
         console.warn(
           `[Lot 4.1-fix] Persona ${p.email} introuvable après INSERT.`,
         );
