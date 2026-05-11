@@ -19,9 +19,16 @@ import {
 function toStringArray(value: unknown): string[] | undefined {
   if (value === undefined || value === null || value === '') return undefined;
   if (Array.isArray(value)) {
-    return value.map((v) => String(v)).filter((s) => s.length > 0);
+    return value
+      .map((v) =>
+        typeof v === 'string' || typeof v === 'number' ? String(v) : '',
+      )
+      .filter((s) => s.length > 0);
   }
-  return [String(value)];
+  if (typeof value === 'string' || typeof value === 'number') {
+    return [String(value)];
+  }
+  return undefined;
 }
 
 /**

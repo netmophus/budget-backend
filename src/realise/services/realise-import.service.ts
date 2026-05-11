@@ -242,7 +242,7 @@ export class RealiseImportService {
       if (rowIndex === 1) {
         headers = (row.values as Array<unknown>)
           .slice(1)
-          .map((v) => String(v ?? '').trim());
+          .map((v) => String((v as string | number | null) ?? '').trim());
         return;
       }
       const obj: RowBrute = {};
@@ -254,7 +254,19 @@ export class RealiseImportService {
         } else if (cellVal === null || cellVal === undefined) {
           obj[headers[c]] = '';
         } else {
-          obj[headers[c]] = String(cellVal).trim();
+          // ExcelJS retourne { formula, result } pour les cellules avec formule.
+          // Sans cette extraction, String({formula, result}) donnerait
+          // '[object Object]' au lieu de la valeur calculee.
+          const raw: unknown =
+            typeof cellVal === 'object' &&
+            cellVal !== null &&
+            'result' in cellVal
+              ? cellVal.result
+              : cellVal;
+          if (typeof raw === 'string') obj[headers[c]] = raw.trim();
+          else if (typeof raw === 'number' || typeof raw === 'boolean')
+            obj[headers[c]] = String(raw);
+          else obj[headers[c]] = '';
         }
       }
       if (Object.values(obj).some((v) => v !== '')) rows.push(obj);

@@ -136,7 +136,7 @@ describe('ExportExcelService', () => {
     ws.eachRow((row, idx) => {
       if (idx === 1) return; // header
       lignes.push([
-        String(row.getCell(1).value),
+        String(row.getCell(1).value as string | number),
         row.getCell(2).value as string | number,
       ]);
     });

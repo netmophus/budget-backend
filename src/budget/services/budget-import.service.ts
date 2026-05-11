@@ -336,7 +336,7 @@ export class BudgetImportService {
       for (let i = 1; i < raw.length; i++) values.push(raw[i]);
       if (rowNumber === 1) {
         for (const v of values) {
-          headers.push(String(v ?? '').trim());
+          headers.push(String((v as string | number | null) ?? '').trim());
         }
         return;
       }
@@ -350,7 +350,19 @@ export class BudgetImportService {
         } else if (cellVal === null || cellVal === undefined) {
           obj[headers[c]] = '';
         } else {
-          obj[headers[c]] = String(cellVal).trim();
+          // ExcelJS retourne { formula, result } pour les cellules avec formule.
+          // Sans cette extraction, String({formula, result}) donnerait
+          // '[object Object]' au lieu de la valeur calculee.
+          const raw: unknown =
+            typeof cellVal === 'object' &&
+            cellVal !== null &&
+            'result' in cellVal
+              ? cellVal.result
+              : cellVal;
+          if (typeof raw === 'string') obj[headers[c]] = raw.trim();
+          else if (typeof raw === 'number' || typeof raw === 'boolean')
+            obj[headers[c]] = String(raw);
+          else obj[headers[c]] = '';
         }
       }
       // Ignore les lignes vides (toutes cellules vides).

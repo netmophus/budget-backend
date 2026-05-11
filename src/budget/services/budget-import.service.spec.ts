@@ -478,6 +478,46 @@ describe('BudgetImportService', () => {
     expect(r.transactionRollback).toBe(false);
   });
 
+  it('XLSX cellule formule → extraction valeur calculée (régression Lot 6.6.B-8.3)', async () => {
+    // ExcelJS retourne { formula, result } pour les cellules avec formule.
+    // Avant le fix : String({formula, result}).trim() donnait '[object Object]'
+    // → Zod rejetait la ligne avec erreur incompréhensible.
+    // Après fix : extraction de .result.
+    const wb = new ExcelJS.Workbook();
+    const ws = wb.addWorksheet('Budget');
+    ws.addRow(HEADER.split(','));
+    const dataRow = ws.addRow([
+      'BR_CIV',
+      '611100',
+      'RETAIL_PARTICULIERS',
+      '2027-01-01',
+      'MONTANT',
+      '',
+      '',
+      '',
+      'Test cellule formule',
+    ]);
+    // Cellule montant (6ème colonne) = formule avec result précalculé.
+    dataRow.getCell(6).value = { formula: '500+500', result: 1000 };
+    const buf = (await wb.xlsx.writeBuffer()) as ArrayBuffer;
+    const buffer = Buffer.from(new Uint8Array(buf));
+    const file = {
+      buffer,
+      originalname: 'budget-formule.xlsx',
+      size: buffer.length,
+    };
+
+    const r = await service.importFichier(
+      file,
+      ids.versionId,
+      ids.scenarioId,
+      adminUser,
+    );
+    expect(r.lignesValides).toBe(1);
+    expect(r.lignesRejetees).toBe(0);
+    expect(r.lignesInserees).toBe(1);
+  });
+
   it('header invalide → BadRequestException', async () => {
     const file = csv(['colA,colB,colC', 'BR_CIV,611100,2027-01']);
     await expect(

@@ -77,7 +77,7 @@ const ligneCompteSchema = z.object({
   // Le CSV peut envoyer 6 ou '6' — on coerce en string et on valide.
   classe: z
     .preprocess(
-      (v) => (v === undefined || v === null ? v : String(v)),
+      (v) => (typeof v === 'number' || typeof v === 'string' ? String(v) : v),
       z.string().regex(/^[1-9]$/, 'classe doit être 1..9'),
     )
     .pipe(z.string()),
