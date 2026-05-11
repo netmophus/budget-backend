@@ -131,6 +131,11 @@ describe('Notifications — intégration listener (Lot 4.3)', () => {
     );
     listeners = new NotificationsListeners(service);
     // Câblage manuel des @OnEvent (nécessaire hors NestJS module).
+    // EventEmitter2 supporte les listeners async via emitAsync(), que les
+    // tests utilisent (cf. emitAsync + helper attendreLogs plus bas). Le
+    // typage strict de .on() déclare le callback comme void et ne reflète
+    // pas cette capacité — d'où la désactivation locale ciblée.
+    /* eslint-disable @typescript-eslint/no-misused-promises */
     events.on(EVENT_BUDGET_SUBMITTED, (p) => listeners.onBudgetSubmitted(p));
     events.on(EVENT_BUDGET_VALIDATED, (p) => listeners.onBudgetValidated(p));
     events.on(EVENT_BUDGET_REJECTED, (p) => listeners.onBudgetRejected(p));
@@ -147,6 +152,7 @@ describe('Notifications — intégration listener (Lot 4.3)', () => {
     events.on(EVENT_AFFECTATION_CREATED, (p) =>
       listeners.onAffectationCreated(p),
     );
+    /* eslint-enable @typescript-eslint/no-misused-promises */
   }
 
   async function attendreLogs(timeoutMs = 500): Promise<void> {
