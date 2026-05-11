@@ -32,4 +32,28 @@ export default tseslint.config(
       "prettier/prettier": ["error", { endOfLine: "auto" }],
     },
   },
+  // Override Lot 6.6 : tests, migrations et seeds utilisent des patterns
+  // dynamiques (mocks Jest, raw SQL via runner.query, fixtures TypeORM)
+  // ou les types stricts apportent peu de valeur et bloquent la productivite.
+  // Trace en dette : a reprendre si bascule vers approche fixture-based
+  // typee (Lot 7+).
+  {
+    files: [
+      '**/*.spec.ts',
+      '**/*.e2e-spec.ts',
+      'test/**/*.ts',
+      'src/migrations/**/*.ts',
+      'src/seeds/**/*.ts',
+      'src/data-source.ts',
+    ],
+    rules: {
+      '@typescript-eslint/no-unsafe-member-access': 'off',
+      '@typescript-eslint/no-unsafe-assignment': 'off',
+      '@typescript-eslint/no-unsafe-argument': 'off',
+      '@typescript-eslint/no-unsafe-call': 'off',
+      '@typescript-eslint/no-unsafe-return': 'off',
+      '@typescript-eslint/unbound-method': 'off',
+      '@typescript-eslint/no-unnecessary-type-assertion': 'off',
+    },
+  },
 );
