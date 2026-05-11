@@ -12,6 +12,7 @@ import type { Repository } from 'typeorm';
 
 import type { PermissionsService } from '../auth/permissions.service';
 import type { User } from '../users/entities/user.entity';
+import type { EmailQueueProducer } from './email-queue.producer';
 import type { EmailLog } from './entities/email-log.entity';
 import { NotificationsService } from './notifications.service';
 
@@ -30,6 +31,7 @@ function makeService(): NotificationsService {
     {} as Repository<User>,
     cfg,
     {} as PermissionsService,
+    {} as EmailQueueProducer,
   );
 }
 

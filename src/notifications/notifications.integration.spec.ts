@@ -33,6 +33,7 @@ import {
   EVENT_DELEGATION_EXPIRED,
   EVENT_DELEGATION_REVOKED,
 } from './notifications.events';
+import { EmailQueueProducer } from './email-queue.producer';
 import { NotificationsListeners } from './notifications.listeners';
 import { NotificationsService } from './notifications.service';
 
@@ -128,6 +129,9 @@ describe('Notifications — intégration listener (Lot 4.3)', () => {
           k === 'EMAIL_DRY_RUN' ? 'true' : (def ?? ''),
       } as unknown as ConfigService,
       makePermsMock(perms),
+      {
+        publier: jest.fn().mockResolvedValue(undefined),
+      } as unknown as EmailQueueProducer,
     );
     listeners = new NotificationsListeners(service);
     // Câblage manuel des @OnEvent (nécessaire hors NestJS module).
