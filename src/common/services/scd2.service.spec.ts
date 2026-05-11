@@ -325,7 +325,7 @@ describe('Scd2Service', () => {
 
       const actifs = await service.findAllCurrent({
         estActif: true,
-      } as Partial<DimTest>);
+      } as Partial<DimTest> as never);
       expect(actifs).toHaveLength(1);
       expect(actifs[0]!.libelle).toBe('A-cur');
     });

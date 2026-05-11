@@ -175,7 +175,6 @@ describe('CentreResponsabiliteService', () => {
         libelle: 'V1',
         fkStructure: sId,
         dateDebutValidite: '2024-01-01',
-        dateFinValidite: '2025-01-01' as never,
         versionCourante: false,
       });
       await insertCr(dataSource, {

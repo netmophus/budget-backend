@@ -800,7 +800,7 @@ describe('AnalyseEcartsService', () => {
     ); // 6%
     const r = await svc.getBudgetVsRealise(
       {
-        ...filtres(),
+        ...(filtres() as Record<string, unknown>),
         seuilEcartPctAttention: 3,
         seuilEcartPctCritique: 7,
       } as never,

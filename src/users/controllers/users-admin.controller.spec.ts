@@ -65,13 +65,14 @@ describe('UsersAdminController', () => {
     expect(svc.reactiver).toHaveBeenCalledWith('42', auteur);
   });
 
-  it('POST /:id/reset-password renvoie le mot de passe temporaire', async () => {
+  it('POST /:id/reset-password renvoie success + message (Lot 6.4.C breaking change : mdp envoye par email, pas retourne)', async () => {
     svc.resetPassword.mockResolvedValue({
-      motDePasseTemporaire: 'TempPwd!1234',
-      message: 'OK',
-    } as never);
+      success: true,
+      message: 'Email de réinitialisation envoyé à user@miznas.local.',
+    });
     const r = await controller.resetPassword('42', auteur);
-    expect(r.motDePasseTemporaire).toBe('TempPwd!1234');
+    expect(r.success).toBe(true);
+    expect(r.message).toContain('Email');
   });
 
   it('POST /:id/forcer-deconnexion délègue', async () => {

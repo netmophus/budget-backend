@@ -373,7 +373,7 @@ describe('UsersAdminService', () => {
       // 4. email_log inséré statut EN_ATTENTE, payload SANS mdp.
       const log = await ds
         .getRepository(EmailLog)
-        .findOne({ where: { id: emailLogId } });
+        .findOne({ where: { id: String(emailLogId) } });
       expect(log).not.toBeNull();
       expect(log!.statut).toBe('EN_ATTENTE');
       expect(log!.evenement).toBe('RESET_PASSWORD_ADMIN');

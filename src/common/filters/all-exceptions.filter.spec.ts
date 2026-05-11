@@ -35,21 +35,21 @@ function createHost(
 
   const request = { url, method };
 
-  const host: ArgumentsHost = {
+  const host = {
     switchToHttp: () => ({
       getResponse: <T>() => response as unknown as T,
       getRequest: <T>() => request as unknown as T,
       getNext: <T>() => undefined as unknown as T,
     }),
-    getArgs: () => [],
-    getArgByIndex: () => undefined,
+    getArgs: <T>() => [] as unknown as T,
+    getArgByIndex: <T>() => undefined as unknown as T,
     switchToRpc: () =>
       ({ getContext: () => ({}), getData: () => ({}) }) as never,
     switchToWs: () => ({ getClient: () => ({}), getData: () => ({}) }) as never,
     getType: () => 'http' as never,
     getClass: () => Object as never,
     getHandler: () => (() => undefined) as never,
-  };
+  } as unknown as ArgumentsHost;
 
   return { host, captured };
 }
