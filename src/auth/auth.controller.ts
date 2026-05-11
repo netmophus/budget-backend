@@ -55,8 +55,8 @@ export class AuthController {
     @Body() dto: LoginDto,
     @Req() req: Request,
   ): Promise<LoginResponse> {
-    const ip = (req.ip ?? null) as string | null;
-    const userAgent = (req.headers['user-agent'] ?? null) as string | null;
+    const ip = req.ip ?? null;
+    const userAgent = req.headers['user-agent'] ?? null;
     const { tokens, user, mdpExpire, doitChangerMdp } =
       await this.authService.login(dto.email, dto.motDePasse, ip, userAgent);
     return {
@@ -87,8 +87,8 @@ export class AuthController {
     @Body() dto: RefreshTokenDto,
     @Req() req: Request,
   ): Promise<IssuedTokens> {
-    const ip = (req.ip ?? null) as string | null;
-    const userAgent = (req.headers['user-agent'] ?? null) as string | null;
+    const ip = req.ip ?? null;
+    const userAgent = req.headers['user-agent'] ?? null;
     return this.authService.refresh(dto.refreshToken, ip, userAgent);
   }
 
@@ -106,8 +106,8 @@ export class AuthController {
     @CurrentUser() user: AuthUser,
     @Req() req: Request,
   ): Promise<void> {
-    const ip = (req.ip ?? null) as string | null;
-    const userAgent = (req.headers['user-agent'] ?? null) as string | null;
+    const ip = req.ip ?? null;
+    const userAgent = req.headers['user-agent'] ?? null;
     await this.authService.logout(
       user.userId,
       user.email,

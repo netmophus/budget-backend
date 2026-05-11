@@ -189,9 +189,9 @@ export class BudgetSaisieService {
       );
     }
     const ligneMetierRef = {
-      id: String(ligneMetierEntity[0]!.id),
-      codeLigneMetier: ligneMetierEntity[0]!.code_ligne_metier,
-      libelle: ligneMetierEntity[0]!.libelle,
+      id: String(ligneMetierEntity[0].id),
+      codeLigneMetier: ligneMetierEntity[0].code_ligne_metier,
+      libelle: ligneMetierEntity[0].libelle,
     };
 
     // 3. Charger les 12 mois de l'exercice
@@ -400,10 +400,10 @@ export class BudgetSaisieService {
 
     return {
       ok: true,
-      fkDevise: String(xof[0]!.id),
+      fkDevise: String(xof[0].id),
       fkStructure: String(fkStructureCr),
       fkProduit: String(fkProduit),
-      fkSegment: String(segmentDefaut[0]!.id),
+      fkSegment: String(segmentDefaut[0].id),
     };
   }
 
@@ -479,7 +479,7 @@ export class BudgetSaisieService {
       const tempsRepoTx = manager.getRepository(DimTemps);
 
       for (let i = 0; i < dto.lignes.length; i++) {
-        const ligne = dto.lignes[i]!;
+        const ligne = dto.lignes[i];
         // Compte feuille check
         const compte = await compteRepoTx.findOne({
           where: { id: ligne.compteId },
@@ -534,8 +534,7 @@ export class BudgetSaisieService {
             continue;
           }
           // Validation mode ENCOURS_TIE
-          const mode: ModeSaisieFaitBudget = (cell.modeSaisie ??
-            'MONTANT') as ModeSaisieFaitBudget;
+          const mode: ModeSaisieFaitBudget = cell.modeSaisie ?? 'MONTANT';
           if (mode === 'ENCOURS_TIE' && !compte.estPorteurInterets) {
             erreurs.push({
               ligneIndex: i,
