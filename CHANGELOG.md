@@ -8,6 +8,32 @@ en interne pour BSIC ; pas de release publique).
 
 ## [Non publié]
 
+### Lot 6.7 — UX résiduel (mai 2026)
+
+Objectif : 3 améliorations UX avant recette finale Lot 6.8.
+Diagnostic préalable systématique (discipline Lot 6.6) a écarté
+une tâche basée sur hypothèse fausse (`structure_id` n'existe pas).
+
+Documentation complète : [docs/lot-6/6.7-ux-residuel.md](./docs/lot-6/6.7-ux-residuel.md).
+
+#### Métriques
+
+- ESLint backend : **0 problems** (préservé)
+- tsc strict backend : **0 erreurs** (préservé)
+- `npm run build` : VERT
+- Jest : **1153 → 1157 verts** (+4 tests régression `mdpExpireProchainement`)
+
+#### Ajouté
+
+- **Lot 6.7.1** — `mdpExpireProchainement: boolean` exposé dans
+  `LoginResponse`. Mutuellement exclusif avec `mdpExpire` (Lot 6.4) :
+  vrai uniquement si `dateExpirationMdp ∈ ]now, now+7j[`. Permet
+  au frontend d'afficher un bandeau d'avertissement préventif sans
+  bloquer l'accès. Retourné aussi par `changerMdp()` avec valeur
+  `false` (date renouvelée à ~90 jours après changement).
+  Couverture : 4 tests Jest (J+5 true, J+10 false, déjà expiré
+  false par exclusion mutuelle, `dateExpirationMdp` null false).
+
 ### Lot 6.6 — Nettoyage codebase (mai 2026)
 
 Objectif : atteindre 0 problems ESLint + 0 erreurs tsc strict

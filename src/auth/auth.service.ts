@@ -31,6 +31,7 @@ export interface LoginResult {
   tokens: IssuedTokens;
   user: User;
   mdpExpire: boolean;
+  mdpExpireProchainement: boolean;
   doitChangerMdp: boolean;
 }
 
@@ -161,6 +162,14 @@ export class AuthService {
     const mdpExpire =
       user.dateExpirationMdp instanceof Date &&
       user.dateExpirationMdp.getTime() < Date.now();
+    // Lot 6.7.1 — booléen J-7 mutuellement exclusif avec mdpExpire :
+    // vrai si la date d'expiration est dans la fenêtre ]now, now+7j[.
+    // Permet au frontend d'afficher un bandeau d'avertissement avant
+    // le blocage effectif.
+    const mdpExpireProchainement =
+      user.dateExpirationMdp instanceof Date &&
+      user.dateExpirationMdp.getTime() >= Date.now() &&
+      user.dateExpirationMdp.getTime() < Date.now() + 7 * MS_PAR_JOUR;
     const doitChangerMdp = user.doitChangerMdp === true;
 
     const tokens = await this.issueTokens(user, ip, userAgent, {
@@ -182,7 +191,7 @@ export class AuthService {
           : null,
     });
 
-    return { tokens, user, mdpExpire, doitChangerMdp };
+    return { tokens, user, mdpExpire, mdpExpireProchainement, doitChangerMdp };
   }
 
   /**
@@ -260,7 +269,13 @@ export class AuthService {
       doitChangerMdp: false,
     });
 
-    return { tokens, user, mdpExpire: false, doitChangerMdp: false };
+    return {
+      tokens,
+      user,
+      mdpExpire: false,
+      mdpExpireProchainement: false,
+      doitChangerMdp: false,
+    };
   }
 
   async refresh(

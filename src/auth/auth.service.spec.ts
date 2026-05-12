@@ -253,6 +253,87 @@ describe('AuthService', () => {
       expect(result.mdpExpire).toBe(false);
       expect(result.doitChangerMdp).toBe(false);
     });
+
+    // ─── Lot 6.7.1 — bandeau d'avertissement J-7 ─────────────────────
+
+    it('mdpExpireProchainement=true si expiration dans 5 jours', async () => {
+      const hash = await bcrypt.hash('correct', 4);
+      userRepo.findOne.mockResolvedValue(
+        makeUser({
+          motDePasseHash: hash,
+          dateExpirationMdp: new Date(Date.now() + 5 * 86_400_000),
+          doitChangerMdp: false,
+        }),
+      );
+
+      const result = await service.login(
+        'admin@miznas.local',
+        'correct',
+        null,
+        null,
+      );
+      expect(result.mdpExpireProchainement).toBe(true);
+      expect(result.mdpExpire).toBe(false);
+    });
+
+    it('mdpExpireProchainement=false si expiration dans 10 jours', async () => {
+      const hash = await bcrypt.hash('correct', 4);
+      userRepo.findOne.mockResolvedValue(
+        makeUser({
+          motDePasseHash: hash,
+          dateExpirationMdp: new Date(Date.now() + 10 * 86_400_000),
+          doitChangerMdp: false,
+        }),
+      );
+
+      const result = await service.login(
+        'admin@miznas.local',
+        'correct',
+        null,
+        null,
+      );
+      expect(result.mdpExpireProchainement).toBe(false);
+      expect(result.mdpExpire).toBe(false);
+    });
+
+    it('mdpExpireProchainement=false si dateExpirationMdp déjà dépassée (mutuellement exclusif avec mdpExpire)', async () => {
+      const hash = await bcrypt.hash('correct', 4);
+      userRepo.findOne.mockResolvedValue(
+        makeUser({
+          motDePasseHash: hash,
+          dateExpirationMdp: new Date(Date.now() - 86_400_000),
+          doitChangerMdp: false,
+        }),
+      );
+
+      const result = await service.login(
+        'admin@miznas.local',
+        'correct',
+        null,
+        null,
+      );
+      expect(result.mdpExpire).toBe(true);
+      expect(result.mdpExpireProchainement).toBe(false);
+    });
+
+    it('mdpExpireProchainement=false si dateExpirationMdp null', async () => {
+      const hash = await bcrypt.hash('correct', 4);
+      userRepo.findOne.mockResolvedValue(
+        makeUser({
+          motDePasseHash: hash,
+          dateExpirationMdp: null,
+          doitChangerMdp: false,
+        }),
+      );
+
+      const result = await service.login(
+        'admin@miznas.local',
+        'correct',
+        null,
+        null,
+      );
+      expect(result.mdpExpireProchainement).toBe(false);
+    });
   });
 
   describe('changerMdp', () => {
