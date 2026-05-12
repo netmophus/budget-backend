@@ -58,6 +58,7 @@ describe('AuthController', () => {
       tokens: fakeTokens,
       user: fakeUser,
       mdpExpire: false,
+      mdpExpireProchainement: false,
       doitChangerMdp: false,
     });
 
@@ -76,6 +77,7 @@ describe('AuthController', () => {
       },
       mdpExpire: false,
       doitChangerMdp: false,
+      mdpExpireProchainement: false,
     });
     expect(service.login).toHaveBeenCalledWith(
       'admin@miznas.local',

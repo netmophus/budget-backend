@@ -33,6 +33,9 @@ interface LoginResponse extends IssuedTokens {
   // le frontend doit rediriger vers /change-mdp avant tout accès.
   mdpExpire: boolean;
   doitChangerMdp: boolean;
+  // Lot 6.7.1 — bandeau d'avertissement J-7. Mutuellement exclusif
+  // avec mdpExpire (vrai seulement si dateExpirationMdp ∈ ]now, now+7j[).
+  mdpExpireProchainement: boolean;
 }
 
 @ApiTags('auth')
@@ -57,7 +60,7 @@ export class AuthController {
   ): Promise<LoginResponse> {
     const ip = req.ip ?? null;
     const userAgent = req.headers['user-agent'] ?? null;
-    const { tokens, user, mdpExpire, doitChangerMdp } =
+    const { tokens, user, mdpExpire, mdpExpireProchainement, doitChangerMdp } =
       await this.authService.login(dto.email, dto.motDePasse, ip, userAgent);
     return {
       ...tokens,
@@ -69,6 +72,7 @@ export class AuthController {
       },
       mdpExpire,
       doitChangerMdp,
+      mdpExpireProchainement,
     };
   }
 
