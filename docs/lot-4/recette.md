@@ -1,5 +1,15 @@
 # Lot 4 — Recette transverse R1 → R7
 
+> **📌 Archive historique — voir [`docs/RECETTE-MVP.md`](../RECETTE-MVP.md)
+> pour la recette MVP consolidée v1.0.0.**
+>
+> Ce document est conservé tel quel comme **référence historique du Lot
+> 4** (multi-périmètres, délégations, notifications). Les capacités
+> qu'il couvre restent actives en production v1.0.0-mvp ; la
+> consolidation MVP a regroupé R1-R7 (Lot 5 Module Exécution) + R8-R15
+> (Lots 6.3-6.7) dans un seul document, sans rééditer cette recette
+> Lot 4 — d'où le pointeur ci-dessus.
+
 > Statut : **livré** (2026-05-07) — branche `lot-4/4.4-recette`
 >
 > Ce document décrit 7 scénarios de bout-en-bout exécutables en

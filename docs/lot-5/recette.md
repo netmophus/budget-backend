@@ -1,5 +1,16 @@
 # Lot 5 — Recette transverse R1 → R7
 
+> **📌 Archive historique — voir [`docs/RECETTE-MVP.md`](../RECETTE-MVP.md)
+> pour la recette MVP consolidée v1.0.0.**
+>
+> Ce document est conservé comme **référence historique du Lot 5**
+> (Module Exécution : réalisé, tableau de bord, reforecast). La
+> consolidation MVP reprend les R1-R7 ci-dessous (avec mise à jour du
+> placeholder `CR_AG_BANDABARI` → `CR_AG_ABJ_PLATEAU` et du libellé
+> bouton « Éditer ce reforecast » Lot 6.7.3) et ajoute R8-R15 pour les
+> capacités Lots 6.3-6.7. Pour exécuter la recette MVP complète,
+> utiliser exclusivement `docs/RECETTE-MVP.md`.
+
 > Statut : **livrée pour exécution** (mai 2026) — branche
 > `lot-5/5.3-reforecast` (consolidée à la fin du Lot 5).
 >
