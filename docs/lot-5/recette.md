@@ -1,5 +1,16 @@
 # Lot 5 — Recette transverse R1 → R7
 
+> **📌 Archive historique — voir [`docs/RECETTE-MVP.md`](../RECETTE-MVP.md)
+> pour la recette MVP consolidée v1.0.0.**
+>
+> Ce document est conservé comme **référence historique du Lot 5**
+> (Module Exécution : réalisé, tableau de bord, reforecast). La
+> consolidation MVP reprend les R1-R7 ci-dessous (avec mise à jour du
+> placeholder `CR_AG_BANDABARI` → `CR_AG_ABJ_PLATEAU` et du libellé
+> bouton « Éditer ce reforecast » Lot 6.7.3) et ajoute R8-R15 pour les
+> capacités Lots 6.3-6.7. Pour exécuter la recette MVP complète,
+> utiliser exclusivement `docs/RECETTE-MVP.md`.
+
 > Statut : **livrée pour exécution** (mai 2026) — branche
 > `lot-5/5.3-reforecast` (consolidée à la fin du Lot 5).
 >
@@ -43,12 +54,17 @@
 | Email | Rôle | Mot de passe |
 |-------|------|--------------|
 | `admin@miznas.local` | ADMIN | `SEED_ADMIN_PASSWORD` |
-| `adj.retail@miznas.local` (Amadou) | SAISISSEUR | `ChangeMe!2026` |
-| `dir.retail@miznas.local` (Aïcha) | VALIDATEUR | `ChangeMe!2026` |
-| `dir.corporate@miznas.local` (Ibrahim) | VALIDATEUR | `ChangeMe!2026` |
-| `controleur.gestion@miznas.local` | VALIDATEUR | `ChangeMe!2026` |
-| `dga.exploitation@miznas.local` (Fatima) | PUBLICATEUR | `ChangeMe!2026` |
-| `auditeur@miznas.local` | AUDITEUR | `ChangeMe!2026` |
+| `adj.retail@miznas.local` (Fatima) | SAISISSEUR | `MiznasTest!2026` |
+| `dir.retail@miznas.local` (Amadou) | VALIDATEUR | `MiznasTest!2026` |
+| `dir.corporate@miznas.local` (Ibrahim) | VALIDATEUR | `MiznasTest!2026` |
+| `controleur.gestion@miznas.local` (Aïcha) | VALIDATEUR | `MiznasTest!2026` |
+| `auditeur@miznas.local` (Moussa) | AUDITEUR | `MiznasTest!2026` |
+| `dga.exploitation@miznas.local` (Salif) | PUBLICATEUR | `MiznasTest!2026` |
+
+> Corrigé Lot 6.8 vs version d'origine 2026-05 : prénoms + mot de
+> passe seed alignés sur la migration source
+> `1779200000090-AjouterPersonasBSIC.ts`. Voir
+> [`docs/RECETTE-MVP.md`](../RECETTE-MVP.md).
 
 ### 0.4 Conventions
 
@@ -75,11 +91,12 @@ autre utilisateur (séparation des rôles `REALISE.SAISIR` /
 - Au moins 1 ligne `fait_budget` sur le compte `701100`
   (Commissions de tenue de compte) en mars 2027 sur `CR_AG_BANDABARI`
   pour la version `BUDGET_INITIAL_2027`.
-- Aïcha (`dir.retail`) a `REALISE.SAISIR` + `REALISE.VALIDER`.
+- Amadou (`dir.retail`, VALIDATEUR) a `REALISE.VALIDER`. Fatima
+  (`adj.retail`, SAISISSEUR) a `REALISE.SAISIR`.
 
 ### Étapes
 
-1. **Connexion Amadou** (`adj.retail`, SAISISSEUR).
+1. **Connexion Fatima** (`adj.retail`, SAISISSEUR).
 2. Aller sur `/realise/saisie`.
 3. Sélectionner CR=`CR_AG_BANDABARI`, mois début=2027-01,
    mois fin=2027-03, devise=`XOF`.
@@ -91,9 +108,9 @@ autre utilisateur (séparation des rôles `REALISE.SAISIR` /
    « Recette R1 — saisie initiale ».
 7. Cliquer « Enregistrer ». Toast succès. La grille affiche la
    nouvelle ligne en statut `IMPORTE` (badge ambre).
-8. **Déconnexion** Amadou. **Connexion** Aïcha (`dir.retail`).
+8. **Déconnexion** Fatima. **Connexion** Amadou (`dir.retail`).
 9. Aller sur `/realise/saisie`, mêmes filtres.
-10. La grille montre la ligne saisie par Amadou (statut `IMPORTE`).
+10. La grille montre la ligne saisie par Fatima (statut `IMPORTE`).
 11. Cocher la ligne, cliquer « Valider la sélection ».
 12. Dialogue de validation : récap « 1 ligne(s) seront validées »
     + ligne « 701100 — Commissions de tenue de compte : 1 ligne(s) ».
@@ -118,7 +135,7 @@ SELECT fr.id, fr.statut, fr.montant, fr.valide_le,
           WHERE date='2027-03-01' AND jour=1);
 -- Attendu : statut=VALIDE, valide_par='dir.retail@miznas.local'
 
--- 2 lignes audit (saisie par Amadou + validation par Aïcha)
+-- 2 lignes audit (saisie par Fatima + validation par Amadou)
 SELECT type_action, utilisateur, date_action
   FROM audit_log
  WHERE entite_cible='fait_realise'
@@ -129,9 +146,9 @@ SELECT type_action, utilisateur, date_action
 
 ### Cas négatifs
 
-- **Tenter `DELETE`** côté Aïcha sur la ligne `VALIDE` → 422
+- **Tenter `DELETE`** côté Amadou sur la ligne `VALIDE` → 422
   (statut=VALIDE non supprimable, REALISE.SUPPRIMER ne suffit pas).
-- **Amadou tente de valider sa propre ligne** → bouton « Valider la
+- **Fatima tente de valider sa propre ligne** → bouton « Valider la
   sélection » non visible (pas de `REALISE.VALIDER` pour SAISISSEUR).
 
 ---
@@ -151,7 +168,7 @@ rapport détaillé (lignes OK / KO + raisons). Lot 5.1.B.
 
 ### Étapes
 
-1. **Connexion Amadou** (`adj.retail`, SAISISSEUR).
+1. **Connexion Fatima** (`adj.retail`, SAISISSEUR).
 2. Aller sur `/realise/saisie`.
 3. Cliquer « Importer ». Dialogue d'import s'ouvre.
 4. Glisser-déposer le fichier `realise-2027-q1.xlsx`.
@@ -164,7 +181,7 @@ rapport détaillé (lignes OK / KO + raisons). Lot 5.1.B.
 ### Vérifications SQL
 
 ```sql
--- 50 nouvelles lignes IMPORTE par Amadou
+-- 50 nouvelles lignes IMPORTE par Fatima
 SELECT statut, source, COUNT(*)
   FROM fait_realise
  WHERE source='IMPORT'
@@ -183,9 +200,9 @@ SELECT type_action, payload_apres
 
 ### Cas négatifs
 
-- **Fichier hors-périmètre** (CR auquel Amadou n'a pas accès) → ligne
+- **Fichier hors-périmètre** (CR auquel Fatima n'a pas accès) → ligne
   rejetée avec motif « périmètre interdit ».
-- **Aïcha** (VALIDATEUR sans REALISE.IMPORTER) → bouton « Importer »
+- **Amadou** (VALIDATEUR sans REALISE.IMPORTER) → bouton « Importer »
   non visible.
 
 ---
@@ -348,8 +365,8 @@ SELECT
   « Aucun réalisé validé sur le trimestre T1 2027, impossible de
   lancer le reforecast. »
 - **Trimestre 5** → 400 (validation DTO).
-- **Aïcha** sans `BUDGET.REFORECAST_LANCER` → 403 sur
-  `POST /reforecast/lancer`.
+- **Amadou** (`dir.retail`, VALIDATEUR sans `BUDGET.REFORECAST_LANCER`)
+  → 403 sur `POST /reforecast/lancer`.
 
 ---
 
@@ -369,7 +386,7 @@ reforecast (codes audit `*_REFORECAST` polymorphes). Lot 5.3.
 2. Aller sur `/reforecast/:id` du R4. Statut `Brouillon`.
 3. Cliquer « Soumettre ». Toast « Soumission effectué. ». Statut
    passe à `Soumis`.
-4. **Déconnexion**, **connexion Aïcha** (`dir.retail`, VALIDATEUR).
+4. **Déconnexion**, **connexion Amadou** (`dir.retail`, VALIDATEUR).
 5. Aller sur `/reforecast/:id`. Boutons « Valider » et « Rejeter »
    visibles.
 6. Cliquer « Rejeter ». Dialogue motif. Saisir
@@ -385,9 +402,9 @@ reforecast (codes audit `*_REFORECAST` polymorphes). Lot 5.3.
     marqué `OBSOLETE`. Le nouveau est créé en `Brouillon` `ACTIVE`.
 12. Sur le nouveau reforecast, cliquer « Soumettre » (statut
     `Soumis`).
-13. **Connexion Aïcha**, valider le nouveau reforecast (statut
+13. **Connexion Amadou**, valider le nouveau reforecast (statut
     `Validé`).
-14. **Déconnexion**, **connexion Fatima** (`dga.exploitation`,
+14. **Déconnexion**, **connexion Salif** (`dga.exploitation`,
     PUBLICATEUR).
 15. Aller sur `/reforecast/:id` du nouveau reforecast. Bouton
     « Publier ».
@@ -495,7 +512,8 @@ sur l'ensemble des modules Exécution. Lot 5.1, 5.2, 5.3.
 ### Pré-requis
 
 - Tous les personas seedés et actifs.
-- Amadou affecté à `STRUCTURE_RETAIL` uniquement (cf. R1 du Lot 4).
+- Fatima (`adj.retail`, SAISISSEUR) affectée à `STRUCTURE_RETAIL`
+  uniquement (cf. R1 du Lot 4).
 - Auditeur sans aucun périmètre actif.
 
 ### Étapes
@@ -510,19 +528,19 @@ sur l'ensemble des modules Exécution. Lot 5.1, 5.2, 5.3.
 5. `/reforecast` : accès en lecture, **pas de bouton « Lancer »**
    (pas de `BUDGET.REFORECAST_LANCER`).
 6. `/reforecast/:id` d'un Brouillon : aucun bouton workflow.
-7. **Déconnexion**, **connexion Amadou** (SAISISSEUR).
+7. **Déconnexion**, **connexion Fatima** (`adj.retail`, SAISISSEUR).
 8. `/realise/saisie` : grille filtrée sur les CR de
    `STRUCTURE_RETAIL` uniquement (pas les autres structures).
 9. Boutons « Nouvelle ligne » + « Importer » visibles. Pas de
    « Valider » (pas REALISE.VALIDER).
 10. `/reforecast` : accessible en lecture, pas de bouton « Lancer ».
 11. `/reforecast/:id` Brouillon : bouton « Soumettre » visible
-    (Amadou a `BUDGET.SOUMETTRE`). Pas de « Valider » ni « Publier ».
+    (Fatima a `BUDGET.SOUMETTRE`). Pas de « Valider » ni « Publier ».
 
 ### Vérifications SQL
 
 ```sql
--- Périmètre Amadou (filtrage écriture réalisé)
+-- Périmètre Fatima (filtrage écriture réalisé)
 SELECT cible_type, cible_id, origine, actif
   FROM user_perimetres
  WHERE fk_user = (SELECT id FROM "user" WHERE email='adj.retail@miznas.local')
@@ -545,7 +563,7 @@ SELECT p.code_permission
 
 ### Cas négatifs
 
-- **Amadou tente de saisir sur un CR hors `STRUCTURE_RETAIL`** via
+- **Fatima tente de saisir sur un CR hors `STRUCTURE_RETAIL`** via
   l'API directement → 403 « périmètre interdit ».
 - **Auditeur tente `POST /reforecast/lancer`** → 403.
 

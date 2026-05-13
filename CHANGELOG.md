@@ -6,7 +6,143 @@ en interne pour BSIC ; pas de release publique).
 
 ---
 
-## [Non publié]
+## [v1.0.0-mvp] - 2026-05-13
+
+### MVP MIZNAS officiel — Application de gestion budgétaire pour banques UEMOA
+
+Premier tag de release officiel après 6 mois de développement
+structuré (Lots 1 à 6.8). Le périmètre MVP du module Budgétaire
+Bancaire UEMOA est intégralement livré, prêt pour la recette
+manuelle en pré-prod chez la banque pilote BSIC.
+
+**Documentation complète** : [docs/RELEASE-v1.0.0-mvp.md](./docs/RELEASE-v1.0.0-mvp.md).
+
+#### Récap modules livrés
+
+- **Lots 1-2** : Socle transverse (auth JWT + refresh rotation,
+  RBAC global+périmétré, audit_log 10 ans BCEAO, Swagger
+  `/api/docs`) + Référentiels SCD2 (8 dimensions seedées + 13
+  référentiels secondaires `ref_*` paramétrables + CRUD UI 6
+  dimensions métier).
+- **Lots 3-4** : Élaboration budgétaire (versions, scénarios,
+  workflow 4 statuts, indicateurs PNB/MNI/Coef, import bulk
+  Excel/CSV) + Administration (CRUD users, 6 rôles cumulables) +
+  Multi-périmètres flexibles + Délégations temporaires avec
+  **anti-chaînage strict BCEAO D2** + Notifications email
+  (8 templates Handlebars, dry-run, opt-out user).
+- **Lot 5** : Module Exécution (saisie/import réalisé, tableau
+  de bord budget vs réalisé avec 4 niveaux d'alerte + export
+  Excel 3 onglets, reforecast trimestriel avec 3 méthodes
+  d'extrapolation et écrasement OBSOLETE en cascade).
+- **Lot 6** : Industrialisation et sécurité (CI/CD GitHub Actions
+  bloquante, e2e backend testcontainers Postgres+Redis, smoke
+  Playwright, BullMQ + Redis queue emails, policy mdp
+  12+complexité + expiration 90j + rate limit + force-change-mdp,
+  forgot password self-service anti-énumération, rappel J-3
+  délégation cron, branch protection ESLint+tsc strict, UX
+  résiduel BandeauMdpExpire + tooltips + découvrabilité
+  reforecast).
+
+#### Métriques au tag v1.0.0-mvp
+
+- **61 migrations** TypeORM (`1777800000000-CreateDimTemps` →
+  `1779200000220-AjouterCodesAuditLot65`)
+- **1157 tests Jest backend** + **579 tests Vitest frontend** =
+  **1736 tests automatisés verts**, 0 régression cumulée depuis
+  Lot 1
+- **8 personas seedés BSIC** (1 ADMIN + 1 LECTEUR + 6 personas
+  métier)
+- ESLint 0 problems + tsc strict 0 erreurs + `nest build` VERT
+  (Required CI bloquant)
+- Branch protection active sur main des 2 repos (ESLint + tsc +
+  build + tests = Required)
+
+#### Recette MVP
+
+15 scénarios bout-en-bout R1-R15 documentés dans
+[docs/RECETTE-MVP.md](./docs/RECETTE-MVP.md), couvrant Lot 5
+(Module Exécution) + Lots 6.3-6.7 (industrialisation sécurité +
+UX résiduel). **Recette documentaire** : exécution manuelle à
+réaliser par la banque pilote BSIC en pré-prod avant la mise en
+production. Le tag `v1.0.0-mvp` certifie le code livré + 1736
+tests automatisés verts, pas l'exécution de cette recette.
+
+#### Dette tracée Lot 7+
+
+Cf. [docs/RELEASE-v1.0.0-mvp.md §7](./docs/RELEASE-v1.0.0-mvp.md#7-limitations-connues-et-dette-tracée-lot-7).
+Principaux items : worker BullMQ in-process à isoler, storage
+rate limit in-memory à migrer Redis, CI Playwright pattern
+documenté, refresh token localStorage → cookie httpOnly,
+Pattern 1/2 hydratation et fetch+loading frontend, cleanup
+audit_log 10 ans (purge BCEAO).
+
+#### Modules différés (post-MVP)
+
+Modules G (Capital planning), J (Stress tests), K (Allocation
+analytique) — cf. [`docs/roadmap-mvp.md`](./docs/roadmap-mvp.md)
+§ Modules différés. Release cible V2/V3.
+
+---
+
+### Lot 6.8 — Recette finale + doc release MVP (mai 2026)
+
+Objectif : clôturer le périmètre MVP en consolidant la recette
+transverse + documentant la release v1.0.0-mvp + posant le tag
+sur les 2 mains.
+
+#### Livré
+
+- **`docs/RECETTE-MVP.md`** consolidé (1731 lignes) : 15 scénarios
+  R1-R15 couvrant Lot 5 (R1-R7 Module Exécution) + Lots 6.3-6.7
+  (R8-R15). Inclut tableau de suivi vierge à compléter par BSIC,
+  mises à jour vs lot-5/recette.md (placeholder
+  `CR_AG_BANDABARI` → `CR_AG_ABJ_PLATEAU`, bouton « Éditer ce
+  reforecast » Lot 6.7.3, pattern SCD2 `version_courante=true`).
+  Pointeurs ajoutés en tête des archives `docs/lot-4/recette.md`
+  et `docs/lot-5/recette.md`.
+- **`docs/RELEASE-v1.0.0-mvp.md`** (954 lignes, 8 sections) :
+  vue d'ensemble, fonctionnalités MVP livrées, stack technique,
+  procédure de déploiement (Docker Compose recommandé + options
+  autres à valider ops BSIC), comptes seed BSIC, endpoints
+  principaux (Swagger autoritatif), limitations / dette Lot 7+,
+  procédure de release.
+
+#### Corrigé
+
+- **Prénoms personas BSIC + mots de passe seed** (commit
+  `5f43ca3`) — incohérences héritées des archives `lot-4/recette.md`
+  et `lot-5/recette.md` propagées au commit initial
+  `RECETTE-MVP.md`. Corrections vs migration source
+  `1779200000090-AjouterPersonasBSIC.ts` + `auth-seed.ts:32` :
+  - 5 prénoms recroisés (Amadou ↔ Fatima, Aïcha ↔ Amadou,
+    Fatima ↔ Salif, + ajout Aïcha controleur.gestion et Moussa
+    auditeur)
+  - 6 personas BSIC : mdp `ChangeMe!2026` → `MiznasTest!2026`
+  - `lecteur@miznas.local` : mdp `ChangeMe!2026` → `Lecteur!2026`
+  - Narrations R1-R7 (recette MVP) + Lot 4 R1-R7 (archive) +
+    Lot 5 R1-R7 (archive) toutes alignées sur les bons prénoms
+
+#### Décidé
+
+- **CI Playwright reportée Lot 7+** (confirmation décision Lot
+  6.2.B). Pattern préféré documenté dans
+  `docs/RELEASE-v1.0.0-mvp.md §7.3` : job `playwright-e2e`
+  skipped en PR, lancé sur push main avec services GitHub
+  Actions Postgres+Redis + démarrage backend + `vite build &&
+  preview` + `npx playwright test`. Effort estimé 1-2j Lot 7+.
+
+#### Discipline acquise
+
+- **Verbatim quoting d'archives ≠ vérification source** — cas
+  vécu lors de la propagation des incohérences personas BSIC
+  depuis les archives `lot-4/recette.md` et `lot-5/recette.md`
+  vers `RECETTE-MVP.md` (commit initial), détecté en pré-rédaction
+  release doc grâce à la vérification systématique vs migrations
+  sources. Sur tout élément critique (comptes seed, mdp, env
+  vars, codes audit, naming canonique, FK), vérifier le code
+  source AVANT verbatim quoting.
+
+---
 
 ### Lot 6.7 — UX résiduel (mai 2026)
 
