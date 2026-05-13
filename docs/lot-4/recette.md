@@ -33,18 +33,24 @@
 - SMTP de capture **Mailhog** disponible sur `localhost:1025`
   (UI sur `http://localhost:8025`) — ou `EMAIL_DRY_RUN=true`
   selon le scénario.
-- Seed personas exécuté (cf. migration Lot 4.1-fix3) :
+- Seed personas exécuté (cf. migrations Lot 4.1-fix et Lot 4.1-fix3 +
+  `src/seeds/auth-seed.ts`) :
 
-  | Email | Rôle | Mot de passe seed |
-  |-------|------|-------------------|
-  | `admin@miznas.local` | ADMIN | défini par `SEED_ADMIN_PASSWORD` |
-  | `lecteur@miznas.local` | LECTEUR | `ChangeMe!2026` |
-  | `adj.retail@miznas.local` (Amadou) | SAISISSEUR | `ChangeMe!2026` |
-  | `dir.retail@miznas.local` (Aïcha) | VALIDATEUR | `ChangeMe!2026` |
-  | `dir.corporate@miznas.local` (Ibrahim) | VALIDATEUR | `ChangeMe!2026` |
-  | `controleur.gestion@miznas.local` | VALIDATEUR | `ChangeMe!2026` |
-  | `dga.exploitation@miznas.local` (Fatima) | PUBLICATEUR | `ChangeMe!2026` |
-  | `auditeur@miznas.local` | AUDITEUR | `ChangeMe!2026` |
+  | Email | Prénom | Rôle | Mot de passe seed |
+  |-------|--------|------|-------------------|
+  | `admin@miznas.local` | Admin MIZNAS | ADMIN | défini par `SEED_ADMIN_PASSWORD` (fallback `ChangeMe!2026`) |
+  | `lecteur@miznas.local` | Lecteur Test | LECTEUR | défini par `SEED_LECTEUR_PASSWORD` (fallback `Lecteur!2026`) |
+  | `adj.retail@miznas.local` | Fatima | SAISISSEUR | `MiznasTest!2026` |
+  | `dir.retail@miznas.local` | Amadou | VALIDATEUR | `MiznasTest!2026` |
+  | `dir.corporate@miznas.local` | Ibrahim | VALIDATEUR | `MiznasTest!2026` |
+  | `controleur.gestion@miznas.local` | Aïcha | VALIDATEUR | `MiznasTest!2026` |
+  | `auditeur@miznas.local` | Moussa | AUDITEUR | `MiznasTest!2026` |
+  | `dga.exploitation@miznas.local` | Salif | PUBLICATEUR | `MiznasTest!2026` |
+
+  > Corrigé Lot 6.8 vs version d'origine 2026-05-07 : prénoms +
+  > mot de passe seed alignés sur la migration source
+  > `1779200000090-AjouterPersonasBSIC.ts`. Voir aussi
+  > [`docs/RECETTE-MVP.md`](../RECETTE-MVP.md).
 
 ### 0.2 Outils
 
@@ -71,16 +77,16 @@ que le retrait soft-delete fonctionne.
 
 ### Pré-requis
 
-- Persona cible : Amadou (`adj.retail@miznas.local`).
+- Persona cible : Fatima (`adj.retail@miznas.local`, SAISISSEUR).
 - Au moins une structure courante en base, ex : `STRUCTURE_RETAIL`
   avec ≥ 2 CR rattachés.
-- Aucune affectation `STRUCTURE` active sur Amadou.
+- Aucune affectation `STRUCTURE` active sur Fatima.
 
 ### Étapes
 
 1. **Connexion admin** sur `/login` puis aller sur
    `/admin/affectations`.
-2. **Filtre email** : taper `adj.retail` → la ligne d'Amadou
+2. **Filtre email** : taper `adj.retail` → la ligne de Fatima
    s'affiche, badge gris « 0 périmètre » (ou `n` si Lot 4.1-fix3
    personas par défaut).
 3. **Cliquer « Ajouter une affectation »** sur sa ligne →
@@ -89,15 +95,15 @@ que le retrait soft-delete fonctionne.
    `STRUCTURE_RETAIL`, `dateDebut=today`, `motif="Recette R1"`.
 5. **Cliquer « Ajouter »** → toast succès « Affectation créée. »
    La liste des affectations actuelles affiche maintenant la ligne.
-6. **Déconnexion admin**, **connexion Amadou**.
+6. **Déconnexion admin**, **connexion Fatima**.
 7. **Aller sur `/budget/saisie`** → le sélecteur CR doit
    exposer **les CR rattachés à `STRUCTURE_RETAIL`**.
 8. **Reprendre admin**, retourner sur `/admin/affectations`,
-   ouvrir le dialogue d'Amadou, cliquer sur l'icône poubelle de
+   ouvrir le dialogue de Fatima, cliquer sur l'icône poubelle de
    la ligne d'affectation `STRUCTURE_RETAIL`.
 9. **Confirmer** → toast « Affectation retirée. » La ligne
    apparaît barrée (`actif=false`).
-10. **Reconnexion Amadou** → `/budget/saisie` n'expose plus les CR
+10. **Reconnexion Fatima** → `/budget/saisie` n'expose plus les CR
     de `STRUCTURE_RETAIL`.
 
 ### Vérifications SQL
@@ -143,18 +149,18 @@ disparaît automatiquement après.
 
 ### Pré-requis
 
-- Persona : Aïcha (`dir.retail@miznas.local`).
+- Persona : Amadou (`dir.retail@miznas.local`, VALIDATEUR).
 - 3 CR courants en base, par exemple `CR_AGENCE_NIA`, `CR_AGENCE_OUA`,
   `CR_AGENCE_LOM`.
 
 ### Étapes
 
-1. **Admin** → `/admin/affectations` → ouvrir dialogue d'Aïcha.
+1. **Admin** → `/admin/affectations` → ouvrir dialogue d'Amadou.
 2. **Choisir** `cible_type=CR_SET` → sélectionner les 3 CR ci-dessus.
 3. **dateDebut=today**, **dateFin=today + 30j**, motif
    « Recette R2 multi-CR temporaire ».
 4. **Cliquer « Ajouter »** → toast succès.
-5. **Déconnexion → connexion Aïcha**.
+5. **Déconnexion → connexion Amadou**.
 6. **Aller sur `/budget/saisie`** → sélecteur CR expose
    **exactement les 3 CR** du set (ni plus, ni moins).
 
@@ -180,7 +186,7 @@ UPDATE user_perimetres
 > Note : `actif` reste `true`. Le filtrage par fenêtre temporelle
 > est appliqué côté `PerimetreService.getCrAutorisesPourUser`.
 
-8. **Reconnexion Aïcha** (ou rafraîchir le token) →
+8. **Reconnexion Amadou** (ou rafraîchir le token) →
    `/budget/saisie` n'expose plus les 3 CR (le set est expiré).
 
 ### Cas négatifs
@@ -194,7 +200,7 @@ UPDATE user_perimetres
 
 ---
 
-## R3 — Délégation nominal complet (Aïcha → Ibrahim)
+## R3 — Délégation nominal complet (Amadou → Ibrahim)
 
 **Objectif** : valider la chaîne complète délégation : création UI
 + email DELEGATION_CREEE → action métier via délégation +
@@ -203,7 +209,7 @@ DELEGATION_REVOQUEE + miroirs désactivés.
 
 ### Pré-requis
 
-- Aïcha (`dir.retail@miznas.local`) — VALIDATEUR avec une
+- Amadou (`dir.retail@miznas.local`) — VALIDATEUR avec une
   affectation native (`STRUCTURE` ou `CR_SET`) sur des CR de la
   branche retail.
 - Ibrahim (`dir.corporate@miznas.local`) — VALIDATEUR mais sans
@@ -211,12 +217,12 @@ DELEGATION_REVOQUEE + miroirs désactivés.
 - Au moins une version budgétaire en statut `soumis` sur un CR
   de la branche retail.
 - Mailhog en écoute sur `localhost:1025` ; `EMAIL_DRY_RUN=false`.
-- Aïcha a bien `notifications_email_actives=true` et
+- Amadou a bien `notifications_email_actives=true` et
   `notifications_email_types=NULL` (défaut).
 
 ### Étapes
 
-1. **Connexion Aïcha** → `/mes-delegations`.
+1. **Connexion Amadou** → `/mes-delegations`.
 2. **Cliquer « Nouvelle délégation »** → `CreerDelegationDialog`
    s'ouvre.
 3. **Choisir** : délégataire = Ibrahim ; périmètre =
@@ -232,7 +238,7 @@ DELEGATION_REVOQUEE + miroirs désactivés.
    - Période : du *today* au *today+7*
    - Le motif
    - Mention « **Anti-chaînage strict (BCEAO)** ».
-6. **Déconnexion Aïcha → connexion Ibrahim**.
+6. **Déconnexion Amadou → connexion Ibrahim**.
 7. **Vérifier le bandeau de délégations actives sur
    `/budget/a-valider`** : « Vous agissez actuellement avec **1**
    délégation(s) active(s) (1 permission(s) distincte(s)). »
@@ -275,13 +281,13 @@ SELECT type_action, payload_apres FROM audit_log
 --   "via_delegation_id": "<id de la délégation R3>"
 ```
 
-11. **Reconnexion Aïcha** → `/mes-delegations` onglet « Émises »
+11. **Reconnexion Amadou** → `/mes-delegations` onglet « Émises »
     → cliquer « Révoquer » sur la délégation R3.
 12. **Saisir motif** « Recette R3 fin du test » → confirmer.
 13. **Vérifier Mailhog** : 1 email à Ibrahim, sujet
     `[MIZNAS] Délégation révoquée`, motif rendu dans le corps.
 14. **Reconnexion Ibrahim** → `/budget/a-valider` n'affiche plus
-    les versions du périmètre d'Aïcha (le miroir est désactivé).
+    les versions du périmètre d'Amadou (le miroir est désactivé).
 
 ### Vérifications SQL post-révocation
 
@@ -300,10 +306,10 @@ SELECT evenement, destinataire_email FROM email_log
 
 ### Cas négatifs
 
-- Ibrahim tente de révoquer la délégation d'Aïcha à sa place :
+- Ibrahim tente de révoquer la délégation d'Amadou à sa place :
   rejet 403 `ForbiddenException` (« Seul le délégant ou un
   administrateur peut révoquer cette délégation. »).
-- Aïcha tente de re-révoquer une délégation déjà inactive :
+- Amadou tente de re-révoquer une délégation déjà inactive :
   rejet 400 `BadRequestException`.
 
 ---
@@ -317,12 +323,12 @@ DELEGATION_EXPIREE.
 ### Pré-requis
 
 - Reprendre une nouvelle délégation A → B avec `dateFin=today`
-  (Aïcha délègue à Ibrahim, période de 0 jour mais valide).
+  (Amadou délègue à Ibrahim, période de 0 jour mais valide).
 - Mailhog allumé, `EMAIL_DRY_RUN=false`.
 
 ### Étapes
 
-1. **Aïcha crée la délégation R4** par UI (`/mes-delegations` →
+1. **Amadou crée la délégation R4** par UI (`/mes-delegations` →
    nouvelle, `dateDebut=today`, `dateFin=today`, motif « R4
    expiration »).
 2. **Email DELEGATION_CREEE reçu côté Mailhog** (cf. R3).
@@ -381,19 +387,20 @@ chaîne s'arrête au délégataire.
 
 ### Pré-requis
 
-- Personas A=Aïcha, B=Ibrahim, C=Fatima
-  (`dga.exploitation@miznas.local`).
-- Aïcha a une affectation native sur un périmètre P.
+- Personas A=Amadou (`dir.retail`, VALIDATEUR), B=Ibrahim
+  (`dir.corporate`, VALIDATEUR), C=Salif
+  (`dga.exploitation@miznas.local`, PUBLICATEUR).
+- Amadou a une affectation native sur un périmètre P.
 - Aucune délégation existante entre A, B et C sur P.
 
 ### Étapes
 
-1. **A → B** : Aïcha crée une délégation `VALIDATION` à Ibrahim sur
+1. **A → B** : Amadou crée une délégation `VALIDATION` à Ibrahim sur
    P (cf. R3 étapes 1-4).
 2. **Connexion Ibrahim**, aller sur `/mes-delegations`, cliquer
    « Nouvelle délégation ».
-3. **Tenter** : délégataire = Fatima ; permission = `VALIDATION` ;
-   périmètre = celui qu'il a reçu d'Aïcha (P, miroir
+3. **Tenter** : délégataire = Salif ; permission = `VALIDATION` ;
+   périmètre = celui qu'il a reçu d'Amadou (P, miroir
    `origine='DELEGATION'`).
 4. **Vérifier l'UI** :
    - Dans la liste « Périmètres à déléguer » du dialogue,
@@ -414,8 +421,8 @@ const res = await fetch('/api/v1/delegations', {
              'Authorization': `Bearer ${localStorage.getItem('budget-store')
                ? JSON.parse(localStorage.getItem('budget-store')).state.accessToken : ''}` },
   body: JSON.stringify({
-    fkDelegataire: '<id Fatima>',
-    perimetreUserPerimetreIds: ['<id du miroir reçu d Aïcha>'],
+    fkDelegataire: '<id Salif>',
+    perimetreUserPerimetreIds: ['<id du miroir reçu d Amadou>'],
     permissions: ['VALIDATION'],
     motif: 'Tentative anti-chaînage R5',
     dateDebut: '2027-01-01',
@@ -465,9 +472,10 @@ SELECT type_action, statut FROM audit_log
 
 ### Pré-requis
 
-- Personas : Amadou (SAISISSEUR), Aïcha (VALIDATEUR), Fatima
-  (PUBLICATEUR), avec leurs affectations natives sur le même
-  périmètre `STRUCTURE_RETAIL`.
+- Personas : Fatima (SAISISSEUR `adj.retail`), Amadou
+  (VALIDATEUR `dir.retail`), Salif (PUBLICATEUR
+  `dga.exploitation`), avec leurs affectations natives sur le
+  même périmètre `STRUCTURE_RETAIL`.
 - Une version budgétaire en statut `ouvert` (Brouillon) avec
   ≥ 1 ligne `fait_budget` saisie sur ce périmètre.
 - Mailhog allumé, `EMAIL_DRY_RUN=false`.
@@ -476,25 +484,25 @@ SELECT type_action, statut FROM audit_log
 
 1. **Vider Mailhog** ou noter l'index actuel pour ne capturer que
    les nouveaux mails.
-2. **Connexion Amadou**, aller sur `/budget/versions`, soumettre
+2. **Connexion Fatima**, aller sur `/budget/versions`, soumettre
    la version (statut → `soumis`, commentaire « Recette R6 »).
-3. **Mailhog : vérifier 1 email `BUDGET_SOUMIS`** vers Aïcha
+3. **Mailhog : vérifier 1 email `BUDGET_SOUMIS`** vers Amadou
    (et tout autre VALIDATEUR concerné par le périmètre).
-4. **Connexion Aïcha**, `/budget/a-valider`, **rejeter** la
+4. **Connexion Amadou**, `/budget/a-valider`, **rejeter** la
    version avec motif « R6 — test rejet ».
-5. **Mailhog : 1 email `BUDGET_REJETE`** vers Amadou avec le
+5. **Mailhog : 1 email `BUDGET_REJETE`** vers Fatima avec le
    motif rendu dans le corps.
-6. **Reconnexion Amadou**, re-soumettre la version (statut
+6. **Reconnexion Fatima**, re-soumettre la version (statut
    `ouvert` → `soumis`).
-7. **Mailhog : 1 nouveau `BUDGET_SOUMIS`** vers Aïcha.
-8. **Connexion Aïcha**, **valider** la version avec commentaire
+7. **Mailhog : 1 nouveau `BUDGET_SOUMIS`** vers Amadou.
+8. **Connexion Amadou**, **valider** la version avec commentaire
    « R6 — OK ».
-9. **Mailhog : 1 email `BUDGET_VALIDE`** vers Amadou (le
-   soumetteur, audit lookup) ET vers Fatima (PUBLICATEUR
+9. **Mailhog : 1 email `BUDGET_VALIDE`** vers Fatima (la
+   soumettrice, audit lookup) ET vers Salif (PUBLICATEUR
    concerné par le périmètre).
-10. **Connexion Fatima**, `/budget/versions`, **publier** la
+10. **Connexion Salif**, `/budget/versions`, **publier** la
     version (commentaire « R6 — gel »).
-11. **Mailhog : 1 email `BUDGET_PUBLIE`** vers Amadou + Aïcha +
+11. **Mailhog : 1 email `BUDGET_PUBLIE`** vers Fatima + Amadou +
     tout SAISISSEUR concerné par le périmètre, avec mention
     « action irréversible » et « conservation 10 ans ».
 
@@ -508,9 +516,9 @@ SELECT evenement, destinataire_email, statut
  ORDER BY id ASC;
 -- attendu : 5 lignes minimum dans cet ordre :
 --   BUDGET_SOUMIS  → vers les VALIDATEUR concernés
---   BUDGET_REJETE  → vers Amadou (soumetteur)
+--   BUDGET_REJETE  → vers Fatima (soumettrice)
 --   BUDGET_SOUMIS  → vers les VALIDATEUR (re-soumission)
---   BUDGET_VALIDE  → vers Amadou + Fatima (PUBLICATEUR)
+--   BUDGET_VALIDE  → vers Fatima + Salif (PUBLICATEUR)
 --   BUDGET_PUBLIE  → vers les parties prenantes du périmètre
 ```
 
@@ -530,7 +538,7 @@ SELECT type_action, COUNT(*) FROM audit_log
   émis.
 - Soumettre une version déjà `soumis` : rejet 409
   `ConflictException`.
-- Tenter de valider en tant qu'Amadou (SAISISSEUR sans
+- Tenter de valider en tant que Fatima (SAISISSEUR sans
   `BUDGET.VALIDER`) : rejet 403 `PermissionsGuard`.
 
 ---
@@ -553,7 +561,7 @@ reste systématique** (audit BCEAO).
 #### Étapes
 
 1. **Vider Mailhog**.
-2. **Refaire l'étape R6.2** (Amadou soumet une version).
+2. **Refaire l'étape R6.2** (Fatima soumet une version).
 3. **Mailhog : vide** — aucun email n'est arrivé.
 
 #### Vérification SQL
@@ -575,7 +583,7 @@ SELECT evenement, destinataire_email, statut, payload->>'_motifSuppression' AS m
 
 #### Étapes
 
-4. **Connexion Aïcha** (qui doit recevoir `BUDGET_SOUMIS`).
+4. **Connexion Amadou** (qui doit recevoir `BUDGET_SOUMIS`).
 5. **Aller sur `/me/preferences`** (via dropdown utilisateur
    « Mes préférences »).
 6. **Décocher le toggle global** « Recevoir les notifications par
@@ -589,9 +597,9 @@ SELECT email, notifications_email_actives, notifications_email_types
 -- attendu : actives=false, types=NULL
 ```
 
-8. **Reconnexion Amadou**, soumettre une nouvelle version sur le
+8. **Reconnexion Fatima**, soumettre une nouvelle version sur le
    même périmètre.
-9. **Mailhog** : aucun email pour Aïcha (les autres VALIDATEUR
+9. **Mailhog** : aucun email pour Amadou (les autres VALIDATEUR
    reçoivent bien leur copie).
 
 #### Vérification SQL
@@ -601,15 +609,15 @@ SELECT destinataire_email, statut, payload->>'_motifSuppression'
   FROM email_log
  WHERE evenement='BUDGET_SOUMIS' AND date_creation > NOW() - INTERVAL '2 minutes'
  ORDER BY id DESC;
--- attendu : 1 ligne pour Aïcha en SUPPRIME / motif='PREF_TOGGLE_GLOBAL_OFF'
+-- attendu : 1 ligne pour Amadou en SUPPRIME / motif='PREF_TOGGLE_GLOBAL_OFF'
 --           autres VALIDATEUR en ENVOYE
 ```
 
 10. **Variante liste blanche** : sur `/me/preferences`, réactiver
     le toggle global et **décocher uniquement BUDGET_SOUMIS** dans
     la grille des 8 types → enregistrer.
-11. **Re-soumettre** une version → Aïcha reçoit toujours pas de
-    BUDGET_SOUMIS, mais elle recevrait les autres types
+11. **Re-soumettre** une version → Amadou reçoit toujours pas de
+    BUDGET_SOUMIS, mais il recevrait les autres types
     (BUDGET_VALIDE/BUDGET_PUBLIE/délégations…).
 
 ```sql

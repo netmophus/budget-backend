@@ -58,16 +58,23 @@
   `http://localhost:8025`) — alternative : `EMAIL_DRY_RUN=true` selon le scénario.
 - **Personas BSIC seedés** (cf. migrations 048 et 050) :
 
-  | Email | Rôle métier | Mot de passe seed |
-  |-------|-------------|-------------------|
-  | `admin@miznas.local` | ADMIN | défini par `SEED_ADMIN_PASSWORD` |
-  | `lecteur@miznas.local` | LECTEUR | `ChangeMe!2026` |
-  | `adj.retail@miznas.local` (Amadou) | SAISISSEUR | `ChangeMe!2026` |
-  | `dir.retail@miznas.local` (Aïcha) | VALIDATEUR | `ChangeMe!2026` |
-  | `dir.corporate@miznas.local` (Ibrahim) | VALIDATEUR | `ChangeMe!2026` |
-  | `controleur.gestion@miznas.local` | VALIDATEUR | `ChangeMe!2026` |
-  | `dga.exploitation@miznas.local` (Fatima) | PUBLICATEUR | `ChangeMe!2026` |
-  | `auditeur@miznas.local` | AUDITEUR | `ChangeMe!2026` |
+  | Email | Prénom | Rôle métier | Mot de passe seed |
+  |-------|--------|-------------|-------------------|
+  | `admin@miznas.local` | Admin MIZNAS | ADMIN | défini par `SEED_ADMIN_PASSWORD` (fallback dev : `ChangeMe!2026`) |
+  | `lecteur@miznas.local` | Lecteur Test | LECTEUR | défini par `SEED_LECTEUR_PASSWORD` (fallback dev : `Lecteur!2026`) |
+  | `adj.retail@miznas.local` | Fatima | SAISISSEUR | `MiznasTest!2026` |
+  | `dir.retail@miznas.local` | Amadou | VALIDATEUR | `MiznasTest!2026` |
+  | `dir.corporate@miznas.local` | Ibrahim | VALIDATEUR | `MiznasTest!2026` |
+  | `controleur.gestion@miznas.local` | Aïcha | VALIDATEUR | `MiznasTest!2026` |
+  | `auditeur@miznas.local` | Moussa | AUDITEUR | `MiznasTest!2026` |
+  | `dga.exploitation@miznas.local` | Salif | PUBLICATEUR | `MiznasTest!2026` |
+
+  > ⚠️ **Sécurité 1er déploiement** : les 6 personas BSIC ont **tous le
+  > même mot de passe seed `MiznasTest!2026`** (hash bcrypt fixe dans
+  > la migration `1779200000090-AjouterPersonasBSIC.ts`). Ces comptes
+  > sont des **profils de smoke test** — ils doivent être **désactivés
+  > ou avoir leurs mots de passe rotés** avant tout usage non-test en
+  > pré-prod / production.
 
 ### 0.2 Données de référence (à vérifier dans l'instance BSIC)
 
@@ -181,12 +188,13 @@ Lot 5.1.
 - Au moins 1 ligne `fait_budget` sur le compte `701100` (Commissions de tenue
   de compte) en mars 2027 sur `CR_AG_ABJ_PLATEAU` pour la version
   `BUDGET_INITIAL_2027`.
-- Aïcha (`dir.retail@miznas.local`) a `REALISE.SAISIR` + `REALISE.VALIDER`
-  (rôle VALIDATEUR — cf. Lot 5.1 seed `bridge_role_permission`).
+- Amadou (`dir.retail@miznas.local`, VALIDATEUR) a `REALISE.VALIDER` (rôle
+  VALIDATEUR — cf. Lot 5.1 seed `bridge_role_permission`). Fatima
+  (`adj.retail@miznas.local`, SAISISSEUR) a `REALISE.SAISIR`.
 
 ### Étapes
 
-1. **Connexion Amadou** (`adj.retail`, SAISISSEUR).
+1. **Connexion Fatima** (`adj.retail`, SAISISSEUR).
 2. Aller sur `/realise/saisie`.
 3. Sélectionner `CR=CR_AG_ABJ_PLATEAU`, mois début = 2027-01, mois fin =
    2027-03, devise = `XOF`.
@@ -198,9 +206,9 @@ Lot 5.1.
    initiale ».
 7. Cliquer **« Enregistrer »**. Toast succès. La grille affiche la nouvelle
    ligne en statut `IMPORTE` (badge ambre).
-8. **Déconnexion** Amadou. **Connexion** Aïcha (`dir.retail`).
+8. **Déconnexion** Fatima. **Connexion** Amadou (`dir.retail`).
 9. Aller sur `/realise/saisie`, mêmes filtres.
-10. La grille montre la ligne saisie par Amadou (statut `IMPORTE`).
+10. La grille montre la ligne saisie par Fatima (statut `IMPORTE`).
 11. Cocher la ligne, cliquer **« Valider la sélection »**.
 12. Dialogue de validation : récap « 1 ligne(s) seront validées » + ligne
     « 701100 — Commissions de tenue de compte : 1 ligne(s) ».
@@ -225,7 +233,7 @@ SELECT fr.id, fr.statut, fr.montant, fr.valide_le,
          SELECT id FROM dim_temps WHERE date='2027-03-01' AND jour=1);
 -- Attendu : statut=VALIDE, valide_par='dir.retail@miznas.local'
 
--- 2 lignes audit (saisie par Amadou + validation par Aïcha)
+-- 2 lignes audit (saisie par Fatima + validation par Amadou)
 SELECT type_action, utilisateur, date_action
   FROM audit_log
  WHERE entite_cible='fait_realise'
@@ -236,17 +244,17 @@ SELECT type_action, utilisateur, date_action
 
 ### Cas négatifs
 
-- **Tentative `DELETE`** côté Aïcha sur la ligne `VALIDE` → 422
+- **Tentative `DELETE`** côté Amadou sur la ligne `VALIDE` → 422
   (statut=VALIDE non supprimable, `REALISE.SUPPRIMER` ne suffit pas une
   fois la ligne validée).
-- **Amadou tente de valider sa propre ligne** → bouton « Valider la
+- **Fatima tente de valider sa propre ligne** → bouton « Valider la
   sélection » non visible (pas de `REALISE.VALIDER` pour SAISISSEUR).
 
 ### Critères de validation finale ✅
 
-- [ ] La ligne saisie par Amadou apparaît en statut `IMPORTE` puis `VALIDE`
+- [ ] La ligne saisie par Fatima apparaît en statut `IMPORTE` puis `VALIDE`
 - [ ] Audit `SAISIR_REALISE` + `VALIDER_REALISE` distincts (2 utilisateurs)
-- [ ] `fk_valide_par` pointe sur l'id d'Aïcha
+- [ ] `fk_valide_par` pointe sur l'id d'Amadou (`dir.retail`)
 - [ ] Les cas négatifs renvoient bien 422 / bouton caché
 
 ---
@@ -265,7 +273,7 @@ détaillé (lignes OK / KO + raisons). Lot 5.1.B.
 
 ### Étapes
 
-1. **Connexion Amadou** (`adj.retail`, SAISISSEUR).
+1. **Connexion Fatima** (`adj.retail`, SAISISSEUR).
 2. Aller sur `/realise/saisie`.
 3. Cliquer **« Importer »**. Dialogue d'import s'ouvre.
 4. Glisser-déposer le fichier `realise-2027-q1.xlsx`.
@@ -278,7 +286,7 @@ détaillé (lignes OK / KO + raisons). Lot 5.1.B.
 ### Vérifications SQL
 
 ```sql
--- 50 nouvelles lignes IMPORTE par Amadou
+-- 50 nouvelles lignes IMPORTE par Fatima
 SELECT statut, source, COUNT(*)
   FROM fait_realise
  WHERE source='IMPORT'
@@ -297,9 +305,9 @@ SELECT type_action, payload_apres
 
 ### Cas négatifs
 
-- **Fichier hors-périmètre** (CR auquel Amadou n'a pas accès) → ligne
+- **Fichier hors-périmètre** (CR auquel Fatima n'a pas accès) → ligne
   rejetée avec motif « périmètre interdit ».
-- **Aïcha** (VALIDATEUR sans `REALISE.IMPORTER` natif) → bouton
+- **Amadou** (VALIDATEUR sans `REALISE.IMPORTER` natif) → bouton
   « Importer » non visible (sauf si délégation reçue).
 
 ### Critères de validation finale ✅
@@ -476,8 +484,8 @@ SELECT
   réalisé validé sur le trimestre T1 2027, impossible de lancer le
   reforecast. »
 - **Trimestre 5** → 400 (validation DTO).
-- **Aïcha** sans `BUDGET.REFORECAST_LANCER` → 403 sur
-  `POST /api/v1/reforecast/lancer`.
+- **Amadou** (`dir.retail`, VALIDATEUR sans `BUDGET.REFORECAST_LANCER`) →
+  403 sur `POST /api/v1/reforecast/lancer`.
 
 ### Critères de validation finale ✅
 
@@ -505,7 +513,7 @@ SELECT
 2. Aller sur `/reforecast/:id` du R4. Statut `Brouillon`.
 3. Cliquer **« Soumettre »**. Toast « Soumission effectuée. ». Statut passe
    à `Soumis`.
-4. **Déconnexion**, **connexion Aïcha** (`dir.retail`, VALIDATEUR).
+4. **Déconnexion**, **connexion Amadou** (`dir.retail`, VALIDATEUR).
 5. Aller sur `/reforecast/:id`. Boutons **« Valider »** et **« Rejeter »**
    visibles.
 6. Cliquer **« Rejeter »**. Dialogue motif. Saisir « Méthode incorrecte —
@@ -520,8 +528,8 @@ SELECT
 11. Cliquer **« Lancer le reforecast »**. Le précédent reforecast est marqué
     `OBSOLETE`. Le nouveau est créé en `Brouillon` `ACTIVE`.
 12. Sur le nouveau reforecast, cliquer **« Soumettre »** (statut `Soumis`).
-13. **Connexion Aïcha**, valider le nouveau reforecast (statut `Validé`).
-14. **Déconnexion**, **connexion Fatima** (`dga.exploitation`,
+13. **Connexion Amadou**, valider le nouveau reforecast (statut `Validé`).
+14. **Déconnexion**, **connexion Salif** (`dga.exploitation`,
     PUBLICATEUR).
 15. Aller sur `/reforecast/:id` du nouveau reforecast. Bouton **« Publier »**.
 16. Cliquer **« Publier »**. Toast. Statut `Publié`. Banner vert « Reforecast
@@ -644,12 +652,13 @@ l'ensemble des modules Exécution. Lots 5.1, 5.2, 5.3.
 ### Pré-requis
 
 - Tous les personas seedés et actifs.
-- Amadou affecté à `STRUCTURE_RETAIL` uniquement (cf. R1 du Lot 4 archivé).
-- Auditeur sans aucun périmètre actif.
+- Fatima (`adj.retail`, SAISISSEUR) affectée à `STRUCTURE_RETAIL`
+  uniquement (cf. R1 du Lot 4 archivé).
+- Moussa (`auditeur`, AUDITEUR) sans aucun périmètre actif.
 
 ### Étapes
 
-1. **Connexion auditeur**.
+1. **Connexion Moussa** (`auditeur`).
 2. Sidebar : voit « Saisie réalisé » (`REALISE.LIRE` ✓), « Tableau de bord »
    (`REALISE.LIRE` ✓), « Reforecasts » (`BUDGET.LIRE` ✓).
 3. `/realise/saisie` : grille accessible mais aucun bouton « Nouvelle
@@ -659,19 +668,19 @@ l'ensemble des modules Exécution. Lots 5.1, 5.2, 5.3.
 5. `/reforecast` : accès en lecture, **pas de bouton « Lancer »** (pas de
    `BUDGET.REFORECAST_LANCER`).
 6. `/reforecast/:id` d'un Brouillon : aucun bouton workflow.
-7. **Déconnexion**, **connexion Amadou** (SAISISSEUR).
+7. **Déconnexion**, **connexion Fatima** (`adj.retail`, SAISISSEUR).
 8. `/realise/saisie` : grille filtrée sur les CR de `STRUCTURE_RETAIL`
    uniquement (pas les autres structures).
 9. Boutons « Nouvelle ligne » + « Importer » visibles. Pas de « Valider »
    (pas `REALISE.VALIDER`).
 10. `/reforecast` : accessible en lecture, pas de bouton « Lancer ».
-11. `/reforecast/:id` Brouillon : bouton **« Soumettre »** visible (Amadou
+11. `/reforecast/:id` Brouillon : bouton **« Soumettre »** visible (Fatima
     a `BUDGET.SOUMETTRE`). Pas de « Valider » ni « Publier ».
 
 ### Vérifications SQL
 
 ```sql
--- Périmètre Amadou (filtrage écriture réalisé)
+-- Périmètre Fatima (filtrage écriture réalisé)
 SELECT cible_type, cible_id, origine, actif
   FROM user_perimetres
  WHERE fk_user = (SELECT id FROM "user" WHERE email='adj.retail@miznas.local')
@@ -694,14 +703,14 @@ SELECT p.code_permission
 
 ### Cas négatifs
 
-- **Amadou tente de saisir sur un CR hors `STRUCTURE_RETAIL`** via l'API
+- **Fatima tente de saisir sur un CR hors `STRUCTURE_RETAIL`** via l'API
   directement → 403 « périmètre interdit ».
-- **Auditeur tente `POST /api/v1/reforecast/lancer`** → 403.
+- **Moussa (`auditeur`) tente `POST /api/v1/reforecast/lancer`** → 403.
 
 ### Critères de validation finale ✅
 
-- [ ] L'auditeur voit la sidebar mais n'a aucun bouton d'écriture
-- [ ] Amadou ne voit que les CR de sa structure
+- [ ] Moussa (`auditeur`) voit la sidebar mais n'a aucun bouton d'écriture
+- [ ] Fatima ne voit que les CR de sa structure
 - [ ] Les permissions auditeur en SQL sont **exactement** les 8 LIRE attendues
 - [ ] Les 2 cas négatifs renvoient 403
 
@@ -761,7 +770,7 @@ stats opérationnel). Lot 6.3.
    - **HTTP 200** (et non 503 — l'app reste répondante, décision produit
      « MIZNAS reste utilisable même sans emails »).
    - `status: "degraded"`, `redis.status: "down"`.
-6. Tenter une action qui déclenche un email (ex : Amadou soumet une
+6. Tenter une action qui déclenche un email (ex : Fatima soumet une
    version via R6 archivée Lot 4, ou créer une délégation R3 archivée).
    L'action métier passe ; la ligne `email_log` reste en statut
    `EN_ATTENTE`.
@@ -828,7 +837,8 @@ Lots 6.4.A + 6.4.C.2 + 6.7.1.
 ### Pré-requis
 
 - Admin connectable.
-- Un user de test (ex : `auditeur@miznas.local`, `ChangeMe!2026`).
+- Un user de test (ex : Moussa `auditeur@miznas.local`, mdp seed
+  `MiznasTest!2026`).
 - Mailhog allumé (l'email reset admin partira par la queue).
 - `MDP_DUREE_VALIDITE_JOURS=90` (défaut).
 - `LOGIN_RATE_LIMIT_DISABLED=false` (mais prévoir une marge entre les
@@ -849,7 +859,7 @@ Lots 6.4.A + 6.4.C.2 + 6.7.1.
    -- Attendu : doit_changer_mdp=true, date_expiration_mdp inchangée
    ```
 4. **Déconnexion admin**.
-5. **Connexion auditeur** avec son mdp habituel (`ChangeMe!2026`).
+5. **Connexion Moussa** avec son mdp habituel (`MiznasTest!2026`).
 6. Redirection automatique vers `/change-mdp` (via `ProtectedRoute`
    étendu Lot 6.4.C.2).
 7. La page affiche : titre « Vous devez changer votre mot de passe »,
@@ -857,7 +867,7 @@ Lots 6.4.A + 6.4.C.2 + 6.7.1.
    passe. ».
 8. **Bouton « Plus tard » : CACHÉ** ✅ (sécurité).
 9. Footer texte : « Changement obligatoire ».
-10. Saisir ancien=`ChangeMe!2026`, nouveau=`NouveauMdp!2026A`,
+10. Saisir ancien=`MiznasTest!2026`, nouveau=`NouveauMdp!2026A`,
     confirmation=identique. Submit.
 11. Toast succès. Tokens renouvelés sans flag. Redirect vers `/dashboard`.
 
@@ -1321,7 +1331,8 @@ garantie par l'UPDATE post-publication, respect opt-out user. Lot 6.5.B.
 
 ### Pré-requis
 
-- 2 personas distincts (ex : Aïcha délégant + Ibrahim délégataire).
+- 2 personas distincts (ex : Aïcha `controleur.gestion` délégant +
+  Ibrahim `dir.corporate` délégataire — tous 2 VALIDATEUR).
 - Mailhog allumé. `EMAIL_DRY_RUN=false`.
 - `notifications_email_actives=true` sur les 2 users (défaut).
 - Au moins une délégation active créée (cf. R3 Lot 4 archivé) avec
@@ -1332,8 +1343,9 @@ garantie par l'UPDATE post-publication, respect opt-out user. Lot 6.5.B.
 
 1. Créer une délégation A → B (cf. R3 Lot 4 archivé) avec `dateFin =
    today + 3j` :
-   - Connexion Aïcha → `/mes-delegations` → « Nouvelle délégation » →
-     délégataire = Ibrahim, période courte avec `dateFin = today + 3j`.
+   - Connexion Aïcha (`controleur.gestion`) → `/mes-delegations` →
+     « Nouvelle délégation » → délégataire = Ibrahim (`dir.corporate`),
+     période courte avec `dateFin = today + 3j`.
 2. **Vérification SQL** :
    ```sql
    SELECT id, fk_delegant, fk_delegataire, date_fin, actif,
@@ -1350,9 +1362,9 @@ garantie par l'UPDATE post-publication, respect opt-out user. Lot 6.5.B.
    - Option (b) : attendre 06:00 UTC (cron `@Cron('0 6 * * *', { name:
      'delegations-rappel-j3' })`).
 4. **Vérifier Mailhog** : 2 nouveaux emails :
-   - À `dir.retail@miznas.local` (délégant) avec template
-     `delegation-rappel-delegant`, lien `/admin/delegations`.
-   - À `dir.corporate@miznas.local` (délégataire) avec template
+   - À `controleur.gestion@miznas.local` (Aïcha — délégante) avec
+     template `delegation-rappel-delegant`, lien `/admin/delegations`.
+   - À `dir.corporate@miznas.local` (Ibrahim — délégataire) avec template
      `delegation-rappel-delegataire`, lien `/mes-delegations`.
 
 #### Idempotence
@@ -1440,7 +1452,7 @@ Lot 6.7.2.
 ### Pré-requis
 
 - Admin connectable.
-- Aïcha (`dir.retail`) connectable.
+- Aïcha (`controleur.gestion@miznas.local`, VALIDATEUR) connectable.
 - Au moins 1 délégation existante (cf. R13 ou R3 archivé).
 - `TooltipProvider` racine actif (`delayDuration={200}` côté `App.tsx`).
 
