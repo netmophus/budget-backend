@@ -16,6 +16,7 @@ import { BudgetImportController } from './controllers/budget-import.controller';
 import { IndicateursController } from './controllers/indicateurs.controller';
 import { BudgetImportService } from './services/budget-import.service';
 import { BudgetSaisieService } from './services/budget-saisie.service';
+import { IndicateursHomeService } from './services/indicateurs-home.service';
 import { IndicateursService } from './services/indicateurs.service';
 import { PerimetreService } from './services/perimetre.service';
 
@@ -55,12 +56,14 @@ import { PerimetreService } from './services/perimetre.service';
     PerimetreService,
     BudgetSaisieService,
     IndicateursService,
+    IndicateursHomeService,
     BudgetImportService,
   ],
   exports: [
     PerimetreService,
     BudgetSaisieService,
     IndicateursService,
+    IndicateursHomeService,
     BudgetImportService,
   ],
 })

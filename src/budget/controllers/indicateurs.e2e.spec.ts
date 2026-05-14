@@ -523,4 +523,60 @@ describe('IndicateursController (e2e)', () => {
       .set('Authorization', `Bearer ${lecteurToken}`)
       .expect(200);
   });
+
+  // ─── Lot 7.2 — endpoint home (KPI page d'accueil) ─────────────────
+  describe('GET /indicateurs/home (Lot 7.2)', () => {
+    beforeEach(async () => {
+      // État initial avant chaque test : la version seedée BI_2027
+      // est en `ouvert`, donc inéligible — chaque test repart de là.
+      await dataSource.query(
+        `UPDATE dim_version
+            SET statut = 'ouvert',
+                date_gel = NULL
+          WHERE code_version = 'BI_2027'`,
+      );
+    });
+
+    it('sans token → 401', async () => {
+      await request(app.getHttpServer())
+        .get('/api/v1/budget/indicateurs/home')
+        .expect(401);
+    });
+
+    it("admin + version 'gele' → defauts + indicateurs renseignés", async () => {
+      await dataSource.query(
+        `UPDATE dim_version
+            SET statut = 'gele',
+                date_gel = '2026-05-13T10:00:00Z'
+          WHERE code_version = 'BI_2027'`,
+      );
+
+      const res = await request(app.getHttpServer())
+        .get('/api/v1/budget/indicateurs/home')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .expect(200);
+
+      expect(res.body.defauts).toMatchObject({
+        codeVersion: 'BI_2027',
+        codeScenario: 'MEDIAN_2027',
+        exerciceFiscal: 2027,
+      });
+      // Délégation à IndicateursService → mêmes sommes que le test
+      // GET /globaux ci-dessus pour le triplet (BI_2027, MEDIAN, 2027) :
+      // PNB = (100-20) + (50-10) = 120, 2 CR inclus.
+      expect(Number(res.body.indicateurs.pnb)).toBe(120);
+      expect(res.body.indicateurs.nbCrInclus).toBe(2);
+    });
+
+    it('aucune version éligible → defauts:null + indicateurs:null (200)', async () => {
+      // BI_2027 reste 'ouvert' (beforeEach), aucune autre version
+      // seedée → cascade gele/valide/soumis ne trouve rien.
+      const res = await request(app.getHttpServer())
+        .get('/api/v1/budget/indicateurs/home')
+        .set('Authorization', `Bearer ${lecteurToken}`)
+        .expect(200);
+
+      expect(res.body).toEqual({ defauts: null, indicateurs: null });
+    });
+  });
 });

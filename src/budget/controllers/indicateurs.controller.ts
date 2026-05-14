@@ -25,6 +25,7 @@ import {
 import { CurrentUser } from '../../auth/decorators/current-user.decorator';
 import type { AuthUser } from '../../auth/decorators/current-user.decorator';
 import { RequirePermissions } from '../../auth/decorators/require-permissions.decorator';
+import { IndicateursHomeDto } from '../dto/indicateurs-home.dto';
 import {
   IndicateursComparaisonDto,
   IndicateursComparaisonFiltersDto,
@@ -33,13 +34,44 @@ import {
   IndicateursParCrDto,
   RefreshIndicateursResponseDto,
 } from '../dto/indicateurs.dto';
+import { IndicateursHomeService } from '../services/indicateurs-home.service';
 import { IndicateursService } from '../services/indicateurs.service';
 
 @ApiTags('budget-indicateurs')
 @ApiBearerAuth()
 @Controller('budget/indicateurs')
 export class IndicateursController {
-  constructor(private readonly service: IndicateursService) {}
+  constructor(
+    private readonly service: IndicateursService,
+    private readonly homeService: IndicateursHomeService,
+  ) {}
+
+  /**
+   * Endpoint dédié à la bande KPI de la page d'accueil (Lot 7.2).
+   * Résout automatiquement le triplet (version / scénario / exercice) :
+   *  - Version : la plus récente en `gele`, fallback `valide`, puis
+   *    `soumis` (statutPublication = 'ACTIVE' uniquement).
+   *  - Scénario : le scénario `central` `actif` rattaché à l'exercice
+   *    de la version retenue (fallback héritage Lot 2.4 sur les
+   *    scénarios sans exerciceFiscal).
+   *  - Indicateurs calculés via `IndicateursService` avec filtrage
+   *    périmètre Q5.
+   *
+   * Renvoie `{ defauts: null, indicateurs: null }` (200 OK) si aucune
+   * version éligible — le frontend affiche un état vide propre.
+   */
+  @Get('home')
+  @RequirePermissions('BUDGET.LIRE')
+  @ApiOperation({
+    summary:
+      "KPI par défaut pour la page d'accueil — résout automatiquement " +
+      'la dernière version éligible, son scénario central, et calcule ' +
+      'les indicateurs globaux pour ce triplet.',
+  })
+  @ApiOkResponse({ type: IndicateursHomeDto })
+  getHome(@CurrentUser() user: AuthUser): Promise<IndicateursHomeDto> {
+    return this.homeService.getHome(user);
+  }
 
   @Get('globaux')
   @RequirePermissions('BUDGET.LIRE')
