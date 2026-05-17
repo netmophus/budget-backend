@@ -13,18 +13,33 @@ import { OnEvent } from '@nestjs/event-emitter';
 import {
   type AffectationEventPayload,
   type BudgetEventPayload,
+  type CampagneOuverteEventPayload,
   type DelegationEventPayload,
   EVENT_AFFECTATION_CREATED,
   EVENT_BUDGET_PUBLISHED,
   EVENT_BUDGET_REJECTED,
   EVENT_BUDGET_SUBMITTED,
   EVENT_BUDGET_VALIDATED,
+  EVENT_CAMPAGNE_OUVERTE,
   EVENT_DELEGATION_CREATED,
   EVENT_DELEGATION_EXPIRED,
   EVENT_DELEGATION_REVOKED,
 } from './notifications.events';
 import { NotificationsService } from './notifications.service';
 import type { TypeEvenement } from './entities/email-log.entity';
+
+/**
+ * Formate une date ISO en "dd/MM/yyyy" pour affichage humain dans
+ * les templates email (Lot 6.6 — campagne ouverte). Renvoie la chaîne
+ * brute si parsing échoue (sécurité : on n'embête pas l'utilisateur
+ * avec "Invalid Date" dans un email).
+ */
+function formatDateFr(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  const pad = (n: number): string => String(n).padStart(2, '0');
+  return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`;
+}
 
 @Injectable()
 export class NotificationsListeners {
@@ -132,6 +147,44 @@ export class NotificationsListeners {
     } catch (err) {
       this.logger.error(
         `Erreur notification ${evenement} : ${
+          err instanceof Error ? err.message : String(err)
+        }`,
+      );
+    }
+  }
+
+  // ─── Campagne budgétaire (Lot 6.6 — E14) ────────────────────────
+
+  @OnEvent(EVENT_CAMPAGNE_OUVERTE, { async: true })
+  async onCampagneOuverte(payload: CampagneOuverteEventPayload): Promise<void> {
+    try {
+      const destinataires = await this.notifs.resoudreDestinataires(
+        'CAMPAGNE_OUVERTE',
+        {
+          budgetVersionId: payload.versionId,
+          auteurId: payload.auteurId,
+          auteurEmail: payload.auteurEmail,
+        },
+      );
+      // Formatage humain des dates côté listener — l'événement reste
+      // neutre en ISO. Le template Handlebars affiche directement les
+      // chaînes "dd/MM/yyyy".
+      const dateOuvertureFmt = formatDateFr(payload.dateOuverture);
+      const dateFermetureFmt = formatDateFr(payload.dateFermeture);
+      for (const d of destinataires) {
+        await this.notifs.envoyer('CAMPAGNE_OUVERTE', d, {
+          versionId: payload.versionId,
+          codeVersion: payload.codeVersion,
+          auteurEmail: payload.auteurEmail,
+          dateOuverture: dateOuvertureFmt,
+          dateFermeture: dateFermetureFmt,
+          commentaire: payload.commentaire ?? null,
+          lien_action: '/saisie-budgetaire',
+        });
+      }
+    } catch (err) {
+      this.logger.error(
+        `Erreur notification CAMPAGNE_OUVERTE : ${
           err instanceof Error ? err.message : String(err)
         }`,
       );

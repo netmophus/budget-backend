@@ -29,6 +29,7 @@ import {
   EVENT_BUDGET_REJECTED,
   EVENT_BUDGET_SUBMITTED,
   EVENT_BUDGET_VALIDATED,
+  EVENT_CAMPAGNE_OUVERTE,
   EVENT_DELEGATION_CREATED,
   EVENT_DELEGATION_EXPIRED,
   EVENT_DELEGATION_REVOKED,
@@ -156,6 +157,7 @@ describe('Notifications — intégration listener (Lot 4.3)', () => {
     events.on(EVENT_AFFECTATION_CREATED, (p) =>
       listeners.onAffectationCreated(p),
     );
+    events.on(EVENT_CAMPAGNE_OUVERTE, (p) => listeners.onCampagneOuverte(p));
     /* eslint-enable @typescript-eslint/no-misused-promises */
   }
 
@@ -367,5 +369,50 @@ describe('Notifications — intégration listener (Lot 4.3)', () => {
     const logs = await ds.getRepository(EmailLog).find();
     expect(logs).toHaveLength(1);
     expect(logs[0]!.payload.motifRevocation).toBe('Retour anticipé');
+  });
+
+  // ─── 9. campagne.ouverte (Lot 6.6 — E14) ────────────────────────
+
+  it('campagne.ouverte → email_log CAMPAGNE_OUVERTE pour saisisseurs + validateurs dédupliqués, auteur exclu', async () => {
+    const auteur = await seedUser(ds, 'auteur@miznas.local');
+    const sais = await seedUser(ds, 'sais@miznas.local');
+    const valid = await seedUser(ds, 'valid@miznas.local');
+    const hybride = await seedUser(ds, 'hybride@miznas.local');
+    setupAvecPerms({
+      [sais.id]: ['BUDGET.SAISIR'],
+      [valid.id]: ['BUDGET.VALIDER'],
+      [hybride.id]: ['BUDGET.SAISIR', 'BUDGET.VALIDER'],
+      [auteur.id]: ['BUDGET.SAISIR', 'BUDGET.VALIDER'],
+    });
+
+    await events.emitAsync(EVENT_CAMPAGNE_OUVERTE, {
+      versionId: '42',
+      codeVersion: 'BUDGET_INITIAL_2027',
+      auteurId: auteur.id,
+      auteurEmail: auteur.email,
+      dateOuverture: '2026-08-01T00:00:00.000Z',
+      dateFermeture: '2026-10-31T00:00:00.000Z',
+      commentaire: 'Lettre DG 07/07/2026',
+    });
+    await attendreLogs();
+
+    const logs = await ds.getRepository(EmailLog).find();
+    expect(logs).toHaveLength(3);
+    const emails = logs.map((l) => l.destinataireEmail).sort();
+    expect(emails).toEqual([
+      'hybride@miznas.local',
+      'sais@miznas.local',
+      'valid@miznas.local',
+    ]);
+    expect(emails).not.toContain('auteur@miznas.local');
+    for (const log of logs) {
+      expect(log.evenement).toBe('CAMPAGNE_OUVERTE');
+      expect(log.payload.codeVersion).toBe('BUDGET_INITIAL_2027');
+      // Dates formatées humainement par le listener avant envoyer().
+      expect(log.payload.dateOuverture).toBe('01/08/2026');
+      expect(log.payload.dateFermeture).toBe('31/10/2026');
+      expect(log.payload.lien_action).toBe('/saisie-budgetaire');
+      expect(log.payload.commentaire).toBe('Lettre DG 07/07/2026');
+    }
   });
 });

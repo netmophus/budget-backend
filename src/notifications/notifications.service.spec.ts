@@ -401,6 +401,38 @@ describe('NotificationsService', () => {
       });
       expect(r.map((x) => x.email)).toEqual(['newbie@miznas.local']);
     });
+
+    it('E14 CAMPAGNE_OUVERTE → union saisisseurs + validateurs, dédupliqués, auteur exclu', async () => {
+      const auteur = await seedUser(ds, 'auteur@miznas.local');
+      const sais = await seedUser(ds, 'sais@miznas.local');
+      const valid = await seedUser(ds, 'valid@miznas.local');
+      const hybride = await seedUser(ds, 'hybride@miznas.local'); // saisir + valider → 1 seule fois
+      await seedUser(ds, 'autre@miznas.local'); // sans permission → exclu
+      service = new NotificationsService(
+        ds.getRepository(EmailLog),
+        ds.getRepository(User),
+        makeConfig({ EMAIL_DRY_RUN: 'true' }),
+        makePermsMock({
+          [sais.id]: ['BUDGET.SAISIR'],
+          [valid.id]: ['BUDGET.VALIDER'],
+          [hybride.id]: ['BUDGET.SAISIR', 'BUDGET.VALIDER'],
+          [auteur.id]: ['BUDGET.SAISIR', 'BUDGET.VALIDER'], // auteur exclu malgré les perms
+        }),
+        makeQueueMock(),
+      );
+      const r = await service.resoudreDestinataires('CAMPAGNE_OUVERTE', {
+        budgetVersionId: '42',
+        auteurId: auteur.id,
+      });
+      const emails = r.map((u) => u.email).sort();
+      expect(emails).toEqual([
+        'hybride@miznas.local',
+        'sais@miznas.local',
+        'valid@miznas.local',
+      ]);
+      expect(emails).not.toContain('auteur@miznas.local');
+      expect(emails).not.toContain('autre@miznas.local');
+    });
   });
 
   // ─── rejouer() ────────────────────────────────────────────────────
