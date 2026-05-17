@@ -54,3 +54,13 @@ pids
 
 # Diagnostic reports (https://nodejs.org/api/report.html)
 report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
+
+# === Scripts de peuplement client (non versionnés) ===
+admin_backup.json
+gl_bsic_*.json
+reset-miznas*.js
+import-*-bsic.js
+import-*-bsic.txt
+complete-dimensions-bsic.js
+import-version-*.js
+*.DEPRECATED.txt

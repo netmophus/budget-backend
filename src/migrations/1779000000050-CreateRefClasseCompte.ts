@@ -59,13 +59,13 @@ const SEEDS: RefSecondaireSeed[] = [
   },
   {
     code: '8',
-    libelle: 'Hors bilan',
+    libelle: 'Comptabilité analytique',
     ordre: 80,
     estSysteme: true,
   },
   {
     code: '9',
-    libelle: 'Comptabilité analytique',
+    libelle: 'Hors bilan',
     ordre: 90,
     estSysteme: true,
   },
