@@ -85,6 +85,7 @@ const SUJETS: Record<TypeEvenement, string> = {
     '[MIZNAS] Votre délégation expire dans 3 jours',
   DELEGATION_RAPPEL_J3_DELEGATAIRE:
     '[MIZNAS] Délégation reçue : expiration dans 3 jours',
+  CAMPAGNE_OUVERTE: '[MIZNAS] Ouverture de la campagne budgétaire',
 };
 
 const TEMPLATES: Record<TypeEvenement, string> = {
@@ -100,6 +101,7 @@ const TEMPLATES: Record<TypeEvenement, string> = {
   RESET_PASSWORD_SELF_SERVICE: 'reset-password-self-service',
   DELEGATION_RAPPEL_J3_DELEGANT: 'delegation-rappel-delegant',
   DELEGATION_RAPPEL_J3_DELEGATAIRE: 'delegation-rappel-delegataire',
+  CAMPAGNE_OUVERTE: 'campagne-ouverte',
 };
 
 @Injectable()
@@ -255,6 +257,21 @@ export class NotificationsService {
           if (u) users.push(u);
         }
         return users;
+      }
+      case 'CAMPAGNE_OUVERTE': {
+        // E14 (Lot 6.6) — union saisisseurs + validateurs, dédupliqués
+        // par id, auteur exclu (cohérent usersAvecPermission(perm, auteurId)).
+        const saisisseurs = await this.usersAvecPermission(
+          'BUDGET.SAISIR',
+          contexte.auteurId,
+        );
+        const validateurs = await this.usersAvecPermission(
+          'BUDGET.VALIDER',
+          contexte.auteurId,
+        );
+        const dedup = new Map<string, User>();
+        for (const u of [...saisisseurs, ...validateurs]) dedup.set(u.id, u);
+        return [...dedup.values()];
       }
       default:
         return [];

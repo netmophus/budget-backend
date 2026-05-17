@@ -1,0 +1,21 @@
+<p>Bonjour {{destinataire.prenom}} {{destinataire.nom}},</p>
+
+<p>La campagne de saisie budgétaire pour la version <strong>{{codeVersion}}</strong> est officiellement <strong>ouverte</strong>.</p>
+
+<p style="background:#f4f4f4; border-left:3px solid #BA7517; padding:8px 12px; margin:12px 0;">
+<strong>Période de saisie&nbsp;:</strong><br>
+Du {{dateOuverture}} au {{dateFermeture}}
+</p>
+
+{{#if commentaire}}
+<p style="background:#ddf4ff; border-left:3px solid #0969da; padding:8px 12px; margin:12px 0;">
+<em>Note de la Direction&nbsp;:</em><br>
+{{commentaire}}
+</p>
+{{/if}}
+
+<p style="margin:20px 0;">
+<a href="{{app_base_url}}{{lien_action}}" style="background:#0A1F44; color:#ffffff; padding:8px 16px; border-radius:6px; text-decoration:none; display:inline-block;">Accéder à la saisie</a>
+</p>
+
+<p style="font-size:12px; color:#656d76;">Vous recevez ce message car vous disposez d'une habilitation de <strong>saisie</strong> ou de <strong>validation</strong> budgétaire dans MIZNAS.</p>

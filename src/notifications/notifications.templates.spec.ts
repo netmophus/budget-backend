@@ -165,6 +165,39 @@ describe('Templates Handlebars (Lot 4.3)', () => {
     expect(html).toContain('2027-01-15');
   });
 
+  it('campagne-ouverte (E14) : codeVersion + période + CTA + mention saisie/validation', () => {
+    const html = service.rendreTemplate('campagne-ouverte', {
+      ...VARS_BASE,
+      codeVersion: 'BUDGET_INITIAL_2027',
+      dateOuverture: '01/08/2026',
+      dateFermeture: '31/10/2026',
+      commentaire: 'Lettre DG du 07/07/2026 — campagne officielle.',
+      lien_action: '/saisie-budgetaire',
+    });
+    expectValide(html);
+    expect(html).toContain('BUDGET_INITIAL_2027');
+    expect(html).toContain('01/08/2026');
+    expect(html).toContain('31/10/2026');
+    expect(html).toContain('Lettre DG');
+    expect(html).toContain('/saisie-budgetaire');
+    expect(html).toContain('Accéder à la saisie');
+    expect(html).toContain('saisie');
+    expect(html).toContain('validation');
+  });
+
+  it('campagne-ouverte : bloc commentaire absent si pas fourni', () => {
+    const html = service.rendreTemplate('campagne-ouverte', {
+      ...VARS_BASE,
+      codeVersion: 'BI_2027',
+      dateOuverture: '01/08/2026',
+      dateFermeture: '31/10/2026',
+      lien_action: '/saisie-budgetaire',
+      // commentaire absent
+    });
+    expectValide(html);
+    expect(html).not.toContain('Note de la Direction');
+  });
+
   it('layout : pied de page institutionnel + désinscription mentionnée', () => {
     const html = service.rendreTemplate('budget-soumis', {
       ...VARS_BASE,

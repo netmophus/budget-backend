@@ -5,6 +5,7 @@ import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { LoggerModule } from 'nestjs-pino';
+import { CampagnesModule } from './admin/campagnes/campagnes.module';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AuditModule } from './audit/audit.module';
@@ -147,6 +148,8 @@ import { UsersModule } from './users/users.module';
     TableauBordModule,
     // Lot 5.3 — reforecast trimestriel
     ReforecastModule,
+    // Lot 6.6 — E14 ouverture campagne budgétaire (admin)
+    CampagnesModule,
     // Référentiels secondaires (énumérations) — Lot 2.5-bis-A.
     RefTypeStructureModule,
     RefPaysModule,

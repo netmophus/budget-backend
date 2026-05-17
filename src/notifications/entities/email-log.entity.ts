@@ -52,7 +52,11 @@ export type TypeEvenement =
   // 06:00 ; 1 ligne email_log par destinataire (donc 2 par
   // délégation : 1 délégant + 1 délégataire).
   | 'DELEGATION_RAPPEL_J3_DELEGANT' // E12
-  | 'DELEGATION_RAPPEL_J3_DELEGATAIRE'; // E13
+  | 'DELEGATION_RAPPEL_J3_DELEGATAIRE' // E13
+  // Lot 6.6 — ouverture campagne budgétaire. Notification proactive
+  // envoyée aux saisisseurs + validateurs au démarrage officiel de la
+  // phase de saisie (BSIC NIGER, Annexe A6 Email N°1).
+  | 'CAMPAGNE_OUVERTE'; // E14
 
 /**
  * email_log (Lot 4.3) — trace de chaque envoi d'email (réel ou
