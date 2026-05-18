@@ -122,6 +122,49 @@ export class UserPerimetreService {
     );
   }
 
+  /**
+   * Lot 7.1 — Résout la liste des ids de CR accessibles par un
+   * utilisateur, en union de ses entrées `user_perimetres` actives :
+   *   - cible_type='CR'        → cible_id ajouté tel quel
+   *   - cible_type='CR_SET'    → tous les ids de cible_cr_ids[]
+   *   - cible_type='STRUCTURE' → tous les CR dont fk_structure =
+   *                              cible_id (en version courante)
+   *
+   * Déduplication finale par Set. Retourne `[]` si l'utilisateur n'a
+   * aucune entrée active (pas d'erreur — l'appelant décide s'il faut
+   * renvoyer une liste vide ou autre).
+   *
+   * Pattern d'accès `dim_centre_responsabilite` : utilisation de
+   * `repo.manager.query` plutôt que d'injecter le repository CR
+   * (cohérent avec `creer()` qui requête déjà cette table sans
+   * dépendance vers CentreResponsabiliteModule — évite tout risque
+   * de cycle UsersModule ↔ CentreResponsabiliteModule).
+   */
+  async resoudreCrAccessibles(userId: string): Promise<string[]> {
+    const perimetres = await this.repo.find({
+      where: { fkUser: userId, actif: true },
+    });
+
+    const idsSet = new Set<string>();
+
+    for (const p of perimetres) {
+      if (p.cibleType === 'CR' && p.cibleId) {
+        idsSet.add(String(p.cibleId));
+      } else if (p.cibleType === 'CR_SET' && p.cibleCrIds) {
+        for (const id of p.cibleCrIds) idsSet.add(String(id));
+      } else if (p.cibleType === 'STRUCTURE' && p.cibleId) {
+        const crs = await this.repo.manager.query<Array<{ id: string }>>(
+          `SELECT id FROM dim_centre_responsabilite
+            WHERE fk_structure = $1 AND version_courante = true`,
+          [p.cibleId],
+        );
+        for (const cr of crs) idsSet.add(String(cr.id));
+      }
+    }
+
+    return [...idsSet];
+  }
+
   // ─── Création ─────────────────────────────────────────────────────
 
   async creer(

@@ -43,11 +43,15 @@ export class CentreResponsabiliteController {
   @Get()
   @RequirePermissions('REFERENTIEL.LIRE')
   @ApiOperation({
-    summary: 'Liste paginée des CR (filtres codeStructure, typeCr, search).',
+    summary:
+      'Liste paginée des CR du périmètre user (filtres codeStructure, typeCr, search). ADMIN (SYSTEM.ADMIN) voit tous les CR (Lot 7.1).',
   })
   @ApiOkResponse({ type: PaginatedCrsDto })
-  findAll(@Query() query: ListCrsQueryDto): Promise<PaginatedCrsDto> {
-    return this.crService.findAllPaginated(query);
+  findAll(
+    @Query() query: ListCrsQueryDto,
+    @CurrentUser() user: AuthUser,
+  ): Promise<PaginatedCrsDto> {
+    return this.crService.findAllPaginated(query, user);
   }
 
   @Get('par-code/:codeCr')

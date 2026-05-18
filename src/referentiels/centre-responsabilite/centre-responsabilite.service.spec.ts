@@ -16,7 +16,11 @@ import {
 import { DataType, IMemoryDb, newDb } from 'pg-mem';
 import { DataSource, Repository } from 'typeorm';
 
+import type { AuthUser } from '../../auth/decorators/current-user.decorator';
+import type { PermissionsService } from '../../auth/permissions.service';
+import type { UserPerimetreService } from '../../users/services/user-perimetre.service';
 import { CentreResponsabiliteService } from './centre-responsabilite.service';
+import { ListCrsQueryDto } from './dto/list-crs-query.dto';
 import { DimCentreResponsabilite } from './entities/dim-centre-responsabilite.entity';
 import { DimStructure } from '../structure/entities/dim-structure.entity';
 import { StructureService } from '../structure/structure.service';
@@ -127,6 +131,12 @@ describe('CentreResponsabiliteService', () => {
   let structureRepo: Repository<DimStructure>;
   let structureService: StructureService;
   let service: CentreResponsabiliteService;
+  // Lot 7.1 — mocks reconfigurables entre tests pour le filtrage
+  // périmètre. hasPermission() simule le bypass ADMIN ;
+  // resoudreCrAccessibles() simule l'union CR + CR_SET + STRUCTURE.
+  let permsMock: { hasPermission: jest.Mock };
+  let perimMock: { resoudreCrAccessibles: jest.Mock };
+  const userTest: AuthUser = { userId: '42', email: 'test@miznas.local' };
 
   beforeAll(async () => {
     dataSource = await createDataSource();
@@ -139,10 +149,14 @@ describe('CentreResponsabiliteService', () => {
       dataSource,
       undefined,
     );
+    permsMock = { hasPermission: jest.fn() };
+    perimMock = { resoudreCrAccessibles: jest.fn() };
     service = new CentreResponsabiliteService(
       crRepo,
       dataSource,
       structureService,
+      permsMock as unknown as PermissionsService,
+      perimMock as unknown as UserPerimetreService,
     );
   });
 
@@ -156,6 +170,8 @@ describe('CentreResponsabiliteService', () => {
       'UPDATE dim_structure SET fk_structure_parent = NULL',
     );
     await dataSource.query('DELETE FROM dim_structure');
+    permsMock.hasPermission.mockReset();
+    perimMock.resoudreCrAccessibles.mockReset();
   });
 
   // ─── SCD2 hérité — smoke
@@ -404,6 +420,145 @@ describe('CentreResponsabiliteService', () => {
         'admin@miznas.local',
       );
       expect(result.count).toBe(0);
+    });
+  });
+
+  // ─── Lot 7.1 — Filtrage par périmètre utilisateur ────────────────
+
+  describe('findAllPaginated (Lot 7.1 — filtrage périmètre)', () => {
+    const query: ListCrsQueryDto = { page: 1, limit: 200 } as ListCrsQueryDto;
+
+    it('ADMIN (SYSTEM.ADMIN) → bypass, voit tous les CR', async () => {
+      const sId = await insertStructure(dataSource, { codeStructure: 'SOC' });
+      await insertCr(dataSource, { codeCr: 'CR_A', fkStructure: sId });
+      await insertCr(dataSource, { codeCr: 'CR_B', fkStructure: sId });
+      await insertCr(dataSource, { codeCr: 'CR_C', fkStructure: sId });
+
+      permsMock.hasPermission.mockResolvedValue(true);
+      const result = await service.findAllPaginated(query, userTest);
+
+      expect(result.total).toBe(3);
+      expect(result.items.map((c) => c.codeCr).sort()).toEqual([
+        'CR_A',
+        'CR_B',
+        'CR_C',
+      ]);
+      // Le bypass n'appelle PAS resoudreCrAccessibles.
+      expect(perimMock.resoudreCrAccessibles).not.toHaveBeenCalled();
+    });
+
+    it('non-ADMIN avec périmètre CR direct → reçoit uniquement ce CR', async () => {
+      const sId = await insertStructure(dataSource, { codeStructure: 'SOC' });
+      const id1 = await insertCr(dataSource, {
+        codeCr: 'CR_AUDIT',
+        fkStructure: sId,
+      });
+      await insertCr(dataSource, { codeCr: 'CR_AUTRE', fkStructure: sId });
+
+      permsMock.hasPermission.mockResolvedValue(false);
+      perimMock.resoudreCrAccessibles.mockResolvedValue([id1]);
+
+      const result = await service.findAllPaginated(query, userTest);
+
+      expect(result.total).toBe(1);
+      expect(result.items[0]!.codeCr).toBe('CR_AUDIT');
+      expect(perimMock.resoudreCrAccessibles).toHaveBeenCalledWith('42');
+    });
+
+    it("non-ADMIN avec périmètre CR_SET → reçoit les N CR de l'ensemble", async () => {
+      const sId = await insertStructure(dataSource, { codeStructure: 'SOC' });
+      const ids: string[] = [];
+      for (const code of ['CR_X', 'CR_Y', 'CR_Z']) {
+        ids.push(
+          await insertCr(dataSource, { codeCr: code, fkStructure: sId }),
+        );
+      }
+      await insertCr(dataSource, { codeCr: 'CR_EXCLU', fkStructure: sId });
+
+      permsMock.hasPermission.mockResolvedValue(false);
+      perimMock.resoudreCrAccessibles.mockResolvedValue(ids);
+
+      const result = await service.findAllPaginated(query, userTest);
+
+      expect(result.total).toBe(3);
+      expect(result.items.map((c) => c.codeCr).sort()).toEqual([
+        'CR_X',
+        'CR_Y',
+        'CR_Z',
+      ]);
+    });
+
+    it('non-ADMIN avec périmètre STRUCTURE → reçoit tous les CR rattachés (via resoudreCrAccessibles)', async () => {
+      const sId = await insertStructure(dataSource, { codeStructure: 'BSIC' });
+      const sIdAutre = await insertStructure(dataSource, {
+        codeStructure: 'AUTRE',
+      });
+      const id1 = await insertCr(dataSource, {
+        codeCr: 'CR_BSIC_1',
+        fkStructure: sId,
+      });
+      const id2 = await insertCr(dataSource, {
+        codeCr: 'CR_BSIC_2',
+        fkStructure: sId,
+      });
+      await insertCr(dataSource, {
+        codeCr: 'CR_AUTRE',
+        fkStructure: sIdAutre,
+      });
+
+      permsMock.hasPermission.mockResolvedValue(false);
+      // resoudreCrAccessibles simule l'expansion STRUCTURE → ids des CR.
+      perimMock.resoudreCrAccessibles.mockResolvedValue([id1, id2]);
+
+      const result = await service.findAllPaginated(query, userTest);
+
+      expect(result.total).toBe(2);
+      expect(result.items.map((c) => c.codeCr).sort()).toEqual([
+        'CR_BSIC_1',
+        'CR_BSIC_2',
+      ]);
+    });
+
+    it('non-ADMIN sans aucun périmètre actif → liste vide (total=0)', async () => {
+      const sId = await insertStructure(dataSource, { codeStructure: 'SOC' });
+      await insertCr(dataSource, { codeCr: 'CR_INACC', fkStructure: sId });
+
+      permsMock.hasPermission.mockResolvedValue(false);
+      perimMock.resoudreCrAccessibles.mockResolvedValue([]);
+
+      const result = await service.findAllPaginated(query, userTest);
+
+      expect(result.total).toBe(0);
+      expect(result.items).toEqual([]);
+      expect(result.page).toBe(1);
+      expect(result.limit).toBe(200);
+    });
+
+    it('non-ADMIN avec filtre codeStructure + périmètre limité → intersection', async () => {
+      const sId1 = await insertStructure(dataSource, { codeStructure: 'AG' });
+      const sId2 = await insertStructure(dataSource, { codeStructure: 'DG' });
+      const idAg1 = await insertCr(dataSource, {
+        codeCr: 'CR_AG_1',
+        fkStructure: sId1,
+      });
+      await insertCr(dataSource, { codeCr: 'CR_AG_2', fkStructure: sId1 });
+      const idDg = await insertCr(dataSource, {
+        codeCr: 'CR_DG',
+        fkStructure: sId2,
+      });
+
+      permsMock.hasPermission.mockResolvedValue(false);
+      // Périmètre user : 1 CR de l'AG + 1 CR de la DG.
+      perimMock.resoudreCrAccessibles.mockResolvedValue([idAg1, idDg]);
+
+      const result = await service.findAllPaginated(
+        { ...query, codeStructure: 'AG' },
+        userTest,
+      );
+
+      // Intersection : seul CR_AG_1 (AG ∩ périmètre user).
+      expect(result.total).toBe(1);
+      expect(result.items[0]!.codeCr).toBe('CR_AG_1');
     });
   });
 });

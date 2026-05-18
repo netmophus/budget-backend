@@ -117,10 +117,24 @@ function buildService(ds: DataSource): FaitBudgetService {
     ds.getRepository(DimStructure),
     ds,
   );
+  // Lot 7.1 — CentreResponsabiliteService a 2 dépendances supplémentaires
+  // (PermissionsService + UserPerimetreService) pour le filtrage par
+  // périmètre dans findAllPaginated. Les tests fait_budget n'appellent
+  // que findValidAt / findCurrent du socle Scd2 (jamais findAllPaginated),
+  // donc on passe des mocks Jest sans implémentation : ils ne seront
+  // jamais invoqués.
+  const permissionsServiceStub = {
+    hasPermission: jest.fn().mockResolvedValue(false),
+  } as unknown as import('../../auth/permissions.service').PermissionsService;
+  const userPerimetreServiceStub = {
+    resoudreCrAccessibles: jest.fn().mockResolvedValue([]),
+  } as unknown as import('../../users/services/user-perimetre.service').UserPerimetreService;
   const centreService = new CentreResponsabiliteService(
     ds.getRepository(DimCentreResponsabilite),
     ds,
     structureService,
+    permissionsServiceStub,
+    userPerimetreServiceStub,
   );
   const compteService = new CompteService(ds.getRepository(DimCompte), ds);
   const ligneMetierService = new LigneMetierService(

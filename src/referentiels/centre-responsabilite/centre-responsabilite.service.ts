@@ -30,7 +30,10 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
 
+import type { AuthUser } from '../../auth/decorators/current-user.decorator';
+import { PermissionsService } from '../../auth/permissions.service';
 import { Scd2Service } from '../../common/services/scd2.service';
+import { UserPerimetreService } from '../../users/services/user-perimetre.service';
 import { StructureService } from '../structure/structure.service';
 import { CreateCrDto } from './dto/create-cr.dto';
 import { CrResponseDto, StructureCouranteDto } from './dto/cr-response.dto';
@@ -87,13 +90,22 @@ export class CentreResponsabiliteService extends Scd2Service<DimCentreResponsabi
      */
     @Inject(forwardRef(() => StructureService))
     private readonly structureService: StructureService,
+    // Lot 7.1 — filtrage de findAllPaginated par périmètre utilisateur.
+    // PermissionsService détecte le bypass ADMIN (perm SYSTEM.ADMIN) ;
+    // UserPerimetreService résout les CR accessibles (union CR + CR_SET
+    // + STRUCTURE depuis user_perimetres actifs).
+    private readonly permissionsService: PermissionsService,
+    private readonly userPerimetreService: UserPerimetreService,
   ) {
     super(repo, 'codeCr', dataSource);
   }
 
   // ─── Lecture / liste ──────────────────────────────────────────────
 
-  async findAllPaginated(query: ListCrsQueryDto): Promise<PaginatedCrsDto> {
+  async findAllPaginated(
+    query: ListCrsQueryDto,
+    user: AuthUser,
+  ): Promise<PaginatedCrsDto> {
     const qb = this.repo
       .createQueryBuilder('cr')
       .leftJoinAndSelect('cr.structure', 'structure');
@@ -111,6 +123,26 @@ export class CentreResponsabiliteService extends Scd2Service<DimCentreResponsabi
     }
     if (query.search) {
       qb.andWhere('cr.libelle ILIKE :search', { search: `%${query.search}%` });
+    }
+
+    // Lot 7.1 — filtrage par périmètre utilisateur, sauf bypass ADMIN.
+    // Le bypass est défini par la possession de la permission RBAC
+    // `SYSTEM.ADMIN` (portée par le rôle ADMIN seedé Lot 1). Aucun
+    // accès à user.roles directement — AuthUser n'expose que userId
+    // et email, on passe par PermissionsService (source de vérité).
+    const isAdmin = await this.permissionsService.hasPermission(user.userId, [
+      'SYSTEM.ADMIN',
+    ]);
+    if (!isAdmin) {
+      const crIdsAccessibles =
+        await this.userPerimetreService.resoudreCrAccessibles(user.userId);
+      if (crIdsAccessibles.length === 0) {
+        // Utilisateur sans aucun périmètre actif → liste vide.
+        // Cohérent avec le message UI déjà prévu côté SelecteurContexte
+        // "Aucun centre de responsabilité dans votre périmètre".
+        return { items: [], total: 0, page: query.page, limit: query.limit };
+      }
+      qb.andWhere('cr.id IN (:...crIds)', { crIds: crIdsAccessibles });
     }
 
     qb.orderBy('cr.codeCr', 'ASC')
