@@ -20,6 +20,7 @@ import type { AuthUser } from '../../auth/decorators/current-user.decorator';
 import type { PermissionsService } from '../../auth/permissions.service';
 import type { UserPerimetreService } from '../../users/services/user-perimetre.service';
 import { CentreResponsabiliteService } from './centre-responsabilite.service';
+import { ListCrsQueryDto } from './dto/list-crs-query.dto';
 import { DimCentreResponsabilite } from './entities/dim-centre-responsabilite.entity';
 import { DimStructure } from '../structure/entities/dim-structure.entity';
 import { StructureService } from '../structure/structure.service';
@@ -425,7 +426,7 @@ describe('CentreResponsabiliteService', () => {
   // ─── Lot 7.1 — Filtrage par périmètre utilisateur ────────────────
 
   describe('findAllPaginated (Lot 7.1 — filtrage périmètre)', () => {
-    const query = { page: 1, limit: 200 } as never;
+    const query: ListCrsQueryDto = { page: 1, limit: 200 } as ListCrsQueryDto;
 
     it('ADMIN (SYSTEM.ADMIN) → bypass, voit tous les CR', async () => {
       const sId = await insertStructure(dataSource, { codeStructure: 'SOC' });
@@ -551,7 +552,7 @@ describe('CentreResponsabiliteService', () => {
       perimMock.resoudreCrAccessibles.mockResolvedValue([idAg1, idDg]);
 
       const result = await service.findAllPaginated(
-        { ...query, codeStructure: 'AG' } as never,
+        { ...query, codeStructure: 'AG' },
         userTest,
       );
 
