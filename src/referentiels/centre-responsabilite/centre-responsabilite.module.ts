@@ -2,6 +2,7 @@ import { Module, forwardRef } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 
 import { AuthModule } from '../../auth/auth.module';
+import { UsersModule } from '../../users/users.module';
 import { StructureModule } from '../structure/structure.module';
 import { CentreResponsabiliteController } from './centre-responsabilite.controller';
 import { CentreResponsabiliteService } from './centre-responsabilite.service';
@@ -15,6 +16,11 @@ import { DimCentreResponsabilite } from './entities/dim-centre-responsabilite.en
     // CrModule ↔ StructureModule (relink stratégie A —
     // cf. scd2-pattern.md §8).
     forwardRef(() => StructureModule),
+    // Lot 7.1 — filtrage findAllPaginated par périmètre user via
+    // UserPerimetreService.resoudreCrAccessibles. UsersModule importe
+    // déjà CentreResponsabiliteModule indirectement via UsersAdminService ?
+    // Non vérifié — si cycle, basculer en forwardRef(() => UsersModule).
+    UsersModule,
   ],
   controllers: [CentreResponsabiliteController],
   providers: [CentreResponsabiliteService],

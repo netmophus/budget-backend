@@ -275,6 +275,9 @@ describe('CR (e2e) — 2ᵉ dimension SCD2 + relink stratégie A', () => {
 
   beforeEach(async () => {
     await dataSource.query('DELETE FROM audit_log');
+    // Lot 7.1 — purger les périmètres user entre tests, sinon les
+    // INSERTs cumulés font fuiter la visibilité d'un test à l'autre.
+    await dataSource.query('DELETE FROM user_perimetres');
 
     // Purge complète puis reseed propre — c'est plus robuste que des
     // resets partiels qui se sont avérés fragiles entre tests
@@ -340,6 +343,23 @@ describe('CR (e2e) — 2ᵉ dimension SCD2 + relink stratégie A', () => {
          "est_actif","utilisateur_creation")
        VALUES ('CR_DIR_RETAIL','CR Direction Retail','cdp',$1,$2,NULL,true,true,'system')`,
       [ids.dirRetailId, pastDate],
+    );
+
+    // Lot 7.1 — donner au LECTEUR un périmètre STRUCTURE (SOC racine)
+    // pour qu'il voie tous les CR rattachés via la hiérarchie. Sans
+    // cette entrée user_perimetres, le filtrage par périmètre
+    // retourne une liste vide (cohérent métier mais casse les tests
+    // GET /cr écrits avant Lot 7.1).
+    const crDirRetailId = (
+      (await dataSource.query(
+        `SELECT id FROM dim_centre_responsabilite WHERE code_cr = 'CR_DIR_RETAIL'`,
+      )) as Array<{ id: string }>
+    )[0]!.id;
+    await dataSource.query(
+      `INSERT INTO user_perimetres
+         (fk_user, cible_type, cible_id, origine, date_debut, actif, utilisateur_creation)
+       VALUES ($1, 'CR', $2, 'AFFECTATION', CURRENT_DATE, true, 'system')`,
+      [ids.lecteurId, String(crDirRetailId)],
     );
   });
 
