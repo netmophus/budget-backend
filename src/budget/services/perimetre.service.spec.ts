@@ -668,4 +668,50 @@ describe('PerimetreService.getPerimetreEffectif (Lot 4.1)', () => {
     // L'affectation expirée est ignorée → fallback bridge global → null
     expect(result).toBeNull();
   });
+
+  // ─── Lot 7.3 : getResume (pill "Mon périmètre (N CR)") ─────────
+
+  it('getResume admin global → isAdminGlobal=true + nb = total CR actifs', async () => {
+    const userId = seed.userIds['admin@miznas.local']!;
+    await ds.query(
+      `INSERT INTO bridge_user_role ("fk_user","fk_role","perimetre_type","est_actif","utilisateur_creation")
+       VALUES ($1, $2, 'global', true, 'system')`,
+      [userId, seed.roleIds['ADMIN']!],
+    );
+    const r = await service.getResume(userId);
+    expect(r.isAdminGlobal).toBe(true);
+    expect(r.nbCrAccessibles).toBe(7); // 7 CR seedés version_courante + actif
+  });
+
+  it('getResume user périmètré CR unique → isAdminGlobal=false + nb=1', async () => {
+    const userId = seed.userIds['preparateur_civ@miznas.local']!;
+    // Un rôle bridge actif est requis (sinon loadRolesActifs lève
+    // Unauthorized) — user_perimetres prend la main pour le calcul.
+    await ds.query(
+      `INSERT INTO bridge_user_role ("fk_user","fk_role","perimetre_type","est_actif","utilisateur_creation")
+       VALUES ($1, $2, 'global', true, 'system')`,
+      [userId, seed.roleIds['PREPARATEUR']!],
+    );
+    await ajouterPerimetre(userId, 'CR', {
+      cibleId: seed.crIds['CR_AG_ABJ_PLATEAU']!,
+    });
+    const r = await service.getResume(userId);
+    expect(r.isAdminGlobal).toBe(false);
+    expect(r.nbCrAccessibles).toBe(1);
+  });
+
+  it('getResume user périmètré STRUCTURE BR_CIV → 6 CR', async () => {
+    const userId = seed.userIds['preparateur_civ@miznas.local']!;
+    await ds.query(
+      `INSERT INTO bridge_user_role ("fk_user","fk_role","perimetre_type","est_actif","utilisateur_creation")
+       VALUES ($1, $2, 'global', true, 'system')`,
+      [userId, seed.roleIds['PREPARATEUR']!],
+    );
+    await ajouterPerimetre(userId, 'STRUCTURE', {
+      cibleId: seed.structureIds['BR_CIV']!,
+    });
+    const r = await service.getResume(userId);
+    expect(r.isAdminGlobal).toBe(false);
+    expect(r.nbCrAccessibles).toBe(6);
+  });
 });
