@@ -14,11 +14,13 @@ import { UserRole } from '../users/entities/user-role.entity';
 import { BudgetGrilleController } from './controllers/budget-grille.controller';
 import { BudgetImportController } from './controllers/budget-import.controller';
 import { IndicateursController } from './controllers/indicateurs.controller';
+import { VersionsResumeController } from './controllers/versions-resume.controller';
 import { BudgetImportService } from './services/budget-import.service';
 import { BudgetSaisieService } from './services/budget-saisie.service';
 import { IndicateursHomeService } from './services/indicateurs-home.service';
 import { IndicateursService } from './services/indicateurs.service';
 import { PerimetreService } from './services/perimetre.service';
+import { VersionsResumeService } from './services/versions-resume.service';
 
 /**
  * BudgetModule (Lot 3.3) — porte les services applicatifs transverses
@@ -51,6 +53,7 @@ import { PerimetreService } from './services/perimetre.service';
     BudgetGrilleController,
     IndicateursController,
     BudgetImportController,
+    VersionsResumeController,
   ],
   providers: [
     PerimetreService,
@@ -58,6 +61,7 @@ import { PerimetreService } from './services/perimetre.service';
     IndicateursService,
     IndicateursHomeService,
     BudgetImportService,
+    VersionsResumeService,
   ],
   exports: [
     PerimetreService,
@@ -65,6 +69,7 @@ import { PerimetreService } from './services/perimetre.service';
     IndicateursService,
     IndicateursHomeService,
     BudgetImportService,
+    VersionsResumeService,
   ],
 })
 export class BudgetModule {}
