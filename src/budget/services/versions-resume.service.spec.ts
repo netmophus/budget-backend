@@ -15,45 +15,35 @@ import { Repository, SelectQueryBuilder } from 'typeorm';
 import { FaitBudget } from '../../faits/budget/entities/fait-budget.entity';
 import { VersionsResumeService } from './versions-resume.service';
 
-interface QbCalls {
-  where: Array<{ clause: string; params?: Record<string, unknown> }>;
-  andWhere: Array<{ clause: string; params?: Record<string, unknown> }>;
-  selects: string[];
-  rawOne: unknown;
+/**
+ * Mock QueryBuilder typé via `as unknown as SelectQueryBuilder` —
+ * `jest.fn().mockReturnThis()` court-circuite les surcharges multiples
+ * de `select`/`addSelect` (string | callback | string[]) qu'on ne peut
+ * pas matcher proprement avec un Partial.
+ */
+interface QbMocks {
+  qb: SelectQueryBuilder<FaitBudget>;
+  select: jest.Mock;
+  addSelect: jest.Mock;
+  where: jest.Mock;
+  andWhere: jest.Mock;
+  getRawOne: jest.Mock;
 }
 
-function makeQb(rawOne: unknown): {
-  qb: Partial<SelectQueryBuilder<FaitBudget>>;
-  calls: QbCalls;
-} {
-  const calls: QbCalls = {
-    where: [],
-    andWhere: [],
-    selects: [],
-    rawOne,
-  };
-  const qb: Partial<SelectQueryBuilder<FaitBudget>> = {
-    select(s: string, _alias?: string) {
-      calls.selects.push(s);
-      return qb as SelectQueryBuilder<FaitBudget>;
-    },
-    addSelect(s: string, _alias?: string) {
-      calls.selects.push(s);
-      return qb as SelectQueryBuilder<FaitBudget>;
-    },
-    where(clause: string, params?: Record<string, unknown>) {
-      calls.where.push({ clause, params });
-      return qb as SelectQueryBuilder<FaitBudget>;
-    },
-    andWhere(clause: string, params?: Record<string, unknown>) {
-      calls.andWhere.push({ clause, params });
-      return qb as SelectQueryBuilder<FaitBudget>;
-    },
-    async getRawOne<T>() {
-      return rawOne as T;
-    },
-  };
-  return { qb, calls };
+function makeQb(rawOne: unknown): QbMocks {
+  const select = jest.fn().mockReturnThis();
+  const addSelect = jest.fn().mockReturnThis();
+  const where = jest.fn().mockReturnThis();
+  const andWhere = jest.fn().mockReturnThis();
+  const getRawOne = jest.fn().mockResolvedValue(rawOne);
+  const qb = {
+    select,
+    addSelect,
+    where,
+    andWhere,
+    getRawOne,
+  } as unknown as SelectQueryBuilder<FaitBudget>;
+  return { qb, select, addSelect, where, andWhere, getRawOne };
 }
 
 describe('VersionsResumeService', () => {
@@ -89,12 +79,12 @@ describe('VersionsResumeService', () => {
   });
 
   it('admin global (crAutorises=null) : pas de filtre fk_centre', async () => {
-    const { qb, calls } = makeQb({
+    const mocks = makeQb({
       totalFcfa: '30000000',
       nbComptes: '5',
       nbLignes: '60',
     });
-    createQueryBuilderSpy.mockReturnValue(qb);
+    createQueryBuilderSpy.mockReturnValue(mocks.qb);
 
     const res = await service.getResumeVersion('42', null);
 
@@ -104,36 +94,33 @@ describe('VersionsResumeService', () => {
       nombreComptes: 5,
       nombreLignes: 60,
     });
-    expect(calls.where).toEqual([
-      { clause: 'fb.fk_version = :vid', params: { vid: '42' } },
-    ]);
-    expect(calls.andWhere).toEqual([]);
+    expect(mocks.where).toHaveBeenCalledWith('fb.fk_version = :vid', {
+      vid: '42',
+    });
+    expect(mocks.andWhere).not.toHaveBeenCalled();
   });
 
   it('user périmètré : ajoute AND fk_centre IN (...) avec les bons CR', async () => {
-    const { qb, calls } = makeQb({
+    const mocks = makeQb({
       totalFcfa: 12_500_000,
       nbComptes: 3,
       nbLignes: 24,
     });
-    createQueryBuilderSpy.mockReturnValue(qb);
+    createQueryBuilderSpy.mockReturnValue(mocks.qb);
 
     const res = await service.getResumeVersion('42', ['100', '101', '102']);
 
     expect(res.montantTotalFcfa).toBe(12_500_000);
     expect(res.nombreComptes).toBe(3);
     expect(res.nombreLignes).toBe(24);
-    expect(calls.andWhere).toEqual([
-      {
-        clause: 'fb.fk_centre IN (:...crs)',
-        params: { crs: ['100', '101', '102'] },
-      },
-    ]);
+    expect(mocks.andWhere).toHaveBeenCalledWith('fb.fk_centre IN (:...crs)', {
+      crs: ['100', '101', '102'],
+    });
   });
 
   it('version vide (getRawOne retourne null) : renvoie 0/0/0 sans throw', async () => {
-    const { qb } = makeQb(undefined);
-    createQueryBuilderSpy.mockReturnValue(qb);
+    const mocks = makeQb(undefined);
+    createQueryBuilderSpy.mockReturnValue(mocks.qb);
 
     const res = await service.getResumeVersion('999', null);
 
@@ -146,19 +133,24 @@ describe('VersionsResumeService', () => {
   });
 
   it('agrégation SQL : 1 SUM + 1 COUNT DISTINCT + 1 COUNT(*)', async () => {
-    const { qb, calls } = makeQb({
+    const mocks = makeQb({
       totalFcfa: 0,
       nbComptes: 0,
       nbLignes: 0,
     });
-    createQueryBuilderSpy.mockReturnValue(qb);
+    createQueryBuilderSpy.mockReturnValue(mocks.qb);
 
     await service.getResumeVersion('42', null);
 
-    expect(calls.selects).toEqual([
+    expect(mocks.select).toHaveBeenCalledWith(
       'COALESCE(SUM(fb.montant_fcfa), 0)',
+      'totalFcfa',
+    );
+    expect(mocks.addSelect).toHaveBeenNthCalledWith(
+      1,
       'COUNT(DISTINCT fb.fk_compte)',
-      'COUNT(*)',
-    ]);
+      'nbComptes',
+    );
+    expect(mocks.addSelect).toHaveBeenNthCalledWith(2, 'COUNT(*)', 'nbLignes');
   });
 });
