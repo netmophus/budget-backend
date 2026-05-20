@@ -210,6 +210,36 @@ export class PerimetreService {
     return Array.from(setIds);
   }
 
+  /**
+   * Résumé du périmètre du user pour affichage UI (Lot 7.3).
+   *
+   * Retourne :
+   *   - `nbCrAccessibles` : taille effective du périmètre
+   *     (= longueur de `getCrAutorisesPourUser` si non-null, sinon
+   *     comptage total des CR actifs `dim_centre_responsabilite`).
+   *   - `isAdminGlobal`   : true uniquement si `getCrAutorisesPourUser`
+   *     retourne `null` (rôle 'global' SANS affectation explicite ; la
+   *     priorité user_perimetres > bridge_user_role implique qu'un user
+   *     avec affectation explicite n'est PAS admin global même si son
+   *     rôle l'est).
+   */
+  async getResume(
+    userId: string,
+  ): Promise<{ nbCrAccessibles: number; isAdminGlobal: boolean }> {
+    const crs = await this.getCrAutorisesPourUser(userId);
+    if (crs === null) {
+      const rows = await this.userRoleRepo.manager.query<Array<{ n: string }>>(
+        `SELECT COUNT(*)::text AS n FROM dim_centre_responsabilite
+          WHERE version_courante = true AND est_actif = true`,
+      );
+      return {
+        nbCrAccessibles: Number(rows[0]?.n ?? 0),
+        isAdminGlobal: true,
+      };
+    }
+    return { nbCrAccessibles: crs.length, isAdminGlobal: false };
+  }
+
   /* getPerimetresActifsPourUser déplacé dans UserPerimetreService.lister
    (Lot 4.1) — évite un import croisé UsersModule ↔ BudgetModule. */
 
