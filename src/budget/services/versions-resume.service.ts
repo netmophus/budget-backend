@@ -6,6 +6,10 @@
  * fk_compte), COUNT(*). Filtré par la liste de CR autorisés du user
  * connecté (null = admin global, [] = aucun CR → 0/0/0 sans aller en
  * base).
+ *
+ * Lot 7.4 — Si la version est verrouillée (soumis/valide/gele), le
+ * filtre périmètre est bypassé : un validateur doit voir le budget
+ * complet pour pouvoir décider.
  */
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -16,6 +20,16 @@ import { ResumeVersionDto } from '../dto/resume-version.dto';
 
 @Injectable()
 export class VersionsResumeService {
+  /**
+   * Statuts pour lesquels le résumé est consultable globalement
+   * (lecture par les validateurs/publicateur sans filtre périmètre).
+   */
+  private static readonly STATUTS_LECTURE_GLOBALE: readonly string[] = [
+    'soumis',
+    'valide',
+    'gele',
+  ];
+
   constructor(
     @InjectRepository(FaitBudget)
     private readonly repo: Repository<FaitBudget>,
@@ -29,11 +43,26 @@ export class VersionsResumeService {
    *                    `null` = admin (pas de filtre CR),
    *                    `[]`   = aucun CR autorisé (court-circuit zéro),
    *                    `string[]` = filtre IN sur fk_centre.
+   *
+   * Lot 7.4 — Si la version est dans un statut "lecture globale",
+   * `crAutorises` est forcé à `null` (lecture du budget complet).
    */
   async getResumeVersion(
     versionId: string,
     crAutorises: string[] | null,
   ): Promise<ResumeVersionDto> {
+    const statutRow = (await this.repo.manager.query(
+      `SELECT statut FROM dim_version WHERE id = $1`,
+      [versionId],
+    )) as Array<{ statut: string }>;
+    const statut = statutRow[0]?.statut;
+    if (
+      statut &&
+      VersionsResumeService.STATUTS_LECTURE_GLOBALE.includes(statut)
+    ) {
+      crAutorises = null;
+    }
+
     if (crAutorises !== null && crAutorises.length === 0) {
       return {
         versionId,
