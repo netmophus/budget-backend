@@ -191,10 +191,9 @@ describe('VersionsResumeService', () => {
 
       await service.getResumeVersion('1', ['100', '101', '102']);
 
-      expect(mocks.andWhere).toHaveBeenCalledWith(
-        'fb.fk_centre IN (:...crs)',
-        { crs: ['100', '101', '102'] },
-      );
+      expect(mocks.andWhere).toHaveBeenCalledWith('fb.fk_centre IN (:...crs)', {
+        crs: ['100', '101', '102'],
+      });
     });
   });
 });
