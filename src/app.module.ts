@@ -19,6 +19,7 @@ import { DelegationsModule } from './delegations/delegations.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { RealiseModule } from './realise/realise.module';
 import { ReforecastModule } from './reforecast/reforecast.module';
+import { ReportingModule } from './reporting/reporting.module';
 import { TableauBordModule } from './tableau-de-bord/tableau-bord.module';
 import { FaitBudgetModule } from './faits/budget/fait-budget.module';
 import { BudgetModule } from './budget/budget.module';
@@ -150,6 +151,8 @@ import { UsersModule } from './users/users.module';
     ReforecastModule,
     // Lot 6.6 — E14 ouverture campagne budgétaire (admin)
     CampagnesModule,
+    // Lot 7.6 — module reporting officiel (R01–R20, R04 en premier)
+    ReportingModule,
     // Référentiels secondaires (énumérations) — Lot 2.5-bis-A.
     RefTypeStructureModule,
     RefPaysModule,
