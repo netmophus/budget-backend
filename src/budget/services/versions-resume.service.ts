@@ -51,11 +51,11 @@ export class VersionsResumeService {
     versionId: string,
     crAutorises: string[] | null,
   ): Promise<ResumeVersionDto> {
-    const statutRow = (await this.repo.manager.query(
+    const statutRows: Array<{ statut: string }> = await this.repo.manager.query(
       `SELECT statut FROM dim_version WHERE id = $1`,
       [versionId],
-    )) as Array<{ statut: string }>;
-    const statut = statutRow[0]?.statut;
+    );
+    const statut: string | undefined = statutRows[0]?.statut;
     if (
       statut &&
       VersionsResumeService.STATUTS_LECTURE_GLOBALE.includes(statut)
