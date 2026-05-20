@@ -1,5 +1,5 @@
 /**
- * Tests unitaires VersionsResumeService (Lot 7.3).
+ * Tests unitaires VersionsResumeService (Lot 7.3 + Lot 7.4).
  *
  * Mock léger du Repository<FaitBudget> + QueryBuilder fluent (pas de
  * pg-mem) : on vérifie la composition de la query + le mapping de la
@@ -7,6 +7,10 @@
  *   - null      → pas de WHERE fk_centre
  *   - []        → court-circuit zéro (pas d'appel DB)
  *   - [a, b]    → AND fk_centre IN (a, b)
+ *
+ * Lot 7.4 — Le service lit aussi dim_version.statut via repo.manager.query.
+ * Le mock retourne 'ouvert' par défaut (comportement Lot 7.3 préservé).
+ * Un test dédié couvre le bypass quand statut IN (soumis/valide/gele).
  */
 import { Test } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
@@ -15,12 +19,6 @@ import { Repository, SelectQueryBuilder } from 'typeorm';
 import { FaitBudget } from '../../faits/budget/entities/fait-budget.entity';
 import { VersionsResumeService } from './versions-resume.service';
 
-/**
- * Mock QueryBuilder typé via `as unknown as SelectQueryBuilder` —
- * `jest.fn().mockReturnThis()` court-circuite les surcharges multiples
- * de `select`/`addSelect` (string | callback | string[]) qu'on ne peut
- * pas matcher proprement avec un Partial.
- */
 interface QbMocks {
   qb: SelectQueryBuilder<FaitBudget>;
   select: jest.Mock;
@@ -49,11 +47,15 @@ function makeQb(rawOne: unknown): QbMocks {
 describe('VersionsResumeService', () => {
   let service: VersionsResumeService;
   let createQueryBuilderSpy: jest.Mock;
+  let managerQuerySpy: jest.Mock;
 
   beforeEach(async () => {
     createQueryBuilderSpy = jest.fn();
+    // Lot 7.4 — par défaut, la version est 'ouvert' → comportement Lot 7.3 préservé.
+    managerQuerySpy = jest.fn().mockResolvedValue([{ statut: 'ouvert' }]);
     const repoMock: Partial<Repository<FaitBudget>> = {
       createQueryBuilder: createQueryBuilderSpy as never,
+      manager: { query: managerQuerySpy } as never,
     };
 
     const moduleRef = await Test.createTestingModule({
@@ -152,5 +154,47 @@ describe('VersionsResumeService', () => {
       'nbComptes',
     );
     expect(mocks.addSelect).toHaveBeenNthCalledWith(2, 'COUNT(*)', 'nbLignes');
+  });
+
+  // Lot 7.4 — bypass périmètre quand la version est verrouillée.
+  describe('Lot 7.4 — bypass périmètre si version verrouillée', () => {
+    it.each(['soumis', 'valide', 'gele'])(
+      'statut=%s : ignore crAutorises et lit le budget complet',
+      async (statut) => {
+        managerQuerySpy.mockResolvedValueOnce([{ statut }]);
+        const mocks = makeQb({
+          totalFcfa: 19_493_000_000,
+          nbComptes: 30,
+          nbLignes: 1080,
+        });
+        createQueryBuilderSpy.mockReturnValue(mocks.qb);
+
+        // L'appelant passe son périmètre restreint (3 CR) — il doit être ignoré.
+        const res = await service.getResumeVersion('1', ['100', '101', '102']);
+
+        expect(res.montantTotalFcfa).toBe(19_493_000_000);
+        expect(res.nombreComptes).toBe(30);
+        expect(res.nombreLignes).toBe(1080);
+        // Pas de andWhere fk_centre : filtre périmètre bypassé.
+        expect(mocks.andWhere).not.toHaveBeenCalled();
+      },
+    );
+
+    it('statut=ouvert : filtre périmètre conservé (régression Lot 7.3)', async () => {
+      // Le beforeEach mocke déjà 'ouvert'.
+      const mocks = makeQb({
+        totalFcfa: 180_000_000,
+        nbComptes: 7,
+        nbLignes: 96,
+      });
+      createQueryBuilderSpy.mockReturnValue(mocks.qb);
+
+      await service.getResumeVersion('1', ['100', '101', '102']);
+
+      expect(mocks.andWhere).toHaveBeenCalledWith(
+        'fb.fk_centre IN (:...crs)',
+        { crs: ['100', '101', '102'] },
+      );
+    });
   });
 });
