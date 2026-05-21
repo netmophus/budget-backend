@@ -68,6 +68,7 @@ async function seedLot81ACampagneTest(ds: DataSource): Promise<void> {
     );
   }
 
+<<<<<<< HEAD
   // ─── 2. INSERT campagne (idempotent via ON CONFLICT) ─────────────
   // **Hotfix Lot 8.1.A** : `INSERT ... SELECT $1 ... WHERE code = $1`
   // déclenchait PG 42P08 (types incohérents pour le paramètre $1 —
@@ -76,12 +77,22 @@ async function seedLot81ACampagneTest(ds: DataSource): Promise<void> {
   // ON CONFLICT DO NOTHING utilise chaque paramètre une seule fois →
   // pas d'ambiguïté de type, et cohérent avec la convention idempotence
   // des migrations du projet (Lot 7.6 / 8.1.A).
+=======
+  // ─── 2. INSERT campagne (idempotent) ─────────────────────────────
+>>>>>>> origin/main
   await ds.query(
     `INSERT INTO "campagne_budgetaire"
        ("code","exercice_fiscal","libelle","statut","mode_visa_defaut",
         "fk_user_signataire_defaut","utilisateur_creation")
+<<<<<<< HEAD
      VALUES ($1, $2, $3, 'PARAMETRAGE', 'PARALLELE', $4::bigint, $5)
      ON CONFLICT ("code") DO NOTHING`,
+=======
+     SELECT $1, $2, $3, 'PARAMETRAGE', 'PARALLELE', $4::bigint, $5
+     WHERE NOT EXISTS (
+       SELECT 1 FROM "campagne_budgetaire" WHERE "code" = $1
+     )`,
+>>>>>>> origin/main
     [
       CODE_CAMPAGNE,
       EXERCICE,
@@ -117,6 +128,7 @@ async function seedLot81ACampagneTest(ds: DataSource): Promise<void> {
       nbSkipped++;
       continue;
     }
+<<<<<<< HEAD
     // Idempotence via ON CONFLICT sur la contrainte UNIQUE
     // `uq_camp_user (fk_campagne, fk_user)`. Le RETURNING ne renvoie
     // les colonnes QUE si l'INSERT a effectivement eu lieu (sinon
@@ -127,6 +139,16 @@ async function seedLot81ACampagneTest(ds: DataSource): Promise<void> {
          ("fk_campagne","fk_user","ordre","est_obligatoire","libelle_fonction","utilisateur_creation")
        VALUES ($1::uuid, $2::bigint, $3, true, $4, $5)
        ON CONFLICT ("fk_campagne","fk_user") DO NOTHING
+=======
+    const result = (await ds.query(
+      `INSERT INTO "campagne_comite_membre"
+         ("fk_campagne","fk_user","ordre","est_obligatoire","libelle_fonction","utilisateur_creation")
+       SELECT $1::uuid, $2::bigint, $3, true, $4, $5
+       WHERE NOT EXISTS (
+         SELECT 1 FROM "campagne_comite_membre"
+          WHERE "fk_campagne" = $1::uuid AND "fk_user" = $2::bigint
+       )
+>>>>>>> origin/main
        RETURNING "id"`,
       [campagneId, userId, m.ordre, m.libelleFonction, UTILISATEUR_CREATION],
     )) as Array<{ id: string }>;
