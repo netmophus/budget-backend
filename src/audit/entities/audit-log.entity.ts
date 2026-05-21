@@ -78,7 +78,11 @@ export type TypeAction =
   | 'RESET_MDP_USER_VALIDE'
   | 'NETTOYAGE_RESET_TOKENS'
   // 6.5.B — rappel J-3 délégation.
-  | 'DELEGATION_RAPPEL_J3';
+  | 'DELEGATION_RAPPEL_J3'
+  // Lot 7.6 — exports rapport R04 "Budget Publié BCEAO". Codes seedés
+  // via migration 1779200000240 (AjouterCodesAuditExportR04).
+  | 'EXPORT_R04_PDF'
+  | 'EXPORT_R04_XLSX';
 
 export type AuditStatut = 'success' | 'failure';
 
