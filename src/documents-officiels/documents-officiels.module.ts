@@ -1,0 +1,38 @@
+/**
+ * DocumentsOfficielsModule (Lot 8.1.A) — fondation DB du workflow
+ * signature MIZNAS.
+ *
+ * Au Palier 1, ce module n'expose AUCUN service / controller — il
+ * enregistre uniquement les 5 entités TypeORM auprès de la connexion
+ * pour permettre leur injection dans les futurs services (Lot 8.1.B :
+ * service workflow, Lot 8.1.C : controller + endpoints).
+ *
+ * 5 entités enregistrées :
+ *  - CampagneBudgetaire (1 ligne par exercice fiscal)
+ *  - CampagneComiteMembre (N membres comité par campagne)
+ *  - DocumentOfficiel (1 ligne par document : lettre, note, PV, ...)
+ *  - DocumentVisa (snapshot du comité au moment de la soumission)
+ *  - DocumentSignature (empreinte crypto finale, 1 par document)
+ */
+import { Module } from '@nestjs/common';
+import { TypeOrmModule } from '@nestjs/typeorm';
+
+import { CampagneBudgetaire } from './entities/campagne-budgetaire.entity';
+import { CampagneComiteMembre } from './entities/campagne-comite-membre.entity';
+import { DocumentOfficiel } from './entities/document-officiel.entity';
+import { DocumentSignature } from './entities/document-signature.entity';
+import { DocumentVisa } from './entities/document-visa.entity';
+
+@Module({
+  imports: [
+    TypeOrmModule.forFeature([
+      CampagneBudgetaire,
+      CampagneComiteMembre,
+      DocumentOfficiel,
+      DocumentVisa,
+      DocumentSignature,
+    ]),
+  ],
+  exports: [TypeOrmModule],
+})
+export class DocumentsOfficielsModule {}
