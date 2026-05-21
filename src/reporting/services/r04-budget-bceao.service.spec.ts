@@ -105,6 +105,10 @@ function mockGeleVersion(
     date_gel: '2026-05-20T17:09:00.000Z',
     utilisateur_gel: 'dg@bsic.ne',
     commentaire_publication: 'Publication (gel) — action irréversible.',
+    // Lot 7.6.bis fix #4 — noms complets résolus par LEFT JOIN "user".
+    nom_soumetteur: 'Ousmane MAMANE',
+    nom_validateur: 'Yacouba HAROUNA',
+    nom_publicateur: 'Issoufou BARRY',
     ...overrides,
   };
 }

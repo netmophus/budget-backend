@@ -495,17 +495,19 @@ function drawVentilationCr(
   d: R04Donnees,
   pdf: PdfBuilderService,
 ): void {
-  doc.addPage();
+  // Lot 7.6.bis fix #6 — paysage pour les tableaux denses. Largeur
+  // utile en A4 paysage ≈ 742pt après marges (842 - 50 - 50).
+  doc.addPage({ size: 'A4', layout: 'landscape' });
   pdf.drawSectionTitle(doc, 'IV. VENTILATION PAR CENTRE DE RESPONSABILITÉ');
 
   const cols: PdfTableColumn[] = [
-    { header: 'Code CR', width: 75 },
-    { header: 'Libellé', width: 145 },
-    { header: 'Type', width: 75 },
-    { header: 'Produits (M)', width: 60, align: 'right' },
-    { header: 'Charges (M)', width: 60, align: 'right' },
-    { header: 'Solde (M)', width: 50, align: 'right' },
-    { header: 'Poids %', width: 30, align: 'right' },
+    { header: 'Code CR', width: 110 },
+    { header: 'Libellé', width: 220 },
+    { header: 'Type', width: 110 },
+    { header: 'Produits (M)', width: 80, align: 'right' },
+    { header: 'Charges (M)', width: 80, align: 'right' },
+    { header: 'Solde (M)', width: 75, align: 'right' },
+    { header: 'Poids %', width: 60, align: 'right' },
   ];
 
   const totalActivite = d.totaux.total_produits + d.totaux.total_charges;
@@ -569,15 +571,16 @@ function drawDetailComptes(
   d: R04Donnees,
   pdf: PdfBuilderService,
 ): void {
-  doc.addPage();
+  // Lot 7.6.bis fix #6 — paysage pour le détail comptes (30+ lignes).
+  doc.addPage({ size: 'A4', layout: 'landscape' });
   pdf.drawSectionTitle(doc, 'V. DÉTAIL PAR COMPTE COMPTABLE (PCB-UMOA)');
 
   const cols: PdfTableColumn[] = [
-    { header: 'Code', width: 70 },
-    { header: 'Libellé', width: 230 },
-    { header: 'Classe', width: 50, align: 'center' },
-    { header: 'Sens', width: 45, align: 'center' },
-    { header: 'Montant (M FCFA)', width: 100, align: 'right' },
+    { header: 'Code', width: 90 },
+    { header: 'Libellé', width: 370 },
+    { header: 'Classe', width: 70, align: 'center' },
+    { header: 'Sens', width: 60, align: 'center' },
+    { header: 'Montant (M FCFA)', width: 150, align: 'right' },
   ];
   const rows = d.detailComptes.map((c) => [
     c.code_compte,
@@ -598,7 +601,10 @@ function drawAuditTrail(
   d: R04Donnees,
   pdf: PdfBuilderService,
 ): void {
-  doc.addPage();
+  // Lot 7.6.bis — retour explicite en portrait après les 2 pages
+  // paysage précédentes (CR + détail comptes). Sans ce override,
+  // pdfkit hérite du layout de la dernière addPage().
+  doc.addPage({ size: 'A4', layout: 'portrait' });
   pdf.drawSectionTitle(
     doc,
     "VI. JOURNAL D'AUDIT — TRAÇABILITÉ DES TRANSITIONS",
@@ -715,6 +721,7 @@ function drawSignatures(
     y,
     blocW,
     'Le Directeur Général',
+    d.version.nom_publicateur,
     d.version.utilisateur_gel,
     'Date publication MIZNAS',
     d.version.date_gel,
@@ -726,6 +733,7 @@ function drawSignatures(
     y,
     blocW,
     "Le Président du Conseil d'Administration",
+    d.version.nom_validateur,
     d.version.utilisateur_validation,
     'Date validation comité collégial',
     d.version.date_validation,
@@ -771,7 +779,10 @@ function drawSignatureBlock(
   y: number,
   w: number,
   role: string,
-  utilisateur: string | null,
+  // Lot 7.6.bis fix #4 — `nomComplet` issu du JOIN user (prénom+nom).
+  // Si null (user supprimé), fallback affichage de l'email seul.
+  nomComplet: string | null,
+  email: string | null,
   dateLabel: string,
   date: string | null,
   auditId: string | undefined,
@@ -782,11 +793,20 @@ function drawSignatureBlock(
     .fontSize(11)
     .text(role, x, y, { width: w });
   doc.moveDown(2.5);
+  // Nom complet en gras (ou email seul si JOIN user a renvoyé null).
   doc
     .fillColor(BSIC_BRAND.colors.bleuNuitDark)
     .font(BSIC_BRAND.fonts.titre)
     .fontSize(10)
-    .text(utilisateur ?? '—', x, doc.y, { width: w });
+    .text(nomComplet ?? email ?? '—', x, doc.y, { width: w });
+  // Email en sous-texte gris (seulement si on a affiché un nom au-dessus).
+  if (nomComplet && email) {
+    doc
+      .fillColor(BSIC_BRAND.colors.grisFonce)
+      .font(BSIC_BRAND.fonts.body)
+      .fontSize(8)
+      .text(email, x, doc.y, { width: w });
+  }
   doc
     .fillColor(BSIC_BRAND.colors.grisFonce)
     .font(BSIC_BRAND.fonts.body)

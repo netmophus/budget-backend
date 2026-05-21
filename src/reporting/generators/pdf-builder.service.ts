@@ -126,31 +126,43 @@ export class PdfBuilderService {
   }
 
   /**
-   * Placeholder pour le logo BSIC NIGER. Tant qu'un fichier image n'est
-   * pas fourni (assets/logo-bsic.png ou équivalent), on dessine un
-   * encadré bleu nuit avec "[BSIC NIGER]" — visuellement reconnaissable.
+   * Placeholder pour le logo BSIC NIGER (Lot 7.6.bis fix #7 — refonte).
+   *
+   * Rectangle plein bleu nuit + bordure or fine + "BSIC" bold blanc +
+   * "NIGER" or. Sobre, lisible, conforme à la charte. Sera remplacé par
+   * un PNG/SVG quand un asset officiel sera fourni par BSIC.
    */
   drawLogoPlaceholder(
     doc: PDFKit.PDFDocument,
     x: number,
     y: number,
-    width = 120,
-    height = 40,
+    width = 150,
+    height = 70,
   ): void {
     doc
       .save()
-      .lineWidth(1)
-      .strokeColor(BSIC_BRAND.colors.bleuNuit)
+      // Fond bleu nuit
       .rect(x, y, width, height)
-      .stroke();
-    doc
       .fillColor(BSIC_BRAND.colors.bleuNuit)
+      .fill();
+    // Bordure or fine
+    doc
+      .rect(x, y, width, height)
+      .lineWidth(1.5)
+      .strokeColor(BSIC_BRAND.colors.or)
+      .stroke();
+    // "BSIC" bold blanc
+    doc
       .font(BSIC_BRAND.fonts.titre)
+      .fontSize(20)
+      .fillColor('#FFFFFF')
+      .text('BSIC', x, y + 14, { width, align: 'center', lineBreak: false });
+    // "NIGER" or
+    doc
+      .font(BSIC_BRAND.fonts.body)
       .fontSize(11)
-      .text('[BSIC NIGER]', x, y + height / 2 - 6, {
-        width,
-        align: 'center',
-      });
+      .fillColor(BSIC_BRAND.colors.or)
+      .text('NIGER', x, y + 42, { width, align: 'center', lineBreak: false });
     doc.restore();
   }
 
@@ -198,8 +210,12 @@ export class PdfBuilderService {
   }
 
   /**
-   * Cachet stylisé "BUDGET GELÉ BCEAO 10 ANS" — encadré or sur fond
-   * crème. Utilisé en page 2 du R04 (référence audit + validation).
+   * Cachet officiel "BUDGET GELÉ BCEAO" (Lot 7.6.bis fix #5 — refonte
+   * visuelle). Double bordure rouge sur fond crème, titre principal +
+   * sous-titre conservation + référence audit_log.
+   *
+   * `x`/`y` ancrent le coin top-left du cachet. Pour un cachet centré,
+   * passer `x = (page.width - width) / 2`. `width` par défaut 220pt.
    */
   drawBceaoStamp(
     doc: PDFKit.PDFDocument,
@@ -208,37 +224,61 @@ export class PdfBuilderService {
     width: number,
     referenceAudit: string,
   ): void {
-    const height = 72;
+    const height = 100;
+    doc.save();
+    // Fond crème pâle
+    doc.rect(x, y, width, height).fillColor('#FDF6E3').fill();
+    // Bordure extérieure rouge épaisse
     doc
-      .save()
-      .lineWidth(2)
-      .strokeColor(BSIC_BRAND.colors.or)
-      .fillColor('#FBF6E9')
       .rect(x, y, width, height)
-      .fillAndStroke();
+      .lineWidth(2)
+      .strokeColor(BSIC_BRAND.colors.rouge)
+      .stroke();
+    // Bordure intérieure rouge fine (effet cachet officiel)
     doc
-      .fillColor(BSIC_BRAND.colors.bleuNuit)
+      .rect(x + 4, y + 4, width - 8, height - 8)
+      .lineWidth(0.5)
+      .strokeColor(BSIC_BRAND.colors.rouge)
+      .stroke();
+    // Titre principal
+    doc
+      .fillColor(BSIC_BRAND.colors.rouge)
       .font(BSIC_BRAND.fonts.titre)
       .fontSize(13)
-      .text('BUDGET GELÉ BCEAO 10 ANS', x, y + 12, {
+      .text('BUDGET GELÉ BCEAO', x, y + 18, {
         width,
         align: 'center',
+        lineBreak: false,
       });
+    // Sous-titre conservation
     doc
-      .fillColor(BSIC_BRAND.colors.grisFonce)
       .font(BSIC_BRAND.fonts.body)
       .fontSize(9)
-      .text(`Référence audit : ${referenceAudit}`, x, y + 35, {
+      .fillColor(BSIC_BRAND.colors.rouge)
+      .text('Conservation 10 ans', x, y + 40, {
         width,
         align: 'center',
+        lineBreak: false,
       });
+    // Référence audit_log
     doc
-      .fillColor(BSIC_BRAND.colors.vert)
-      .font(BSIC_BRAND.fonts.titre)
-      .fontSize(9)
-      .text('Validation cryptographique : OK', x, y + 52, {
+      .font(BSIC_BRAND.fonts.body)
+      .fontSize(8)
+      .fillColor(BSIC_BRAND.colors.grisFonce)
+      .text(`Réf. audit ${referenceAudit}`, x, y + 62, {
         width,
         align: 'center',
+        lineBreak: false,
+      });
+    // Mention cachet électronique
+    doc
+      .font(BSIC_BRAND.fonts.italic)
+      .fontSize(7)
+      .fillColor(BSIC_BRAND.colors.grisFonce)
+      .text('Cachet électronique MIZNAS', x, y + 78, {
+        width,
+        align: 'center',
+        lineBreak: false,
       });
     doc.restore();
   }

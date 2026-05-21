@@ -44,6 +44,12 @@ export interface R04VersionMetadata {
   date_gel: string | null;
   utilisateur_gel: string | null;
   commentaire_publication: string | null;
+  // Lot 7.6.bis fix #4 — noms complets pour signatures nominatives.
+  // LEFT JOIN : null si user supprimé après publication (le template
+  // fallback sur l'email dans ce cas).
+  nom_soumetteur: string | null;
+  nom_validateur: string | null;
+  nom_publicateur: string | null;
 }
 
 export interface R04Totaux {
@@ -195,14 +201,25 @@ export class R04BudgetBceaoService {
   private async queryVersion(
     versionId: string,
   ): Promise<R04VersionMetadata | null> {
+    // Lot 7.6.bis fix #4 — LEFT JOIN "user" (table reserved Postgres,
+    // guillemets obligatoires) pour résoudre le nom complet de chaque
+    // acteur du workflow. Null si user supprimé/inexistant : le
+    // template fallback sur l'email dans ce cas.
     const rows = await this.dataSource.query<R04VersionMetadata[]>(
       `SELECT
-         id, code_version, libelle, type_version, exercice_fiscal, statut,
-         date_soumission, utilisateur_soumission, commentaire_soumission,
-         date_validation, utilisateur_validation, commentaire_validation,
-         date_gel, utilisateur_gel, commentaire_publication
-       FROM dim_version
-       WHERE id = $1`,
+         v.id, v.code_version, v.libelle, v.type_version,
+         v.exercice_fiscal, v.statut,
+         v.date_soumission, v.utilisateur_soumission, v.commentaire_soumission,
+         v.date_validation, v.utilisateur_validation, v.commentaire_validation,
+         v.date_gel, v.utilisateur_gel, v.commentaire_publication,
+         (u_soum.prenom || ' ' || u_soum.nom) AS nom_soumetteur,
+         (u_valid.prenom || ' ' || u_valid.nom) AS nom_validateur,
+         (u_gel.prenom || ' ' || u_gel.nom) AS nom_publicateur
+       FROM dim_version v
+       LEFT JOIN "user" u_soum ON u_soum.email = v.utilisateur_soumission
+       LEFT JOIN "user" u_valid ON u_valid.email = v.utilisateur_validation
+       LEFT JOIN "user" u_gel ON u_gel.email = v.utilisateur_gel
+       WHERE v.id = $1`,
       [versionId],
     );
     return rows[0] ?? null;
