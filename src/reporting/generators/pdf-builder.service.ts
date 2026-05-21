@@ -47,7 +47,8 @@ export function formatMontantSigne(n: number | null | undefined): string {
 
 /**
  * Charte BSIC NIGER — palette et conventions utilisées pour TOUS les
- * rapports MIZNAS. Source : Charte v1 + maquette R04 validée Lot 7.6.
+ * rapports MIZNAS. Source : Charte v1 + maquette R04 validée Lot 7.6
+ * + hiérarchie typographique + espacement vertical Lot 7.6.bis.
  */
 export const BSIC_BRAND = {
   colors: {
@@ -60,17 +61,50 @@ export const BSIC_BRAND = {
     grisClair: '#F4F6F8',
     grisFonce: '#5A6171',
     blanc: '#FFFFFF',
+    // Lot 7.6.bis — palette étendue.
+    creme: '#FDF6E3', // fond cachet BCEAO
+    blancCasse: '#FAFAFA', // bandes alternées tableaux
   },
   fonts: {
     titre: 'Helvetica-Bold',
     body: 'Helvetica',
     italic: 'Helvetica-Oblique',
   },
+  /**
+   * Hiérarchie typographique (Lot 7.6.bis fix amélioration #3).
+   * Toute taille de police dans le template R04 DOIT venir d'ici.
+   */
+  fontSizes: {
+    titreGarde: 26, // gros titre page de garde
+    sousTitreGarde: 11, // sous-titre BSIC NIGER S.A.
+    section: 14, // "I. TRAÇABILITÉ..." etc.
+    sousSection: 12, // "A. PRODUITS", "B. CHARGES"
+    body: 10, // texte courant
+    bodySmall: 9, // texte secondaire
+    tableHeader: 9, // entête de tableau
+    tableCell: 9, // cellule de tableau
+    tableSmall: 8, // tableaux denses (CR, comptes)
+    footer: 7, // footer paginé
+    header: 8, // header récurrent
+    metaSmall: 8, // métadonnées (email sous nom signature)
+    italicNote: 9, // notes en bas de section
+  },
   marges: {
     haut: 50,
     bas: 60,
     gauche: 50,
     droite: 50,
+  },
+  /**
+   * Espacement vertical standard (Lot 7.6.bis bonus). Utilisé via
+   * `doc.moveDown(BSIC_BRAND.espacement.apresSection / 12)` (12 = base
+   * d'une ligne pdfkit ≈ fontSize 10).
+   */
+  espacement: {
+    apresSection: 18,
+    apresSousSection: 10,
+    apresParagraphe: 8,
+    apresTableau: 14,
   },
 } as const;
 
@@ -455,6 +489,91 @@ export class PdfBuilderService {
   }
 
   /**
+   * Applique le header récurrent sur toutes les pages SAUF la première
+   * (page de garde) (Lot 7.6.bis amélioration #2). Symétrique au footer
+   * mais positionné dans la marge haute. Filet or fin en dessous.
+   *
+   * Mêmes précautions que le footer : appel obligatoire EN TOUT DERNIER,
+   * `bufferPages: true` requis, `lineBreak: false` sur chaque `text()`.
+   */
+  applyHeaderToAllPagesExceptFirst(
+    doc: PDFKit.PDFDocument,
+    parts: { left: string; center: string; right: string },
+  ): void {
+    const range = doc.bufferedPageRange();
+    const total = range.count;
+    // Toujours skip la page 0 (garde).
+    for (let i = 1; i < total; i++) {
+      doc.switchToPage(range.start + i);
+      this.drawHeaderOnCurrentPage(doc, parts);
+    }
+  }
+
+  /**
+   * Dessine le header sur la page courante (assume `switchToPage` déjà
+   * fait par l'appelant). Position Y dans la marge haute, au-dessus du
+   * contenu.
+   */
+  private drawHeaderOnCurrentPage(
+    doc: PDFKit.PDFDocument,
+    parts: { left: string; center: string; right: string },
+  ): void {
+    const pageWidth = doc.page.width;
+    const left = BSIC_BRAND.marges.gauche;
+    const right = pageWidth - BSIC_BRAND.marges.droite;
+    const width = right - left;
+    const headerY = 22;
+
+    doc
+      .save()
+      .fillColor(BSIC_BRAND.colors.grisFonce)
+      .font(BSIC_BRAND.fonts.body)
+      .fontSize(BSIC_BRAND.fontSizes.header);
+    doc.text(parts.left, left, headerY, {
+      width: width / 3,
+      align: 'left',
+      lineBreak: false,
+    });
+    doc.text(parts.center, left + width / 3, headerY, {
+      width: width / 3,
+      align: 'center',
+      lineBreak: false,
+    });
+    doc.text(parts.right, left + (2 * width) / 3, headerY, {
+      width: width / 3,
+      align: 'right',
+      lineBreak: false,
+    });
+    // Filet or fin en dessous du header (séparateur visuel).
+    doc
+      .lineWidth(0.5)
+      .strokeColor(BSIC_BRAND.colors.or)
+      .moveTo(left, headerY + 12)
+      .lineTo(right, headerY + 12)
+      .stroke();
+    doc.restore();
+  }
+
+  /**
+   * Pagination défensive (Lot 7.6.bis amélioration #4) : ajoute une
+   * nouvelle page UNIQUEMENT si la hauteur restante sur la page
+   * courante est inférieure à `requiredHeight`. Évite les titres
+   * orphelins en bas de page et les tableaux coupés.
+   *
+   * Précision approximative — on estime la hauteur d'un bloc à venir,
+   * pas besoin d'être pixel-perfect. En cas de débordement réel,
+   * pdfkit gère le saut auto.
+   */
+  ensureSpaceOrNewPage(doc: PDFKit.PDFDocument, requiredHeight: number): void {
+    const currentY = doc.y;
+    const pageBottom = doc.page.height - BSIC_BRAND.marges.bas;
+    const available = pageBottom - currentY;
+    if (available < requiredHeight) {
+      doc.addPage();
+    }
+  }
+
+  /**
    * Sectionne le document : titre de section (h2) en bleu nuit + barre
    * or fine en dessous. Retourne le `y` final pour chaîner le contenu.
    */
@@ -462,7 +581,7 @@ export class PdfBuilderService {
     doc
       .fillColor(BSIC_BRAND.colors.bleuNuit)
       .font(BSIC_BRAND.fonts.titre)
-      .fontSize(14)
+      .fontSize(BSIC_BRAND.fontSizes.section)
       .text(title);
     const y = doc.y + 2;
     doc

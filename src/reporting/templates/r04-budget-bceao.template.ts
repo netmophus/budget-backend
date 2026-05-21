@@ -180,7 +180,7 @@ function drawPage1Garde(
   doc
     .fillColor(BSIC_BRAND.colors.bleuNuit)
     .font(BSIC_BRAND.fonts.titre)
-    .fontSize(26)
+    .fontSize(BSIC_BRAND.fontSizes.titreGarde)
     .text(
       `BUDGET ${d.version.exercice_fiscal} — SNAPSHOT OFFICIEL`,
       left,
@@ -192,7 +192,7 @@ function drawPage1Garde(
   doc
     .fillColor(BSIC_BRAND.colors.grisFonce)
     .font(BSIC_BRAND.fonts.body)
-    .fontSize(11)
+    .fontSize(BSIC_BRAND.fontSizes.sousTitreGarde)
     .text(
       'BSIC NIGER S.A. — Banque Sahélo-Saharienne pour l’Investissement et le Commerce',
       left,
@@ -232,7 +232,7 @@ function drawPage1Garde(
   doc
     .fillColor(BSIC_BRAND.colors.rouge)
     .font(BSIC_BRAND.fonts.titre)
-    .fontSize(10)
+    .fontSize(BSIC_BRAND.fontSizes.body)
     .text('CONFIDENTIEL — Usage réglementaire BCEAO', left, 700, {
       width,
       align: 'center',
@@ -240,7 +240,7 @@ function drawPage1Garde(
   doc
     .fillColor(BSIC_BRAND.colors.grisFonce)
     .font(BSIC_BRAND.fonts.body)
-    .fontSize(8)
+    .fontSize(BSIC_BRAND.fontSizes.metaSmall)
     .text(`Référence document : ${refDoc}`, left, doc.y + 6, {
       width,
       align: 'center',
@@ -339,13 +339,17 @@ function drawPage3Resume(
     solde >= 0 ? BSIC_BRAND.colors.vert : BSIC_BRAND.colors.rouge,
   );
 
-  // Tableau Périmètre
+  // Tableau Périmètre — pagination intelligente (Lot 7.6.bis #4) :
+  // hauteur estimée du bloc Périmètre = titre (20pt) + 4 lignes (88pt)
+  // + marges (20pt) ≈ 130pt. Si on n'a pas la place sous les KPI cards,
+  // saut de page propre avant le tableau.
   doc.y = y + cardH + 25;
   doc.x = left;
+  pdf.ensureSpaceOrNewPage(doc, 130);
   doc
     .fillColor(BSIC_BRAND.colors.bleuNuitDark)
     .font(BSIC_BRAND.fonts.titre)
-    .fontSize(11)
+    .fontSize(BSIC_BRAND.fontSizes.sousSection)
     .text('Périmètre du budget');
   doc.moveDown(0.4);
   pdf.drawTable(
@@ -383,11 +387,12 @@ function drawKpiCard(
   doc
     .fillColor(BSIC_BRAND.colors.grisFonce)
     .font(BSIC_BRAND.fonts.body)
-    .fontSize(9)
+    .fontSize(BSIC_BRAND.fontSizes.bodySmall)
     .text(label, x + 10, y + 15, { width: w - 20, align: 'left' });
   doc
     .fillColor(color)
     .font(BSIC_BRAND.fonts.titre)
+    // Lot 7.6.bis — fontSize(18) volontaire : taille KPI card 'metric' non standard du token registre.
     .fontSize(18)
     .text(value, x + 10, y + 40, { width: w - 20, align: 'left' });
   doc.restore();
@@ -411,7 +416,7 @@ function drawCompteResultat(
   doc
     .fillColor(BSIC_BRAND.colors.vert)
     .font(BSIC_BRAND.fonts.titre)
-    .fontSize(12)
+    .fontSize(BSIC_BRAND.fontSizes.sousSection)
     .text('A. PRODUITS (Classe 7)');
   doc.moveDown(0.4);
 
@@ -455,7 +460,7 @@ function drawCompteResultat(
   doc
     .fillColor(BSIC_BRAND.colors.orange)
     .font(BSIC_BRAND.fonts.titre)
-    .fontSize(12)
+    .fontSize(BSIC_BRAND.fontSizes.sousSection)
     .text('B. CHARGES (Classe 6)');
   doc.moveDown(0.4);
 
@@ -561,7 +566,10 @@ function drawVentilationCr(
   ]);
 
   doc.x = BSIC_BRAND.marges.gauche;
-  pdf.drawTable(doc, cols, rows, { rowHeight: 18, fontSize: 8 });
+  pdf.drawTable(doc, cols, rows, {
+    rowHeight: 18,
+    fontSize: BSIC_BRAND.fontSizes.tableSmall,
+  });
 }
 
 // ─── Pages 8-9 — Détail par compte ───────────────────────────────────
@@ -620,7 +628,7 @@ function drawAuditTrail(
     doc
       .fillColor(BSIC_BRAND.colors.grisFonce)
       .font(BSIC_BRAND.fonts.italic)
-      .fontSize(10)
+      .fontSize(BSIC_BRAND.fontSizes.body)
       .text('Aucune action workflow tracée pour ce cycle de publication.');
   }
 
@@ -628,7 +636,7 @@ function drawAuditTrail(
   doc
     .fillColor(BSIC_BRAND.colors.grisFonce)
     .font(BSIC_BRAND.fonts.italic)
-    .fontSize(9)
+    .fontSize(BSIC_BRAND.fontSizes.italicNote)
     .text(
       'Ces enregistrements sont immuables et conservés 10 ans conformément aux exigences BCEAO.',
       { align: 'left' },
@@ -639,12 +647,12 @@ function drawAuditEntry(doc: PDFKit.PDFDocument, a: R04AuditEntry): void {
   doc
     .fillColor(BSIC_BRAND.colors.bleuNuit)
     .font(BSIC_BRAND.fonts.titre)
-    .fontSize(10)
+    .fontSize(BSIC_BRAND.fontSizes.body)
     .text(`[${fmtDateFrShort(a.date_action)}] ${a.type_action}`);
   doc
     .fillColor(BSIC_BRAND.colors.bleuNuitDark)
     .font(BSIC_BRAND.fonts.body)
-    .fontSize(9);
+    .fontSize(BSIC_BRAND.fontSizes.bodySmall);
   doc.text(`  Acteur     : ${a.utilisateur}`);
   doc.text(`  Référence  : audit_log #${a.id}`);
   doc.text(`  Commentaire : ${a.commentaire ?? '—'}`);
@@ -680,11 +688,11 @@ function drawTextesReglementaires(
     doc
       .fillColor(BSIC_BRAND.colors.bleuNuit)
       .font(BSIC_BRAND.fonts.titre)
-      .fontSize(10)
+      .fontSize(BSIC_BRAND.fontSizes.body)
       .text(`• ${ref}`, { continued: true })
       .fillColor(BSIC_BRAND.colors.bleuNuitDark)
       .font(BSIC_BRAND.fonts.body)
-      .fontSize(10)
+      .fontSize(BSIC_BRAND.fontSizes.body)
       .text(` — ${libelle}`);
     doc.moveDown(0.3);
   }
@@ -693,7 +701,7 @@ function drawTextesReglementaires(
   doc
     .fillColor(BSIC_BRAND.colors.grisFonce)
     .font(BSIC_BRAND.fonts.italic)
-    .fontSize(10)
+    .fontSize(BSIC_BRAND.fontSizes.body)
     .text(
       "Le présent budget a été élaboré conformément au Plan Comptable Bancaire UMOA Révisé et respecte les principes de séparation des tâches, de traçabilité et de conservation décennale exigés par la BCEAO. L'ensemble des actions de saisie, validation et publication ont été enregistrées dans le journal d'audit MIZNAS et sont consultables par les organes de contrôle interne (Audit, Risques, Conformité).",
       { align: 'justify', lineGap: 3 },
@@ -756,7 +764,7 @@ function drawSignatures(
   doc
     .fillColor(BSIC_BRAND.colors.grisFonce)
     .font(BSIC_BRAND.fonts.italic)
-    .fontSize(8)
+    .fontSize(BSIC_BRAND.fontSizes.metaSmall)
     .text(
       `Document généré automatiquement par MIZNAS le ${fmtDateFrLong(d.version.date_gel)}`,
       left,
@@ -790,34 +798,34 @@ function drawSignatureBlock(
   doc
     .fillColor(BSIC_BRAND.colors.bleuNuit)
     .font(BSIC_BRAND.fonts.titre)
-    .fontSize(11)
+    .fontSize(BSIC_BRAND.fontSizes.sousSection)
     .text(role, x, y, { width: w });
   doc.moveDown(2.5);
   // Nom complet en gras (ou email seul si JOIN user a renvoyé null).
   doc
     .fillColor(BSIC_BRAND.colors.bleuNuitDark)
     .font(BSIC_BRAND.fonts.titre)
-    .fontSize(10)
+    .fontSize(BSIC_BRAND.fontSizes.body)
     .text(nomComplet ?? email ?? '—', x, doc.y, { width: w });
   // Email en sous-texte gris (seulement si on a affiché un nom au-dessus).
   if (nomComplet && email) {
     doc
       .fillColor(BSIC_BRAND.colors.grisFonce)
       .font(BSIC_BRAND.fonts.body)
-      .fontSize(8)
+      .fontSize(BSIC_BRAND.fontSizes.metaSmall)
       .text(email, x, doc.y, { width: w });
   }
   doc
     .fillColor(BSIC_BRAND.colors.grisFonce)
     .font(BSIC_BRAND.fonts.body)
-    .fontSize(9)
+    .fontSize(BSIC_BRAND.fontSizes.bodySmall)
     .text(dateLabel, x, doc.y + 4, { width: w });
   doc.text(fmtDateFrLong(date), x, doc.y, { width: w });
   doc.moveDown(1);
   doc
     .fillColor(BSIC_BRAND.colors.or)
     .font(BSIC_BRAND.fonts.italic)
-    .fontSize(9)
+    .fontSize(BSIC_BRAND.fontSizes.italicNote)
     .text(`[Cachet électronique : audit_log #${auditId ?? '—'}]`, x, doc.y, {
       width: w,
     });

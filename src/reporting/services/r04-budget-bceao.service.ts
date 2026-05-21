@@ -163,6 +163,13 @@ export class R04BudgetBceaoService {
 
     buildR04Pdf(doc, donnees, this.pdfBuilder);
 
+    // Lot 7.6.bis amélioration #2 — header récurrent (pages 2 à fin).
+    this.pdfBuilder.applyHeaderToAllPagesExceptFirst(doc, {
+      left: 'BSIC NIGER S.A.',
+      center: `Budget ${donnees.version.exercice_fiscal} — Snapshot BCEAO`,
+      right: `R04 — ${donnees.version.code_version}`,
+    });
+
     this.pdfBuilder.applyFooterToAllPages(
       doc,
       {
