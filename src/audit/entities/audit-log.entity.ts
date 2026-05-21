@@ -82,7 +82,15 @@ export type TypeAction =
   // Lot 7.6 — exports rapport R04 "Budget Publié BCEAO". Codes seedés
   // via migration 1779200000240 (AjouterCodesAuditExportR04).
   | 'EXPORT_R04_PDF'
-  | 'EXPORT_R04_XLSX';
+  | 'EXPORT_R04_XLSX'
+  // Lot 8.1.A — workflow signature documents officiels. Codes seedés
+  // via migration 1779200000300 (AjouterPermissionsEtCodesAuditLot81A).
+  | 'CREER_DOCUMENT'
+  | 'EDITER_DOCUMENT'
+  | 'SOUMETTRE_DOCUMENT_VISA'
+  | 'VISER_DOCUMENT'
+  | 'REJETER_DOCUMENT'
+  | 'SIGNER_DOCUMENT';
 
 export type AuditStatut = 'success' | 'failure';
 

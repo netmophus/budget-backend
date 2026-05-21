@@ -16,6 +16,7 @@ import { PasswordExpiredGuard } from './auth/guards/password-expired.guard';
 import { PermissionsGuard } from './auth/guards/permissions.guard';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 import { DelegationsModule } from './delegations/delegations.module';
+import { DocumentsOfficielsModule } from './documents-officiels/documents-officiels.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { RealiseModule } from './realise/realise.module';
 import { ReforecastModule } from './reforecast/reforecast.module';
@@ -153,6 +154,10 @@ import { UsersModule } from './users/users.module';
     CampagnesModule,
     // Lot 7.6 — module reporting officiel (R01–R20, R04 en premier)
     ReportingModule,
+    // Lot 8.1.A — fondation DB du workflow signature (campagnes,
+    // documents officiels, visas, signatures). Service + controller
+    // aux Lots 8.1.B et 8.1.C.
+    DocumentsOfficielsModule,
     // Référentiels secondaires (énumérations) — Lot 2.5-bis-A.
     RefTypeStructureModule,
     RefPaysModule,
