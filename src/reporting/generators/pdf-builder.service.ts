@@ -15,6 +15,37 @@ import { Injectable } from '@nestjs/common';
 import PDFDocument from 'pdfkit';
 
 /**
+ * Formate un nombre en string avec espace ASCII (U+0020) comme
+ * séparateur de milliers.
+ *
+ * **POURQUOI un helper dédié** (Lot 7.6.bis fix #1) :
+ * `Intl.NumberFormat('fr-FR').format(n)` produit U+202F (NARROW NO-BREAK
+ * SPACE) qui n'est PAS dans la table de glyphes Helvetica/Times standard
+ * de pdfkit (encodage WinAnsi/Latin-1). Résultat : tous les montants
+ * formatés s'affichaient avec `/` à la place de l'espace milliers dans
+ * les PDFs du Lot 7.6 initial. L'espace ASCII normal est rendu
+ * correctement par toutes les polices PDF de base.
+ *
+ * Retourne `'—'` pour les valeurs invalides (null/undefined/NaN).
+ */
+export function formatMontant(n: number | null | undefined): string {
+  if (n === null || n === undefined || Number.isNaN(n)) return '—';
+  return Math.round(n)
+    .toString()
+    .replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+}
+
+/**
+ * Variante signée de `formatMontant` : négatifs préfixés `-`.
+ * Ex: `-3681000000` → `-3 681 000 000`.
+ */
+export function formatMontantSigne(n: number | null | undefined): string {
+  if (n === null || n === undefined || Number.isNaN(n)) return '—';
+  const abs = formatMontant(Math.abs(n));
+  return n < 0 ? `-${abs}` : abs;
+}
+
+/**
  * Charte BSIC NIGER — palette et conventions utilisées pour TOUS les
  * rapports MIZNAS. Source : Charte v1 + maquette R04 validée Lot 7.6.
  */
@@ -292,11 +323,24 @@ export class PdfBuilderService {
   }
 
   /**
-   * Ajoute le footer paginé sur toutes les pages du document. À
-   * appeler APRÈS avoir tout dessiné mais AVANT `doc.end()`, sinon
-   * `bufferedPageRange()` retourne 0 pages.
+   * Ajoute le footer paginé sur toutes les pages EXISTANTES du document.
    *
-   * Format : "Gauche | Centre | Droite (Page X/N)".
+   * **CRITIQUE — appel obligatoire EN TOUT DERNIER, juste avant
+   * `doc.end()`** : sinon `bufferedPageRange()` retourne 0 pages.
+   *
+   * **Bug Lot 7.6 initial (#2 — footer dupliqué × 30)** :
+   *   - position Y initiale : `page.height - 60 + 15 = 797` (sur A4=842)
+   *   - marges bas par défaut = 60 → zone utile s'arrête à `y=782`
+   *   - donc le footer débordait dans la marge basse, et `doc.text()`
+   *     sans `lineBreak: false` créait des pages auto pour le wrap
+   *   - `bufferedPageRange().count` augmentait pendant l'itération
+   *     → cascade : chaque footer en générait 2-3 nouveaux jusqu'à 37 pages
+   *
+   * **Fix** :
+   *   - position Y plus haute : `page.height - 35` (au-dessus de la marge bas)
+   *   - `lineBreak: false` sur chaque `text()` pour interdire le wrap auto
+   *   - `total` capturé UNE FOIS hors de la boucle (snapshot)
+   *   - itération stricte de 0 à total exclu, jamais d'addPage()
    */
   applyFooterToAllPages(
     doc: PDFKit.PDFDocument,
@@ -305,37 +349,69 @@ export class PdfBuilderService {
   ): void {
     const range = doc.bufferedPageRange();
     const total = range.count;
+
     for (let i = 0; i < total; i++) {
       if (options.skipFirstPage && i === 0) continue;
       doc.switchToPage(range.start + i);
-
-      const y = doc.page.height - BSIC_BRAND.marges.bas + 15;
-      const left = BSIC_BRAND.marges.gauche;
-      const right = doc.page.width - BSIC_BRAND.marges.droite;
-      const width = right - left;
-
-      doc
-        .save()
-        .lineWidth(0.5)
-        .strokeColor(BSIC_BRAND.colors.grisFonce)
-        .moveTo(left, y - 5)
-        .lineTo(right, y - 5)
-        .stroke();
-      doc
-        .fillColor(BSIC_BRAND.colors.grisFonce)
-        .font(BSIC_BRAND.fonts.body)
-        .fontSize(8);
-      doc.text(parts.left, left, y, { width: width / 3, align: 'left' });
-      doc.text(parts.center, left + width / 3, y, {
-        width: width / 3,
-        align: 'center',
+      this.drawFooterOnCurrentPage(doc, {
+        left: parts.left,
+        center: parts.center,
+        pageNumber: i + 1,
+        totalPages: total,
       });
-      doc.text(`Page ${i + 1}/${total}`, left + (2 * width) / 3, y, {
-        width: width / 3,
-        align: 'right',
-      });
-      doc.restore();
     }
+  }
+
+  /**
+   * Dessine le footer sur la page courante (assume `switchToPage` déjà
+   * fait par l'appelant). Position Y au-dessus de la marge basse pour
+   * éviter le débordement qui déclenchait l'auto-pagination de pdfkit.
+   */
+  private drawFooterOnCurrentPage(
+    doc: PDFKit.PDFDocument,
+    parts: {
+      left: string;
+      center: string;
+      pageNumber: number;
+      totalPages: number;
+    },
+  ): void {
+    const pageWidth = doc.page.width;
+    const left = BSIC_BRAND.marges.gauche;
+    const right = pageWidth - BSIC_BRAND.marges.droite;
+    const width = right - left;
+    const footerY = doc.page.height - 35;
+
+    doc
+      .save()
+      .lineWidth(0.5)
+      .strokeColor(BSIC_BRAND.colors.or)
+      .moveTo(left, footerY - 8)
+      .lineTo(right, footerY - 8)
+      .stroke();
+    doc
+      .fillColor(BSIC_BRAND.colors.grisFonce)
+      .font(BSIC_BRAND.fonts.body)
+      .fontSize(7);
+    // lineBreak: false — empêche `text()` de créer une page auto si
+    // le contenu dépasse la zone utile (bug Lot 7.6 initial).
+    doc.text(parts.left, left, footerY, {
+      width: width / 3,
+      align: 'left',
+      lineBreak: false,
+    });
+    doc.text(parts.center, left + width / 3, footerY, {
+      width: width / 3,
+      align: 'center',
+      lineBreak: false,
+    });
+    doc.text(
+      `Page ${parts.pageNumber}/${parts.totalPages}`,
+      left + (2 * width) / 3,
+      footerY,
+      { width: width / 3, align: 'right', lineBreak: false },
+    );
+    doc.restore();
   }
 
   /**

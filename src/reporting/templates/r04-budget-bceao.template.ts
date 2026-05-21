@@ -21,6 +21,7 @@
  */
 import {
   BSIC_BRAND,
+  formatMontant,
   type PdfBuilderService,
   type PdfTableColumn,
 } from '../generators/pdf-builder.service';
@@ -74,14 +75,15 @@ const TYPE_VERSION_LIBELLES: Record<string, string> = {
 
 // ─── Helpers formatage ───────────────────────────────────────────────
 
-const fcfaFmt = new Intl.NumberFormat('fr-FR');
+// Lot 7.6.bis — `Intl.NumberFormat('fr-FR')` produit U+202F qui s'affiche
+// `/` avec Helvetica pdfkit. Utiliser `formatMontant()` (espace ASCII).
 
 function fmtFcfa(n: number): string {
-  return fcfaFmt.format(Math.round(n));
+  return formatMontant(n);
 }
 
 function fmtMillions(n: number): string {
-  return fcfaFmt.format(Math.round(n / 1_000_000));
+  return formatMontant(n / 1_000_000);
 }
 
 function fmtPct(n: number, total: number): string {
@@ -413,14 +415,24 @@ function drawCompteResultat(
     .text('A. PRODUITS (Classe 7)');
   doc.moveDown(0.4);
 
-  const produitsRows = d.comptedeResultat
-    .filter((r) => r.classe === '7')
-    .map((r) => [
-      r.sous_classe + 'xx',
-      libelleSousClasse('7', r.sous_classe),
-      fmtMillions(r.montant),
-      fmtPct(r.montant, d.totaux.total_produits),
-    ]);
+  // Lot 7.6.bis fix #3 : afficher les 10 sous-classes PCB-UMOA (70-79)
+  // même si la DB n'en a pas, pour un compte de résultat exhaustif.
+  // Les sous-classes absentes en DB sont rendues à 0.
+  const produitsParSousClasse = new Map(
+    d.comptedeResultat
+      .filter((r) => r.classe === '7')
+      .map((r) => [r.sous_classe, r.montant]),
+  );
+  const produitsRows = Array.from({ length: 10 }, (_, i) => {
+    const sc = `7${i}`;
+    const montant = produitsParSousClasse.get(sc) ?? 0;
+    return [
+      sc + 'xx',
+      libelleSousClasse('7', sc),
+      fmtMillions(montant),
+      fmtPct(montant, d.totaux.total_produits),
+    ];
+  });
 
   pdf.drawTable(
     doc,
@@ -430,9 +442,7 @@ function drawCompteResultat(
       { header: 'Montant (M FCFA)', width: 100, align: 'right' },
       { header: '% Total', width: 75, align: 'right' },
     ],
-    produitsRows.length > 0
-      ? produitsRows
-      : [['—', 'Aucune ligne produit', '0', '0,0 %']],
+    produitsRows,
   );
 
   // Saut de page → B. CHARGES
@@ -449,14 +459,22 @@ function drawCompteResultat(
     .text('B. CHARGES (Classe 6)');
   doc.moveDown(0.4);
 
-  const chargesRows = d.comptedeResultat
-    .filter((r) => r.classe === '6')
-    .map((r) => [
-      r.sous_classe + 'xx',
-      libelleSousClasse('6', r.sous_classe),
-      fmtMillions(r.montant),
-      fmtPct(r.montant, d.totaux.total_charges),
-    ]);
+  // Lot 7.6.bis fix #3 : idem pour les charges (60-69 PCB-UMOA).
+  const chargesParSousClasse = new Map(
+    d.comptedeResultat
+      .filter((r) => r.classe === '6')
+      .map((r) => [r.sous_classe, r.montant]),
+  );
+  const chargesRows = Array.from({ length: 10 }, (_, i) => {
+    const sc = `6${i}`;
+    const montant = chargesParSousClasse.get(sc) ?? 0;
+    return [
+      sc + 'xx',
+      libelleSousClasse('6', sc),
+      fmtMillions(montant),
+      fmtPct(montant, d.totaux.total_charges),
+    ];
+  });
 
   pdf.drawTable(
     doc,
@@ -466,9 +484,7 @@ function drawCompteResultat(
       { header: 'Montant (M FCFA)', width: 100, align: 'right' },
       { header: '% Total', width: 75, align: 'right' },
     ],
-    chargesRows.length > 0
-      ? chargesRows
-      : [['—', 'Aucune ligne charge', '0', '0,0 %']],
+    chargesRows,
   );
 }
 
