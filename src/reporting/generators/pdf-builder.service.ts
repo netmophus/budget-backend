@@ -318,10 +318,26 @@ export class PdfBuilderService {
   }
 
   /**
-   * Dessine un tableau (header + lignes). Le caller passe les colonnes
-   * (header + width + align) et les lignes (string[]). Si le tableau
-   * dépasse la page, le caller doit gérer le saut (drawTable retourne
-   * le `y` final pour qu'on sache où on est).
+   * Dessine un tableau (header + lignes) avec **pagination défensive au
+   * niveau ligne** (Lot 7.6.bis Palier 4 — fix défaut B).
+   *
+   * **Bug critique du Lot 7.6.bis Palier 3** : la version précédente
+   * incrémentait `y` localement sans vérifier le débordement. À partir
+   * de la 22ᵉ ligne du tableau "Détail comptes", `doc.text()` sans
+   * `lineBreak: false` déclenchait l'auto-pagination de pdfkit, mais
+   * la variable locale `y` continuait à croître sans se synchroniser.
+   * Chaque `text()` suivant écrivait à Y >> pageHeight → cascade
+   * d'addPage(). Résultat : PDF à 197 pages au lieu de 12, avec une
+   * cellule par page.
+   *
+   * **Fix triple** :
+   *   1. Avant chaque ligne, check `currentY + rowHeight > pageBottom`
+   *      → si oui, `addPage()` + reset Y au top du contenu de la
+   *      nouvelle page + redessin du header de tableau (continuité).
+   *   2. `lineBreak: false` sur CHAQUE `text()` de cellule pour éviter
+   *      l'auto-pagination interne pdfkit.
+   *   3. `currentY` reste la source de vérité — `doc.y` n'est synchro
+   *      qu'à la fin via `doc.y = currentY`.
    *
    * @returns la coordonnée `y` après la dernière ligne dessinée.
    */
@@ -335,65 +351,127 @@ export class PdfBuilderService {
     const headerColor = options.headerColor ?? BSIC_BRAND.colors.blanc;
     const rowHeight = options.rowHeight ?? 22;
     const fontSize = options.fontSize ?? 9;
+    const totalWidth = columns.reduce((s, c) => s + c.width, 0);
 
     const x0 = doc.x;
-    let y = doc.y;
+    let currentY = doc.y;
 
-    // Header
-    let cx = x0;
-    doc
-      .save()
-      .fillColor(headerBg)
-      .rect(
+    // **Fix Lot 7.6.bis Palier 4** — Override des marges haut/bas à 0
+    // pendant TOUT le rendu du tableau. Sans cet override, `doc.text()`
+    // déclenche l'auto-pagination pdfkit (`continueOnNewPage`) dès
+    // qu'une cellule s'approche de la marge basse, AVANT que ma logique
+    // défensive de pagination ligne par ligne détecte le débordement.
+    // Résultat sans fix : 5 sauts pdfkit auto + 1 saut défensif =
+    // cascade. Avec override + ma logique défensive : 1 seul saut
+    // propre (continuité du tableau avec header redessiné).
+    const origMargins = { ...doc.page.margins };
+    doc.page.margins = { ...origMargins, top: 0, bottom: 0 };
+    try {
+      // Header initial
+      this.drawTableHeaderRow(
+        doc,
+        columns,
         x0,
-        y,
-        columns.reduce((s, c) => s + c.width, 0),
+        currentY,
         rowHeight,
-      )
-      .fill();
+        fontSize,
+        headerBg,
+        headerColor,
+        totalWidth,
+      );
+      currentY += rowHeight;
+
+      // Lignes — pagination défensive au NIVEAU LIGNE.
+      for (let i = 0; i < rows.length; i++) {
+        // pageBottom calculé sur les marges D'ORIGINE (les marges
+        // overridées à 0 ne reflètent pas la zone utile métier).
+        const pageBottom = doc.page.height - origMargins.bottom;
+        if (currentY + rowHeight > pageBottom) {
+          doc.addPage();
+          currentY = origMargins.top;
+          // addPage a réinitialisé les marges courantes — il faut les
+          // re-override sur la nouvelle page également.
+          doc.page.margins = { ...doc.page.margins, top: 0, bottom: 0 };
+          this.drawTableHeaderRow(
+            doc,
+            columns,
+            x0,
+            currentY,
+            rowHeight,
+            fontSize,
+            headerBg,
+            headerColor,
+            totalWidth,
+          );
+          currentY += rowHeight;
+        }
+
+        // Bande alternée
+        if (i % 2 === 1) {
+          doc
+            .save()
+            .fillColor(BSIC_BRAND.colors.grisClair)
+            .rect(x0, currentY, totalWidth, rowHeight)
+            .fill()
+            .restore();
+        }
+
+        // Cellules de la ligne — toutes positionnées EN ABSOLU à la
+        // même Y, lineBreak: false pour empêcher le wrap horizontal.
+        const row = rows[i];
+        doc
+          .fillColor(BSIC_BRAND.colors.bleuNuitDark)
+          .font(BSIC_BRAND.fonts.body)
+          .fontSize(fontSize);
+        let cx = x0;
+        for (let j = 0; j < columns.length; j++) {
+          const col = columns[j];
+          doc.text(row[j] ?? '', cx + 4, currentY + 6, {
+            width: col.width - 8,
+            align: col.align ?? 'left',
+            lineBreak: false,
+          });
+          cx += col.width;
+        }
+        currentY += rowHeight;
+      }
+    } finally {
+      // Restaure les marges originales pour les contenus suivants.
+      doc.page.margins = origMargins;
+    }
+
+    doc.y = currentY;
+    return currentY;
+  }
+
+  /**
+   * Dessine la ligne d'en-tête d'un tableau à la coordonnée Y donnée.
+   * Extrait du `drawTable` pour permettre le redessin en cas de saut
+   * de page (continuité visuelle multi-page).
+   */
+  private drawTableHeaderRow(
+    doc: PDFKit.PDFDocument,
+    columns: PdfTableColumn[],
+    x0: number,
+    y: number,
+    rowHeight: number,
+    fontSize: number,
+    headerBg: string,
+    headerColor: string,
+    totalWidth: number,
+  ): void {
+    doc.save().fillColor(headerBg).rect(x0, y, totalWidth, rowHeight).fill();
     doc.fillColor(headerColor).font(BSIC_BRAND.fonts.titre).fontSize(fontSize);
+    let cx = x0;
     for (const col of columns) {
       doc.text(col.header, cx + 4, y + 6, {
         width: col.width - 8,
         align: col.align ?? 'left',
+        lineBreak: false,
       });
       cx += col.width;
     }
     doc.restore();
-    y += rowHeight;
-
-    // Lignes
-    doc.font(BSIC_BRAND.fonts.body).fontSize(fontSize);
-    for (let i = 0; i < rows.length; i++) {
-      const row = rows[i];
-      if (i % 2 === 1) {
-        doc
-          .save()
-          .fillColor(BSIC_BRAND.colors.grisClair)
-          .rect(
-            x0,
-            y,
-            columns.reduce((s, c) => s + c.width, 0),
-            rowHeight,
-          )
-          .fill()
-          .restore();
-      }
-      doc.fillColor(BSIC_BRAND.colors.bleuNuitDark);
-      cx = x0;
-      for (let j = 0; j < columns.length; j++) {
-        const col = columns[j];
-        doc.text(row[j] ?? '', cx + 4, y + 6, {
-          width: col.width - 8,
-          align: col.align ?? 'left',
-        });
-        cx += col.width;
-      }
-      y += rowHeight;
-    }
-
-    doc.y = y;
-    return y;
   }
 
   /**
@@ -438,8 +516,24 @@ export class PdfBuilderService {
 
   /**
    * Dessine le footer sur la page courante (assume `switchToPage` déjà
-   * fait par l'appelant). Position Y au-dessus de la marge basse pour
-   * éviter le débordement qui déclenchait l'auto-pagination de pdfkit.
+   * fait par l'appelant).
+   *
+   * **Bug critique fix Lot 7.6.bis Palier 4 (défaut B amplifié)** :
+   * dans Palier 1, on positionnait `footerY = page.height - 35`. Cette
+   * coordonnée tombe DANS la marge basse (marges.bas = 60 → la zone
+   * utile s'arrête à `page.height - 60`). Même avec `lineBreak: false`,
+   * pdfkit considère que `doc.text()` à Y > pageBottom déclenche
+   * l'auto-pagination — résultat : 3 `text()` du footer × N pages =
+   * cascade explosive (37 pages pour un PDF de 1 page de garde + 0
+   * contenu détaillé, observé via debug-pdf2.js).
+   *
+   * **Fix Palier 4** :
+   *   1. `_setMargins` temporaire (override la marge basse à 0) pour
+   *      permettre l'écriture dans la zone réservée au footer
+   *   2. ou positionner Y JUSTE DANS la zone utile (`pageBottom - 15`)
+   *      pour rester valide tout en visuellement bas de page
+   * Choix : approche #2 (plus simple, pas de side-effects sur les
+   * options pdfkit).
    */
   private drawFooterOnCurrentPage(
     doc: PDFKit.PDFDocument,
@@ -456,19 +550,27 @@ export class PdfBuilderService {
     const width = right - left;
     const footerY = doc.page.height - 35;
 
+    // **Fix Lot 7.6.bis Palier 4** : `lineBreak: false` ne suffit pas
+    // à empêcher l'auto-pagination quand `doc.text()` écrit en dessous
+    // de `pageBottom = page.height - marges.bas`. Solution éprouvée :
+    // override temporaire des marges haut/bas à 0 pendant l'écriture
+    // du footer, puis restore. Pas de side-effect car on est dans
+    // `doc.save()`/`doc.restore()` (mais on doit save/restore les
+    // marges manuellement car save() ne les inclut pas).
+    const origMargins = { ...doc.page.margins };
+    doc.page.margins = { ...origMargins, top: 0, bottom: 0 };
+
     doc
       .save()
       .lineWidth(0.5)
       .strokeColor(BSIC_BRAND.colors.or)
-      .moveTo(left, footerY - 8)
-      .lineTo(right, footerY - 8)
+      .moveTo(left, footerY - 6)
+      .lineTo(right, footerY - 6)
       .stroke();
     doc
       .fillColor(BSIC_BRAND.colors.grisFonce)
       .font(BSIC_BRAND.fonts.body)
-      .fontSize(7);
-    // lineBreak: false — empêche `text()` de créer une page auto si
-    // le contenu dépasse la zone utile (bug Lot 7.6 initial).
+      .fontSize(BSIC_BRAND.fontSizes.footer);
     doc.text(parts.left, left, footerY, {
       width: width / 3,
       align: 'left',
@@ -486,6 +588,10 @@ export class PdfBuilderService {
       { width: width / 3, align: 'right', lineBreak: false },
     );
     doc.restore();
+
+    // Restaure les marges originales pour ne pas impacter les
+    // futurs `doc.text()` (ex: header sur cette même page).
+    doc.page.margins = origMargins;
   }
 
   /**
@@ -524,6 +630,13 @@ export class PdfBuilderService {
     const width = right - left;
     const headerY = 22;
 
+    // **Fix Lot 7.6.bis Palier 4** — même cause que `drawFooterOnCurrentPage` :
+    // `headerY = 22` est dans la marge HAUTE (marges.haut = 50), donc
+    // `doc.text()` déclenche l'auto-pagination même avec `lineBreak: false`.
+    // Override temporaire des marges à 0 pendant l'écriture.
+    const origMargins = { ...doc.page.margins };
+    doc.page.margins = { ...origMargins, top: 0, bottom: 0 };
+
     doc
       .save()
       .fillColor(BSIC_BRAND.colors.grisFonce)
@@ -552,6 +665,8 @@ export class PdfBuilderService {
       .lineTo(right, headerY + 12)
       .stroke();
     doc.restore();
+
+    doc.page.margins = origMargins;
   }
 
   /**

@@ -275,16 +275,16 @@ function drawPage2Audit(
   doc.x = BSIC_BRAND.marges.gauche;
   pdf.drawTable(doc, cols, rows, { rowHeight: 30 });
 
-  // Cachet BCEAO en bas de page
+  // Cachet BCEAO — Lot 7.6.bis fix défaut A : positionnement en FLOW
+  // NATUREL juste après le tableau (doc.y + espacement) au lieu du Y
+  // absolu `page.height - 200` qui créait un vide de ~490pt entre le
+  // tableau et le cachet. Centré horizontalement par calcul width.
   const lastAudit = d.auditTrail[d.auditTrail.length - 1];
   const refAudit = lastAudit ? `log #${lastAudit.id}` : 'log non disponible';
-  pdf.drawBceaoStamp(
-    doc,
-    BSIC_BRAND.marges.gauche + 90,
-    doc.page.height - 200,
-    doc.page.width - BSIC_BRAND.marges.gauche - BSIC_BRAND.marges.droite - 180,
-    refAudit,
-  );
+  const stampWidth = 280;
+  const stampX = (doc.page.width - stampWidth) / 2;
+  const stampY = doc.y + BSIC_BRAND.espacement.apresTableau + 16;
+  pdf.drawBceaoStamp(doc, stampX, stampY, stampWidth, refAudit);
 }
 
 // ─── Page 3 — Résumé exécutif ────────────────────────────────────────
