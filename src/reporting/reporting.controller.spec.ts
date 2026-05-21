@@ -42,6 +42,10 @@ function mockDonnees(): R04Donnees {
       date_gel: '2026-05-20T17:09:00.000Z',
       utilisateur_gel: 'dg@bsic.ne',
       commentaire_publication: null,
+      // Lot 7.6.bis fix #4 — résolus par LEFT JOIN "user".
+      nom_soumetteur: null,
+      nom_validateur: null,
+      nom_publicateur: 'Issoufou BARRY',
     },
     totaux: {
       nb_lignes: 0,

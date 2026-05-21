@@ -21,6 +21,7 @@
  */
 import {
   BSIC_BRAND,
+  formatMontant,
   type PdfBuilderService,
   type PdfTableColumn,
 } from '../generators/pdf-builder.service';
@@ -74,14 +75,15 @@ const TYPE_VERSION_LIBELLES: Record<string, string> = {
 
 // ─── Helpers formatage ───────────────────────────────────────────────
 
-const fcfaFmt = new Intl.NumberFormat('fr-FR');
+// Lot 7.6.bis — `Intl.NumberFormat('fr-FR')` produit U+202F qui s'affiche
+// `/` avec Helvetica pdfkit. Utiliser `formatMontant()` (espace ASCII).
 
 function fmtFcfa(n: number): string {
-  return fcfaFmt.format(Math.round(n));
+  return formatMontant(n);
 }
 
 function fmtMillions(n: number): string {
-  return fcfaFmt.format(Math.round(n / 1_000_000));
+  return formatMontant(n / 1_000_000);
 }
 
 function fmtPct(n: number, total: number): string {
@@ -178,7 +180,7 @@ function drawPage1Garde(
   doc
     .fillColor(BSIC_BRAND.colors.bleuNuit)
     .font(BSIC_BRAND.fonts.titre)
-    .fontSize(26)
+    .fontSize(BSIC_BRAND.fontSizes.titreGarde)
     .text(
       `BUDGET ${d.version.exercice_fiscal} — SNAPSHOT OFFICIEL`,
       left,
@@ -190,7 +192,7 @@ function drawPage1Garde(
   doc
     .fillColor(BSIC_BRAND.colors.grisFonce)
     .font(BSIC_BRAND.fonts.body)
-    .fontSize(11)
+    .fontSize(BSIC_BRAND.fontSizes.sousTitreGarde)
     .text(
       'BSIC NIGER S.A. — Banque Sahélo-Saharienne pour l’Investissement et le Commerce',
       left,
@@ -230,7 +232,7 @@ function drawPage1Garde(
   doc
     .fillColor(BSIC_BRAND.colors.rouge)
     .font(BSIC_BRAND.fonts.titre)
-    .fontSize(10)
+    .fontSize(BSIC_BRAND.fontSizes.body)
     .text('CONFIDENTIEL — Usage réglementaire BCEAO', left, 700, {
       width,
       align: 'center',
@@ -238,7 +240,7 @@ function drawPage1Garde(
   doc
     .fillColor(BSIC_BRAND.colors.grisFonce)
     .font(BSIC_BRAND.fonts.body)
-    .fontSize(8)
+    .fontSize(BSIC_BRAND.fontSizes.metaSmall)
     .text(`Référence document : ${refDoc}`, left, doc.y + 6, {
       width,
       align: 'center',
@@ -273,16 +275,16 @@ function drawPage2Audit(
   doc.x = BSIC_BRAND.marges.gauche;
   pdf.drawTable(doc, cols, rows, { rowHeight: 30 });
 
-  // Cachet BCEAO en bas de page
-  const lastAudit = d.auditTrail[d.auditTrail.length - 1];
-  const refAudit = lastAudit ? `log #${lastAudit.id}` : 'log non disponible';
-  pdf.drawBceaoStamp(
-    doc,
-    BSIC_BRAND.marges.gauche + 90,
-    doc.page.height - 200,
-    doc.page.width - BSIC_BRAND.marges.gauche - BSIC_BRAND.marges.droite - 180,
-    refAudit,
-  );
+  // **Lot 7.6.bis Palier 5 fix défaut B** : cachet "BUDGET GELÉ BCEAO"
+  // SUPPRIMÉ. Redondant avec :
+  //   1. La ligne E3 du tableau ci-dessus ("Publication (gel)... action
+  //      irréversible. Conservation BCEAO 10 ans.").
+  //   2. La page de garde (mention "Conservation BCEAO jusqu'au …").
+  //   3. La page de signatures ("[Cachet électronique : audit_log #…]"
+  //      sous la signature du DG).
+  // Visuellement "tampon de tribunal", hors du code sobre attendu pour
+  // un document réglementaire BCEAO. Le helper `pdf.drawBceaoStamp` est
+  // conservé dans `pdf-builder.service.ts` pour réutilisation future.
 }
 
 // ─── Page 3 — Résumé exécutif ────────────────────────────────────────
@@ -337,13 +339,17 @@ function drawPage3Resume(
     solde >= 0 ? BSIC_BRAND.colors.vert : BSIC_BRAND.colors.rouge,
   );
 
-  // Tableau Périmètre
+  // Tableau Périmètre — pagination intelligente (Lot 7.6.bis #4) :
+  // hauteur estimée du bloc Périmètre = titre (20pt) + 4 lignes (88pt)
+  // + marges (20pt) ≈ 130pt. Si on n'a pas la place sous les KPI cards,
+  // saut de page propre avant le tableau.
   doc.y = y + cardH + 25;
   doc.x = left;
+  pdf.ensureSpaceOrNewPage(doc, 130);
   doc
     .fillColor(BSIC_BRAND.colors.bleuNuitDark)
     .font(BSIC_BRAND.fonts.titre)
-    .fontSize(11)
+    .fontSize(BSIC_BRAND.fontSizes.sousSection)
     .text('Périmètre du budget');
   doc.moveDown(0.4);
   pdf.drawTable(
@@ -381,11 +387,12 @@ function drawKpiCard(
   doc
     .fillColor(BSIC_BRAND.colors.grisFonce)
     .font(BSIC_BRAND.fonts.body)
-    .fontSize(9)
+    .fontSize(BSIC_BRAND.fontSizes.bodySmall)
     .text(label, x + 10, y + 15, { width: w - 20, align: 'left' });
   doc
     .fillColor(color)
     .font(BSIC_BRAND.fonts.titre)
+    // Lot 7.6.bis — fontSize(18) volontaire : taille KPI card 'metric' non standard du token registre.
     .fontSize(18)
     .text(value, x + 10, y + 40, { width: w - 20, align: 'left' });
   doc.restore();
@@ -409,18 +416,28 @@ function drawCompteResultat(
   doc
     .fillColor(BSIC_BRAND.colors.vert)
     .font(BSIC_BRAND.fonts.titre)
-    .fontSize(12)
+    .fontSize(BSIC_BRAND.fontSizes.sousSection)
     .text('A. PRODUITS (Classe 7)');
   doc.moveDown(0.4);
 
-  const produitsRows = d.comptedeResultat
-    .filter((r) => r.classe === '7')
-    .map((r) => [
-      r.sous_classe + 'xx',
-      libelleSousClasse('7', r.sous_classe),
-      fmtMillions(r.montant),
-      fmtPct(r.montant, d.totaux.total_produits),
-    ]);
+  // Lot 7.6.bis fix #3 : afficher les 10 sous-classes PCB-UMOA (70-79)
+  // même si la DB n'en a pas, pour un compte de résultat exhaustif.
+  // Les sous-classes absentes en DB sont rendues à 0.
+  const produitsParSousClasse = new Map(
+    d.comptedeResultat
+      .filter((r) => r.classe === '7')
+      .map((r) => [r.sous_classe, r.montant]),
+  );
+  const produitsRows = Array.from({ length: 10 }, (_, i) => {
+    const sc = `7${i}`;
+    const montant = produitsParSousClasse.get(sc) ?? 0;
+    return [
+      sc + 'xx',
+      libelleSousClasse('7', sc),
+      fmtMillions(montant),
+      fmtPct(montant, d.totaux.total_produits),
+    ];
+  });
 
   pdf.drawTable(
     doc,
@@ -430,9 +447,7 @@ function drawCompteResultat(
       { header: 'Montant (M FCFA)', width: 100, align: 'right' },
       { header: '% Total', width: 75, align: 'right' },
     ],
-    produitsRows.length > 0
-      ? produitsRows
-      : [['—', 'Aucune ligne produit', '0', '0,0 %']],
+    produitsRows,
   );
 
   // Saut de page → B. CHARGES
@@ -445,18 +460,26 @@ function drawCompteResultat(
   doc
     .fillColor(BSIC_BRAND.colors.orange)
     .font(BSIC_BRAND.fonts.titre)
-    .fontSize(12)
+    .fontSize(BSIC_BRAND.fontSizes.sousSection)
     .text('B. CHARGES (Classe 6)');
   doc.moveDown(0.4);
 
-  const chargesRows = d.comptedeResultat
-    .filter((r) => r.classe === '6')
-    .map((r) => [
-      r.sous_classe + 'xx',
-      libelleSousClasse('6', r.sous_classe),
-      fmtMillions(r.montant),
-      fmtPct(r.montant, d.totaux.total_charges),
-    ]);
+  // Lot 7.6.bis fix #3 : idem pour les charges (60-69 PCB-UMOA).
+  const chargesParSousClasse = new Map(
+    d.comptedeResultat
+      .filter((r) => r.classe === '6')
+      .map((r) => [r.sous_classe, r.montant]),
+  );
+  const chargesRows = Array.from({ length: 10 }, (_, i) => {
+    const sc = `6${i}`;
+    const montant = chargesParSousClasse.get(sc) ?? 0;
+    return [
+      sc + 'xx',
+      libelleSousClasse('6', sc),
+      fmtMillions(montant),
+      fmtPct(montant, d.totaux.total_charges),
+    ];
+  });
 
   pdf.drawTable(
     doc,
@@ -466,9 +489,7 @@ function drawCompteResultat(
       { header: 'Montant (M FCFA)', width: 100, align: 'right' },
       { header: '% Total', width: 75, align: 'right' },
     ],
-    chargesRows.length > 0
-      ? chargesRows
-      : [['—', 'Aucune ligne charge', '0', '0,0 %']],
+    chargesRows,
   );
 }
 
@@ -479,17 +500,19 @@ function drawVentilationCr(
   d: R04Donnees,
   pdf: PdfBuilderService,
 ): void {
-  doc.addPage();
+  // Lot 7.6.bis fix #6 — paysage pour les tableaux denses. Largeur
+  // utile en A4 paysage ≈ 742pt après marges (842 - 50 - 50).
+  doc.addPage({ size: 'A4', layout: 'landscape' });
   pdf.drawSectionTitle(doc, 'IV. VENTILATION PAR CENTRE DE RESPONSABILITÉ');
 
   const cols: PdfTableColumn[] = [
-    { header: 'Code CR', width: 75 },
-    { header: 'Libellé', width: 145 },
-    { header: 'Type', width: 75 },
-    { header: 'Produits (M)', width: 60, align: 'right' },
-    { header: 'Charges (M)', width: 60, align: 'right' },
-    { header: 'Solde (M)', width: 50, align: 'right' },
-    { header: 'Poids %', width: 30, align: 'right' },
+    { header: 'Code CR', width: 110 },
+    { header: 'Libellé', width: 220 },
+    { header: 'Type', width: 110 },
+    { header: 'Produits (M)', width: 80, align: 'right' },
+    { header: 'Charges (M)', width: 80, align: 'right' },
+    { header: 'Solde (M)', width: 75, align: 'right' },
+    { header: 'Poids %', width: 60, align: 'right' },
   ];
 
   const totalActivite = d.totaux.total_produits + d.totaux.total_charges;
@@ -543,7 +566,10 @@ function drawVentilationCr(
   ]);
 
   doc.x = BSIC_BRAND.marges.gauche;
-  pdf.drawTable(doc, cols, rows, { rowHeight: 18, fontSize: 8 });
+  pdf.drawTable(doc, cols, rows, {
+    rowHeight: 18,
+    fontSize: BSIC_BRAND.fontSizes.tableSmall,
+  });
 }
 
 // ─── Pages 8-9 — Détail par compte ───────────────────────────────────
@@ -553,15 +579,16 @@ function drawDetailComptes(
   d: R04Donnees,
   pdf: PdfBuilderService,
 ): void {
-  doc.addPage();
+  // Lot 7.6.bis fix #6 — paysage pour le détail comptes (30+ lignes).
+  doc.addPage({ size: 'A4', layout: 'landscape' });
   pdf.drawSectionTitle(doc, 'V. DÉTAIL PAR COMPTE COMPTABLE (PCB-UMOA)');
 
   const cols: PdfTableColumn[] = [
-    { header: 'Code', width: 70 },
-    { header: 'Libellé', width: 230 },
-    { header: 'Classe', width: 50, align: 'center' },
-    { header: 'Sens', width: 45, align: 'center' },
-    { header: 'Montant (M FCFA)', width: 100, align: 'right' },
+    { header: 'Code', width: 90 },
+    { header: 'Libellé', width: 370 },
+    { header: 'Classe', width: 70, align: 'center' },
+    { header: 'Sens', width: 60, align: 'center' },
+    { header: 'Montant (M FCFA)', width: 150, align: 'right' },
   ];
   const rows = d.detailComptes.map((c) => [
     c.code_compte,
@@ -582,7 +609,10 @@ function drawAuditTrail(
   d: R04Donnees,
   pdf: PdfBuilderService,
 ): void {
-  doc.addPage();
+  // Lot 7.6.bis — retour explicite en portrait après les 2 pages
+  // paysage précédentes (CR + détail comptes). Sans ce override,
+  // pdfkit hérite du layout de la dernière addPage().
+  doc.addPage({ size: 'A4', layout: 'portrait' });
   pdf.drawSectionTitle(
     doc,
     "VI. JOURNAL D'AUDIT — TRAÇABILITÉ DES TRANSITIONS",
@@ -598,7 +628,7 @@ function drawAuditTrail(
     doc
       .fillColor(BSIC_BRAND.colors.grisFonce)
       .font(BSIC_BRAND.fonts.italic)
-      .fontSize(10)
+      .fontSize(BSIC_BRAND.fontSizes.body)
       .text('Aucune action workflow tracée pour ce cycle de publication.');
   }
 
@@ -606,7 +636,7 @@ function drawAuditTrail(
   doc
     .fillColor(BSIC_BRAND.colors.grisFonce)
     .font(BSIC_BRAND.fonts.italic)
-    .fontSize(9)
+    .fontSize(BSIC_BRAND.fontSizes.italicNote)
     .text(
       'Ces enregistrements sont immuables et conservés 10 ans conformément aux exigences BCEAO.',
       { align: 'left' },
@@ -617,12 +647,12 @@ function drawAuditEntry(doc: PDFKit.PDFDocument, a: R04AuditEntry): void {
   doc
     .fillColor(BSIC_BRAND.colors.bleuNuit)
     .font(BSIC_BRAND.fonts.titre)
-    .fontSize(10)
+    .fontSize(BSIC_BRAND.fontSizes.body)
     .text(`[${fmtDateFrShort(a.date_action)}] ${a.type_action}`);
   doc
     .fillColor(BSIC_BRAND.colors.bleuNuitDark)
     .font(BSIC_BRAND.fonts.body)
-    .fontSize(9);
+    .fontSize(BSIC_BRAND.fontSizes.bodySmall);
   doc.text(`  Acteur     : ${a.utilisateur}`);
   doc.text(`  Référence  : audit_log #${a.id}`);
   doc.text(`  Commentaire : ${a.commentaire ?? '—'}`);
@@ -658,11 +688,11 @@ function drawTextesReglementaires(
     doc
       .fillColor(BSIC_BRAND.colors.bleuNuit)
       .font(BSIC_BRAND.fonts.titre)
-      .fontSize(10)
+      .fontSize(BSIC_BRAND.fontSizes.body)
       .text(`• ${ref}`, { continued: true })
       .fillColor(BSIC_BRAND.colors.bleuNuitDark)
       .font(BSIC_BRAND.fonts.body)
-      .fontSize(10)
+      .fontSize(BSIC_BRAND.fontSizes.body)
       .text(` — ${libelle}`);
     doc.moveDown(0.3);
   }
@@ -671,7 +701,7 @@ function drawTextesReglementaires(
   doc
     .fillColor(BSIC_BRAND.colors.grisFonce)
     .font(BSIC_BRAND.fonts.italic)
-    .fontSize(10)
+    .fontSize(BSIC_BRAND.fontSizes.body)
     .text(
       "Le présent budget a été élaboré conformément au Plan Comptable Bancaire UMOA Révisé et respecte les principes de séparation des tâches, de traçabilité et de conservation décennale exigés par la BCEAO. L'ensemble des actions de saisie, validation et publication ont été enregistrées dans le journal d'audit MIZNAS et sont consultables par les organes de contrôle interne (Audit, Risques, Conformité).",
       { align: 'justify', lineGap: 3 },
@@ -699,6 +729,7 @@ function drawSignatures(
     y,
     blocW,
     'Le Directeur Général',
+    d.version.nom_publicateur,
     d.version.utilisateur_gel,
     'Date publication MIZNAS',
     d.version.date_gel,
@@ -710,6 +741,7 @@ function drawSignatures(
     y,
     blocW,
     "Le Président du Conseil d'Administration",
+    d.version.nom_validateur,
     d.version.utilisateur_validation,
     'Date validation comité collégial',
     d.version.date_validation,
@@ -732,7 +764,7 @@ function drawSignatures(
   doc
     .fillColor(BSIC_BRAND.colors.grisFonce)
     .font(BSIC_BRAND.fonts.italic)
-    .fontSize(8)
+    .fontSize(BSIC_BRAND.fontSizes.metaSmall)
     .text(
       `Document généré automatiquement par MIZNAS le ${fmtDateFrLong(d.version.date_gel)}`,
       left,
@@ -755,7 +787,10 @@ function drawSignatureBlock(
   y: number,
   w: number,
   role: string,
-  utilisateur: string | null,
+  // Lot 7.6.bis fix #4 — `nomComplet` issu du JOIN user (prénom+nom).
+  // Si null (user supprimé), fallback affichage de l'email seul.
+  nomComplet: string | null,
+  email: string | null,
   dateLabel: string,
   date: string | null,
   auditId: string | undefined,
@@ -763,25 +798,34 @@ function drawSignatureBlock(
   doc
     .fillColor(BSIC_BRAND.colors.bleuNuit)
     .font(BSIC_BRAND.fonts.titre)
-    .fontSize(11)
+    .fontSize(BSIC_BRAND.fontSizes.sousSection)
     .text(role, x, y, { width: w });
   doc.moveDown(2.5);
+  // Nom complet en gras (ou email seul si JOIN user a renvoyé null).
   doc
     .fillColor(BSIC_BRAND.colors.bleuNuitDark)
     .font(BSIC_BRAND.fonts.titre)
-    .fontSize(10)
-    .text(utilisateur ?? '—', x, doc.y, { width: w });
+    .fontSize(BSIC_BRAND.fontSizes.body)
+    .text(nomComplet ?? email ?? '—', x, doc.y, { width: w });
+  // Email en sous-texte gris (seulement si on a affiché un nom au-dessus).
+  if (nomComplet && email) {
+    doc
+      .fillColor(BSIC_BRAND.colors.grisFonce)
+      .font(BSIC_BRAND.fonts.body)
+      .fontSize(BSIC_BRAND.fontSizes.metaSmall)
+      .text(email, x, doc.y, { width: w });
+  }
   doc
     .fillColor(BSIC_BRAND.colors.grisFonce)
     .font(BSIC_BRAND.fonts.body)
-    .fontSize(9)
+    .fontSize(BSIC_BRAND.fontSizes.bodySmall)
     .text(dateLabel, x, doc.y + 4, { width: w });
   doc.text(fmtDateFrLong(date), x, doc.y, { width: w });
   doc.moveDown(1);
   doc
     .fillColor(BSIC_BRAND.colors.or)
     .font(BSIC_BRAND.fonts.italic)
-    .fontSize(9)
+    .fontSize(BSIC_BRAND.fontSizes.italicNote)
     .text(`[Cachet électronique : audit_log #${auditId ?? '—'}]`, x, doc.y, {
       width: w,
     });

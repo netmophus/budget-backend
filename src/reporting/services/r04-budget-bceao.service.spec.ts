@@ -105,6 +105,10 @@ function mockGeleVersion(
     date_gel: '2026-05-20T17:09:00.000Z',
     utilisateur_gel: 'dg@bsic.ne',
     commentaire_publication: 'Publication (gel) — action irréversible.',
+    // Lot 7.6.bis fix #4 — noms complets résolus par LEFT JOIN "user".
+    nom_soumetteur: 'Ousmane MAMANE',
+    nom_validateur: 'Yacouba HAROUNA',
+    nom_publicateur: 'Issoufou BARRY',
     ...overrides,
   };
 }
@@ -262,5 +266,38 @@ describe('R04BudgetBceaoService', () => {
     expect(buffer[1]).toBe(0x4b); // K
     expect(buffer[2]).toBe(0x03);
     expect(buffer[3]).toBe(0x04);
+  });
+
+  // ─── Lot 7.6.bis Palier 4 — anti-régression pagination drawTable ─
+
+  it('PDF : pagination raisonnable (8 < pages < 20) avec 35 comptes', async () => {
+    // Reproduit la condition du bug défaut B : un tableau "détail
+    // comptes" assez large pour forcer drawTable à paginer plusieurs
+    // fois. Avant le fix, ce dataset générait ~197 pages.
+    const detailComptes = Array.from({ length: 35 }, (_, i) => ({
+      id: String(500 + i),
+      code_compte: `7${String(i).padStart(5, '0')}`,
+      libelle: `Compte test ${i} — libellé long pour stresser le wrap`,
+      classe: i < 20 ? '7' : '6',
+      sens: i % 2 === 0 ? 'C' : 'D',
+      montant_total: String(1_000_000 * (i + 1)),
+      nb_lignes: '12',
+    }));
+    await bootstrap({
+      version: mockGeleVersion(),
+      detailComptes,
+    });
+
+    const buffer = await service.genererPdfBuffer('42');
+    // Compte des pages : un PDF a un objet `/Type /Page` (singulier)
+    // par page + un `/Type /Pages` (pluriel) en racine. La regex
+    // `/Type\s*\/Page\s` matche uniquement les pages individuelles.
+    const text = buffer.toString('latin1');
+    const pageCount = (text.match(/\/Type\s*\/Page\s/g) ?? []).length;
+
+    // Avant le fix Palier 4 : ~197. Après : ~12-14 pages selon
+    // pagination réelle. Marge ample pour absorber l'évolution future.
+    expect(pageCount).toBeGreaterThan(8);
+    expect(pageCount).toBeLessThan(20);
   });
 });
