@@ -36,7 +36,8 @@
     "seed:segments": "ts-node src/seeds/segment-seed.ts",
     "seed:versions": "ts-node src/seeds/version-seed.ts",
     "seed:scenarios": "ts-node src/seeds/scenario-seed.ts",
-    "seed:taux-change": "ts-node src/seeds/taux-change-seed.ts"
+    "seed:taux-change": "ts-node src/seeds/taux-change-seed.ts",
+    "seed:lot-8-1-a-campagne": "ts-node src/seeds/lot-8-1-a-campagne-test-seed.ts"
   },
   "dependencies": {
     "@nestjs-modules/mailer": "^2.3.4",
