@@ -275,16 +275,16 @@ function drawPage2Audit(
   doc.x = BSIC_BRAND.marges.gauche;
   pdf.drawTable(doc, cols, rows, { rowHeight: 30 });
 
-  // Cachet BCEAO — Lot 7.6.bis fix défaut A : positionnement en FLOW
-  // NATUREL juste après le tableau (doc.y + espacement) au lieu du Y
-  // absolu `page.height - 200` qui créait un vide de ~490pt entre le
-  // tableau et le cachet. Centré horizontalement par calcul width.
-  const lastAudit = d.auditTrail[d.auditTrail.length - 1];
-  const refAudit = lastAudit ? `log #${lastAudit.id}` : 'log non disponible';
-  const stampWidth = 280;
-  const stampX = (doc.page.width - stampWidth) / 2;
-  const stampY = doc.y + BSIC_BRAND.espacement.apresTableau + 16;
-  pdf.drawBceaoStamp(doc, stampX, stampY, stampWidth, refAudit);
+  // **Lot 7.6.bis Palier 5 fix défaut B** : cachet "BUDGET GELÉ BCEAO"
+  // SUPPRIMÉ. Redondant avec :
+  //   1. La ligne E3 du tableau ci-dessus ("Publication (gel)... action
+  //      irréversible. Conservation BCEAO 10 ans.").
+  //   2. La page de garde (mention "Conservation BCEAO jusqu'au …").
+  //   3. La page de signatures ("[Cachet électronique : audit_log #…]"
+  //      sous la signature du DG).
+  // Visuellement "tampon de tribunal", hors du code sobre attendu pour
+  // un document réglementaire BCEAO. Le helper `pdf.drawBceaoStamp` est
+  // conservé dans `pdf-builder.service.ts` pour réutilisation future.
 }
 
 // ─── Page 3 — Résumé exécutif ────────────────────────────────────────

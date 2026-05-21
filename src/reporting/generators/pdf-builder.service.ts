@@ -349,21 +349,17 @@ export class PdfBuilderService {
   ): number {
     const headerBg = options.headerBg ?? BSIC_BRAND.colors.bleuNuit;
     const headerColor = options.headerColor ?? BSIC_BRAND.colors.blanc;
-    const rowHeight = options.rowHeight ?? 22;
+    const minRowHeight = options.rowHeight ?? 22;
     const fontSize = options.fontSize ?? 9;
     const totalWidth = columns.reduce((s, c) => s + c.width, 0);
+    const cellPaddingV = 6;
 
     const x0 = doc.x;
     let currentY = doc.y;
 
-    // **Fix Lot 7.6.bis Palier 4** — Override des marges haut/bas à 0
-    // pendant TOUT le rendu du tableau. Sans cet override, `doc.text()`
-    // déclenche l'auto-pagination pdfkit (`continueOnNewPage`) dès
-    // qu'une cellule s'approche de la marge basse, AVANT que ma logique
-    // défensive de pagination ligne par ligne détecte le débordement.
-    // Résultat sans fix : 5 sauts pdfkit auto + 1 saut défensif =
-    // cascade. Avec override + ma logique défensive : 1 seul saut
-    // propre (continuité du tableau avec header redessiné).
+    // **Lot 7.6.bis Palier 4** : override des marges haut/bas à 0
+    // pour neutraliser l'auto-pagination pdfkit pendant le rendu.
+    // La pagination est gérée manuellement au niveau LIGNE.
     const origMargins = { ...doc.page.margins };
     doc.page.margins = { ...origMargins, top: 0, bottom: 0 };
     try {
@@ -373,52 +369,72 @@ export class PdfBuilderService {
         columns,
         x0,
         currentY,
-        rowHeight,
+        minRowHeight,
         fontSize,
         headerBg,
         headerColor,
         totalWidth,
       );
-      currentY += rowHeight;
+      currentY += minRowHeight;
 
-      // Lignes — pagination défensive au NIVEAU LIGNE.
+      // Lignes — pagination défensive + hauteur DYNAMIQUE par ligne.
       for (let i = 0; i < rows.length; i++) {
-        // pageBottom calculé sur les marges D'ORIGINE (les marges
-        // overridées à 0 ne reflètent pas la zone utile métier).
+        const row = rows[i];
+
+        // **Lot 7.6.bis Palier 5 fix défaut A** : hauteur dynamique.
+        // Mesurer `heightOfString` pour CHAQUE cellule avec les mêmes
+        // contraintes (width, font, fontSize) que le `doc.text()` qui
+        // suivra, puis prendre le max comme hauteur de ligne. Évite
+        // que la ligne suivante recouvre une cellule au texte wrappé
+        // (ex: commentaire E1 du tableau de traçabilité, 3 lignes).
+        doc.font(BSIC_BRAND.fonts.body).fontSize(fontSize);
+        const cellHeights = columns.map((col, j) => {
+          const text = row[j] ?? '';
+          return doc.heightOfString(text, {
+            width: col.width - 8,
+            align: col.align ?? 'left',
+          });
+        });
+        const actualRowHeight = Math.max(
+          minRowHeight,
+          ...cellHeights.map((h) => h + cellPaddingV * 2),
+        );
+
+        // Saut de page si la ligne ne tient pas (avec sa vraie hauteur).
         const pageBottom = doc.page.height - origMargins.bottom;
-        if (currentY + rowHeight > pageBottom) {
+        if (currentY + actualRowHeight > pageBottom) {
           doc.addPage();
           currentY = origMargins.top;
-          // addPage a réinitialisé les marges courantes — il faut les
-          // re-override sur la nouvelle page également.
+          // addPage réinitialise les marges courantes — re-override.
           doc.page.margins = { ...doc.page.margins, top: 0, bottom: 0 };
           this.drawTableHeaderRow(
             doc,
             columns,
             x0,
             currentY,
-            rowHeight,
+            minRowHeight,
             fontSize,
             headerBg,
             headerColor,
             totalWidth,
           );
-          currentY += rowHeight;
+          currentY += minRowHeight;
         }
 
-        // Bande alternée
+        // Bande alternée — utilise la hauteur DYNAMIQUE de la ligne.
         if (i % 2 === 1) {
           doc
             .save()
             .fillColor(BSIC_BRAND.colors.grisClair)
-            .rect(x0, currentY, totalWidth, rowHeight)
+            .rect(x0, currentY, totalWidth, actualRowHeight)
             .fill()
             .restore();
         }
 
-        // Cellules de la ligne — toutes positionnées EN ABSOLU à la
-        // même Y, lineBreak: false pour empêcher le wrap horizontal.
-        const row = rows[i];
+        // Cellules — texte wrappable (PAS de lineBreak: false). L'auto-
+        // pagination verticale est inhibée par l'override de marges,
+        // donc seul le wrap horizontal s'applique → comportement
+        // souhaité (cellule à 3 lignes dans la même ligne tableau).
         doc
           .fillColor(BSIC_BRAND.colors.bleuNuitDark)
           .font(BSIC_BRAND.fonts.body)
@@ -426,17 +442,16 @@ export class PdfBuilderService {
         let cx = x0;
         for (let j = 0; j < columns.length; j++) {
           const col = columns[j];
-          doc.text(row[j] ?? '', cx + 4, currentY + 6, {
+          doc.text(row[j] ?? '', cx + 4, currentY + cellPaddingV, {
             width: col.width - 8,
             align: col.align ?? 'left',
-            lineBreak: false,
           });
           cx += col.width;
         }
-        currentY += rowHeight;
+
+        currentY += actualRowHeight;
       }
     } finally {
-      // Restaure les marges originales pour les contenus suivants.
       doc.page.margins = origMargins;
     }
 
