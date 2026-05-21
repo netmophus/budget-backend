@@ -23,7 +23,9 @@ import {
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
 
+import { ExcelBuilderService } from '../generators/excel-builder.service';
 import { PdfBuilderService } from '../generators/pdf-builder.service';
+import { buildR04Xlsx } from '../templates/r04-budget-bceao.excel.template';
 import { buildR04Pdf } from '../templates/r04-budget-bceao.template';
 
 export interface R04VersionMetadata {
@@ -102,6 +104,7 @@ export class R04BudgetBceaoService {
     @InjectDataSource()
     private readonly dataSource: DataSource,
     private readonly pdfBuilder: PdfBuilderService,
+    private readonly excelBuilder: ExcelBuilderService,
   ) {}
 
   /**
@@ -170,6 +173,21 @@ export class R04BudgetBceaoService {
       doc.on('error', (err: Error) => reject(err));
       doc.end();
     });
+  }
+
+  /**
+   * Génère le workbook XLSX complet du rapport R04 et retourne un
+   * Buffer prêt à être streamé. Même cycle qu'`extractDonnees` :
+   * validation amont 404/409 avant la construction du workbook.
+   */
+  async genererXlsxBuffer(versionId: string): Promise<Buffer> {
+    const donnees = await this.extractDonnees(versionId);
+    const wb = this.excelBuilder.createWorkbook({
+      title: `${donnees.version.code_version} — Snapshot BCEAO`,
+      subject: `Rapport R04 — Budget Publié BCEAO ${donnees.version.exercice_fiscal}`,
+    });
+    buildR04Xlsx(wb, donnees, this.excelBuilder);
+    return this.excelBuilder.toBuffer(wb);
   }
 
   // ─── Queries SQL ────────────────────────────────────────────────
