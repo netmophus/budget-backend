@@ -64,3 +64,8 @@ import-*-bsic.txt
 complete-dimensions-bsic.js
 import-version-*.js
 *.DEPRECATED.txt
+
+# Lot 8.1.D — PDFs uploadés par les coordinateurs (source de vérité
+# documentaire, conservation 10 ans BCEAO). Stockés sur disque local
+# en dev, bucket S3 en prod. Jamais commités.
+uploads/documents/

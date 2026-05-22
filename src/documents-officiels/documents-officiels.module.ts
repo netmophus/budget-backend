@@ -27,6 +27,7 @@ import { DocumentVisa } from './entities/document-visa.entity';
 import { CampagnesController } from './controllers/campagnes.controller';
 import { DocumentsController } from './controllers/documents.controller';
 import { CampagneService } from './services/campagne.service';
+import { DocumentFichierService } from './services/document-fichier.service';
 import { DocumentHashService } from './services/document-hash.service';
 import { DocumentWorkflowService } from './services/document-workflow.service';
 
@@ -43,12 +44,18 @@ import { DocumentWorkflowService } from './services/document-workflow.service';
     AuditModule, // pour AuditService dans CampagneService
   ],
   controllers: [CampagnesController, DocumentsController],
-  providers: [DocumentHashService, CampagneService, DocumentWorkflowService],
+  providers: [
+    DocumentHashService,
+    CampagneService,
+    DocumentWorkflowService,
+    DocumentFichierService,
+  ],
   exports: [
     TypeOrmModule,
     DocumentHashService,
     CampagneService,
     DocumentWorkflowService,
+    DocumentFichierService,
   ],
 })
 export class DocumentsOfficielsModule {}
