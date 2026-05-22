@@ -408,4 +408,57 @@ describe('DocumentWorkflowService (Lot 8.1.B Palier 3)', () => {
     expect(result.contenuIntact).toBe(true);
     expect(result.visasIntacts).toBe(true);
   });
+
+  // ─── detailDocument (Lot 8.1.C) ─────────────────────────────────
+
+  it('detailDocument — happy path (émetteur) retourne doc + visas + signature', async () => {
+    repos.doc.findOne.mockResolvedValue(mockDoc()); // emetteur = '23' = actor
+    repos.visa.find.mockResolvedValue([mockVisa()]);
+    repos.signature.findOne.mockResolvedValue(null);
+    const result = await service.detailDocument('doc-uuid-1', actor);
+    expect(result.document.id).toBe('doc-uuid-1');
+    expect(result.visas).toHaveLength(1);
+    expect(result.signature).toBeNull();
+  });
+
+  it('detailDocument — user ni emetteur ni viseur ni signataire → 403', async () => {
+    repos.doc.findOne.mockResolvedValue(
+      mockDoc({ fkUserEmetteur: '99', fkUserSignataire: '98' }),
+    );
+    repos.visa.find.mockResolvedValue([mockVisa({ fkUserViseur: '97' })]);
+    await expect(
+      service.detailDocument('doc-uuid-1', actor),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+  });
+
+  // ─── historiqueDocument (Lot 8.1.C) ─────────────────────────────
+
+  it('historiqueDocument — happy path : timeline mappée avec libellés FR', async () => {
+    const qb = {
+      where: jest.fn().mockReturnThis(),
+      andWhere: jest.fn().mockReturnThis(),
+      orderBy: jest.fn().mockReturnThis(),
+      getMany: jest.fn().mockResolvedValue([
+        {
+          typeAction: 'CREER_DOCUMENT',
+          dateAction: new Date('2026-05-01T10:00:00Z'),
+          utilisateur: 'finance@bsic.ne',
+          commentaire: 'Création',
+          payloadApres: { codeDocument: 'X' },
+        },
+        {
+          typeAction: 'SIGNER_DOCUMENT',
+          dateAction: new Date('2026-05-10T17:00:00Z'),
+          utilisateur: 'dg@bsic.ne',
+          commentaire: 'Signature',
+          payloadApres: { hashContenu: 'abc' },
+        },
+      ]),
+    };
+    repos.auditLog.createQueryBuilder.mockReturnValue(qb);
+    const result = await service.historiqueDocument('doc-uuid-1');
+    expect(result.evenements).toHaveLength(2);
+    expect(result.evenements[0].libelle).toBe('Création du document');
+    expect(result.evenements[1].libelle).toBe('Signature finale');
+  });
 });

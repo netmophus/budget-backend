@@ -612,6 +612,110 @@ export class DocumentWorkflowService {
     return qb.getMany();
   }
 
+  // ─── 11. detailDocument (Lot 8.1.C) ──────────────────────────────
+
+  /**
+   * Détail d'un document avec ses visas et sa signature éventuelle.
+   * Check d'accès métier : actor doit être émetteur OU dans
+   * `document_visa` OU signataire OU ADMIN.
+   *
+   * @throws NotFoundException si document introuvable.
+   * @throws ForbiddenException si actor n'a aucun rôle sur le document.
+   */
+  async detailDocument(
+    documentId: string,
+    actor: ActorContext,
+  ): Promise<{
+    document: DocumentOfficiel;
+    visas: DocumentVisa[];
+    signature: DocumentSignature | null;
+  }> {
+    const doc = await this.dataSource
+      .getRepository(DocumentOfficiel)
+      .findOne({ where: { id: documentId } });
+    if (!doc) {
+      throw new NotFoundException(`Document ${documentId} introuvable.`);
+    }
+
+    const visas = await this.dataSource
+      .getRepository(DocumentVisa)
+      .find({ where: { fkDocument: documentId } });
+
+    // Check d'accès métier (RBAC technique reste sur le controller).
+    if (!actor.isAdmin) {
+      const estEmetteur = doc.fkUserEmetteur === actor.userId;
+      const estSignataire = doc.fkUserSignataire === actor.userId;
+      const estViseur = visas.some((v) => v.fkUserViseur === actor.userId);
+      if (!estEmetteur && !estSignataire && !estViseur) {
+        throw new ForbiddenException(
+          "Accès refusé : vous n'êtes ni émetteur, ni viseur, ni signataire de ce document.",
+        );
+      }
+    }
+
+    const signature = await this.dataSource
+      .getRepository(DocumentSignature)
+      .findOne({ where: { fkDocument: documentId } });
+
+    return { document: doc, visas, signature };
+  }
+
+  // ─── 12. historiqueDocument (Lot 8.1.C) ──────────────────────────
+
+  /**
+   * Timeline chronologique d'un document depuis `audit_log`.
+   * Pas de check actor — le RBAC `DOCUMENT.LIRE` est appliqué au
+   * controller. Les événements sont mappés en libellés lisibles.
+   *
+   * @throws NotFoundException si aucun événement (= document inexistant).
+   */
+  async historiqueDocument(documentId: string): Promise<{
+    documentId: string;
+    evenements: Array<{
+      etape: string;
+      date: Date;
+      acteur: string;
+      libelle: string;
+      commentaire: string | null;
+      payload: object | null;
+    }>;
+  }> {
+    const rows = await this.dataSource
+      .getRepository(AuditLog)
+      .createQueryBuilder('a')
+      .where('a.entiteCible = :entite', { entite: 'document_officiel' })
+      .andWhere('a.idCible = :id', { id: documentId })
+      .orderBy('a.dateAction', 'ASC')
+      .getMany();
+
+    if (rows.length === 0) {
+      throw new NotFoundException(
+        `Aucun historique pour le document ${documentId} (probablement inexistant).`,
+      );
+    }
+
+    const LIBELLES_ETAPE: Record<string, string> = {
+      CREER_DOCUMENT: 'Création du document',
+      EDITER_DOCUMENT: 'Édition du document',
+      SOUMETTRE_DOCUMENT_VISA: 'Soumission au visa',
+      VISER_DOCUMENT: 'Visa apposé',
+      REJETER_DOCUMENT: 'Rejet du visa',
+      SIGNER_DOCUMENT: 'Signature finale',
+    };
+
+    return {
+      documentId,
+      evenements: rows.map((r) => ({
+        etape: r.typeAction,
+        date: r.dateAction,
+        acteur: r.utilisateur,
+        libelle: LIBELLES_ETAPE[r.typeAction] ?? r.typeAction,
+        commentaire: r.commentaire,
+        payload: r.payloadApres,
+      })),
+    };
+  }
+
   // ─── Helper privé : insertion audit_log via manager ───────────────
 
   /**
