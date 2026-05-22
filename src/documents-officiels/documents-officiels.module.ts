@@ -26,6 +26,7 @@ import { DocumentSignature } from './entities/document-signature.entity';
 import { DocumentVisa } from './entities/document-visa.entity';
 import { CampagneService } from './services/campagne.service';
 import { DocumentHashService } from './services/document-hash.service';
+import { DocumentWorkflowService } from './services/document-workflow.service';
 
 @Module({
   imports: [
@@ -35,11 +36,16 @@ import { DocumentHashService } from './services/document-hash.service';
       DocumentOfficiel,
       DocumentVisa,
       DocumentSignature,
-      User, // pour lookup signataire dans CampagneService
+      User, // pour lookup signataire dans CampagneService + bcrypt dans DocumentWorkflowService
     ]),
     AuditModule, // pour AuditService dans CampagneService
   ],
-  providers: [DocumentHashService, CampagneService],
-  exports: [TypeOrmModule, DocumentHashService, CampagneService],
+  providers: [DocumentHashService, CampagneService, DocumentWorkflowService],
+  exports: [
+    TypeOrmModule,
+    DocumentHashService,
+    CampagneService,
+    DocumentWorkflowService,
+  ],
 })
 export class DocumentsOfficielsModule {}
