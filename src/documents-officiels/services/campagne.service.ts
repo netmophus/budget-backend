@@ -201,4 +201,40 @@ export class CampagneService {
     campagne.utilisateurModification = userEmail;
     return this.campagneRepo.save(campagne);
   }
+
+  // ─── Lot 8.1.C : lectures pour les controllers ───────────────────
+
+  /**
+   * Liste les campagnes triées par exercice fiscal DESC (plus récente
+   * en premier). Pas de pagination au Lot 8.1.C — moins de 10 campagnes
+   * attendues sur la durée de vie MIZNAS. Filtrage périmètre ajoutable
+   * au Lot 8.2 si volumétrie augmente.
+   */
+  async listerCampagnes(): Promise<CampagneBudgetaire[]> {
+    return this.campagneRepo.find({
+      order: { exerciceFiscal: 'DESC' },
+    });
+  }
+
+  /**
+   * Détail d'une campagne avec ses membres comité ordonnés.
+   *
+   * @throws NotFoundException si campagne introuvable.
+   */
+  async detailCampagne(campagneId: string): Promise<{
+    campagne: CampagneBudgetaire;
+    membres: CampagneComiteMembre[];
+  }> {
+    const campagne = await this.campagneRepo.findOne({
+      where: { id: campagneId },
+    });
+    if (!campagne) {
+      throw new NotFoundException(`Campagne ${campagneId} introuvable.`);
+    }
+    const membres = await this.comiteRepo.find({
+      where: { fkCampagne: campagneId },
+      order: { ordre: 'ASC' },
+    });
+    return { campagne, membres };
+  }
 }

@@ -24,6 +24,8 @@ import { CampagneComiteMembre } from './entities/campagne-comite-membre.entity';
 import { DocumentOfficiel } from './entities/document-officiel.entity';
 import { DocumentSignature } from './entities/document-signature.entity';
 import { DocumentVisa } from './entities/document-visa.entity';
+import { CampagnesController } from './controllers/campagnes.controller';
+import { DocumentsController } from './controllers/documents.controller';
 import { CampagneService } from './services/campagne.service';
 import { DocumentHashService } from './services/document-hash.service';
 import { DocumentWorkflowService } from './services/document-workflow.service';
@@ -40,6 +42,7 @@ import { DocumentWorkflowService } from './services/document-workflow.service';
     ]),
     AuditModule, // pour AuditService dans CampagneService
   ],
+  controllers: [CampagnesController, DocumentsController],
   providers: [DocumentHashService, CampagneService, DocumentWorkflowService],
   exports: [
     TypeOrmModule,
