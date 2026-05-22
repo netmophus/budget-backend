@@ -17,11 +17,15 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 
+import { AuditModule } from '../audit/audit.module';
+import { User } from '../users/entities/user.entity';
 import { CampagneBudgetaire } from './entities/campagne-budgetaire.entity';
 import { CampagneComiteMembre } from './entities/campagne-comite-membre.entity';
 import { DocumentOfficiel } from './entities/document-officiel.entity';
 import { DocumentSignature } from './entities/document-signature.entity';
 import { DocumentVisa } from './entities/document-visa.entity';
+import { CampagneService } from './services/campagne.service';
+import { DocumentHashService } from './services/document-hash.service';
 
 @Module({
   imports: [
@@ -31,8 +35,11 @@ import { DocumentVisa } from './entities/document-visa.entity';
       DocumentOfficiel,
       DocumentVisa,
       DocumentSignature,
+      User, // pour lookup signataire dans CampagneService
     ]),
+    AuditModule, // pour AuditService dans CampagneService
   ],
-  exports: [TypeOrmModule],
+  providers: [DocumentHashService, CampagneService],
+  exports: [TypeOrmModule, DocumentHashService, CampagneService],
 })
 export class DocumentsOfficielsModule {}
