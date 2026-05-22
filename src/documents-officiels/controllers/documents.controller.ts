@@ -24,6 +24,7 @@
  * cadrage Lot 8.1.C.
  */
 import {
+  BadRequestException,
   Body,
   Controller,
   Get,
@@ -35,11 +36,18 @@ import {
   Post,
   Query,
   Req,
+  Res,
+  StreamableFile,
+  UploadedFile,
+  UseInterceptors,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import {
   ApiBadRequestResponse,
   ApiBearerAuth,
+  ApiBody,
   ApiConflictResponse,
+  ApiConsumes,
   ApiCreatedResponse,
   ApiForbiddenResponse,
   ApiNotFoundResponse,
@@ -48,7 +56,7 @@ import {
   ApiTags,
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
-import type { Request } from 'express';
+import type { Request, Response } from 'express';
 
 import { CurrentUser } from '../../auth/decorators/current-user.decorator';
 import type { AuthUser } from '../../auth/decorators/current-user.decorator';
@@ -59,6 +67,10 @@ import { EditerDocumentDto } from '../dto/editer-document.dto';
 import { ListerDocumentsQueryDto } from '../dto/lister-documents-query.dto';
 import { SignerDocumentDto } from '../dto/signer-document.dto';
 import { SoumettreVisaDto } from '../dto/soumettre-visa.dto';
+import {
+  DocumentFichierService,
+  type UploadedPdfFile,
+} from '../services/document-fichier.service';
 import type { ActorContext } from '../services/document-workflow.service';
 import { DocumentWorkflowService } from '../services/document-workflow.service';
 
@@ -66,7 +78,10 @@ import { DocumentWorkflowService } from '../services/document-workflow.service';
 @ApiBearerAuth()
 @Controller('documents')
 export class DocumentsController {
-  constructor(private readonly workflowService: DocumentWorkflowService) {}
+  constructor(
+    private readonly workflowService: DocumentWorkflowService,
+    private readonly fichierService: DocumentFichierService,
+  ) {}
 
   /**
    * Helper : construit l'`ActorContext` à partir des décorateurs NestJS.
@@ -279,5 +294,102 @@ export class DocumentsController {
   })
   async historique(@Param('id', ParseUUIDPipe) documentId: string) {
     return this.workflowService.historiqueDocument(documentId);
+  }
+
+  // ─── 10. POST /:id/upload-fichier — Lot 8.1.D ────────────────────
+
+  @Post(':id/upload-fichier')
+  @HttpCode(HttpStatus.OK)
+  @RequirePermissions('DOCUMENT.CREER')
+  @UseInterceptors(
+    FileInterceptor('fichier', {
+      limits: { fileSize: 10 * 1024 * 1024 }, // 10 MB
+      fileFilter: (_req, file, callback) => {
+        if (file.mimetype !== 'application/pdf') {
+          return callback(
+            new BadRequestException(
+              'Seuls les fichiers PDF (Content-Type: application/pdf) sont acceptés.',
+            ),
+            false,
+          );
+        }
+        callback(null, true);
+      },
+    }),
+  )
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    description: 'PDF original (≤ 10 MB) à attacher au document.',
+    schema: {
+      type: 'object',
+      properties: {
+        fichier: {
+          type: 'string',
+          format: 'binary',
+          description: 'Fichier PDF (multipart field name = "fichier").',
+        },
+      },
+      required: ['fichier'],
+    },
+  })
+  @ApiOperation({
+    summary:
+      'Attache un PDF original au document (BROUILLON only, émetteur only). Source de vérité documentaire pour audit BCEAO. Validation magic bytes %PDF- en plus du MIME type. Remplace silencieusement un fichier précédent.',
+  })
+  @ApiOkResponse({
+    description:
+      'Fichier uploadé, document_officiel.fichier_joint_path mis à jour.',
+  })
+  @ApiBadRequestResponse({
+    description:
+      'Fichier absent, vide, non-PDF (MIME ou magic bytes), ou > 10 MB.',
+  })
+  @ApiForbiddenResponse({ description: "Pas l'émetteur du document." })
+  @ApiConflictResponse({ description: 'Statut différent de BROUILLON.' })
+  @ApiNotFoundResponse({ description: 'Document introuvable.' })
+  async uploadFichier(
+    @Param('id', ParseUUIDPipe) documentId: string,
+    @UploadedFile() file: UploadedPdfFile | undefined,
+    @CurrentUser() user: AuthUser,
+  ) {
+    if (!file) {
+      throw new BadRequestException(
+        'Fichier requis (multipart field "fichier", PDF ≤ 10 MB).',
+      );
+    }
+    return this.fichierService.uploadFichier(documentId, file, user.email);
+  }
+
+  // ─── 11. GET /:id/fichier — Lot 8.1.D ────────────────────────────
+
+  @Get(':id/fichier')
+  @RequirePermissions('DOCUMENT.LIRE')
+  @ApiOperation({
+    summary:
+      'Télécharge le PDF original attaché au document. Accès : émetteur, viseur ou signataire.',
+  })
+  @ApiOkResponse({
+    description:
+      'Stream PDF avec Content-Disposition: attachment + nom original.',
+  })
+  @ApiNotFoundResponse({
+    description: 'Document introuvable ou aucun fichier joint.',
+  })
+  @ApiForbiddenResponse({
+    description:
+      'Pas acteur du document (ni émetteur, ni viseur, ni signataire).',
+  })
+  async telechargerFichier(
+    @Param('id', ParseUUIDPipe) documentId: string,
+    @CurrentUser() user: AuthUser,
+    @Res({ passthrough: true }) response: Response,
+  ): Promise<StreamableFile> {
+    const { stream, fichierNom, mimeType } =
+      await this.fichierService.telechargerFichier(documentId, user.email);
+    response.set({
+      'Content-Type': mimeType,
+      'Content-Disposition': `attachment; filename="${fichierNom}"`,
+    });
+    return new StreamableFile(stream);
   }
 }

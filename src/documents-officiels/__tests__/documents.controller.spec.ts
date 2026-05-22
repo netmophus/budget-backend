@@ -6,8 +6,9 @@
  * `signer(@CurrentUser, @Req)` qui capture IP + User-Agent pour
  * la signature crypto.
  */
+import { BadRequestException } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
-import type { Request } from 'express';
+import type { Request, Response } from 'express';
 
 import type { AuthUser } from '../../auth/decorators/current-user.decorator';
 import {
@@ -15,6 +16,7 @@ import {
   type PermissionsMetadata,
 } from '../../auth/decorators/require-permissions.decorator';
 import { DocumentsController } from '../controllers/documents.controller';
+import { DocumentFichierService } from '../services/document-fichier.service';
 import { DocumentWorkflowService } from '../services/document-workflow.service';
 
 const mockUser: AuthUser = { userId: '23', email: 'dg@bsic.ne' };
@@ -32,6 +34,11 @@ describe('DocumentsController (Lot 8.1.C Palier 3)', () => {
     listerDocuments: jest.Mock;
     detailDocument: jest.Mock;
   };
+  let fichierService: {
+    uploadFichier: jest.Mock;
+    telechargerFichier: jest.Mock;
+    supprimerFichier: jest.Mock;
+  };
 
   beforeEach(async () => {
     service = {
@@ -45,9 +52,17 @@ describe('DocumentsController (Lot 8.1.C Palier 3)', () => {
       listerDocuments: jest.fn(),
       detailDocument: jest.fn(),
     };
+    fichierService = {
+      uploadFichier: jest.fn(),
+      telechargerFichier: jest.fn(),
+      supprimerFichier: jest.fn(),
+    };
     const moduleRef = await Test.createTestingModule({
       controllers: [DocumentsController],
-      providers: [{ provide: DocumentWorkflowService, useValue: service }],
+      providers: [
+        { provide: DocumentWorkflowService, useValue: service },
+        { provide: DocumentFichierService, useValue: fichierService },
+      ],
     }).compile();
     controller = moduleRef.get(DocumentsController);
   });
@@ -162,5 +177,63 @@ describe('DocumentsController (Lot 8.1.C Palier 3)', () => {
     });
     await controller.historique('doc-uuid-1');
     expect(service.historiqueDocument).toHaveBeenCalledWith('doc-uuid-1');
+  });
+
+  // ─── Lot 8.1.D — upload + download fichier ─────────────────────
+
+  it('uploadFichier : @RequirePermissions(DOCUMENT.CREER) + délègue au service', () => {
+    const meta = Reflect.getMetadata(
+      PERMISSIONS_KEY,
+      controller.uploadFichier,
+    ) as PermissionsMetadata;
+    expect(meta.permissions).toContain('DOCUMENT.CREER');
+  });
+
+  it('uploadFichier — sans fichier → 400 BadRequestException', async () => {
+    await expect(
+      controller.uploadFichier('doc-uuid-1', undefined, mockUser),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(fichierService.uploadFichier).not.toHaveBeenCalled();
+  });
+
+  it('uploadFichier — happy : délègue (documentId, file, user.email)', async () => {
+    const file = {
+      buffer: Buffer.from('%PDF-1.4 fake', 'utf-8'),
+      originalname: 'lettre.pdf',
+      mimetype: 'application/pdf',
+      size: 13,
+    };
+    fichierService.uploadFichier.mockResolvedValue({
+      documentId: 'doc-uuid-1',
+      fichierNom: 'lettre.pdf',
+      fichierTaille: 13,
+      dateUpload: new Date(),
+    });
+    await controller.uploadFichier('doc-uuid-1', file, mockUser);
+    expect(fichierService.uploadFichier).toHaveBeenCalledWith(
+      'doc-uuid-1',
+      file,
+      'dg@bsic.ne',
+    );
+  });
+
+  it('telechargerFichier — set headers + retourne StreamableFile', async () => {
+    const fakeStream = { pipe: jest.fn() } as never;
+    fichierService.telechargerFichier.mockResolvedValue({
+      stream: fakeStream,
+      fichierNom: 'lettre-cadrage.pdf',
+      mimeType: 'application/pdf',
+    });
+    const res = { set: jest.fn() } as unknown as Response;
+    const result = await controller.telechargerFichier(
+      'doc-uuid-1',
+      mockUser,
+      res,
+    );
+    expect(res.set).toHaveBeenCalledWith({
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': 'attachment; filename="lettre-cadrage.pdf"',
+    });
+    expect(result).toBeDefined();
   });
 });
