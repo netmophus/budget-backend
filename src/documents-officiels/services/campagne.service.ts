@@ -30,6 +30,59 @@ import { CreerCampagneDto } from '../dto/creer-campagne.dto';
 import { CampagneBudgetaire } from '../entities/campagne-budgetaire.entity';
 import { CampagneComiteMembre } from '../entities/campagne-comite-membre.entity';
 
+/**
+ * Vue allégée d'un User sans champs sensibles (motDePasseHash,
+ * dateExpirationMdp, doitChangerMdp, ...). Le projet n'utilise PAS
+ * `ClassSerializerInterceptor` ni `@Exclude` — la sérialisation des
+ * réponses API est explicite côté service (cf. users.service.spec.ts
+ * "Critical: hash must not appear anywhere in the response").
+ *
+ * Hotfix Lot 8.2.A : avant ce fix, listerCampagnes/detailCampagne ne
+ * chargeaient pas la relation User → pas de risque. Le fix l'introduit
+ * via `relations: ['signataireDefaut']`, donc le mapping vers cette
+ * vue allégée est obligatoire pour ne pas leaker motDePasseHash dans
+ * la réponse JSON.
+ */
+export interface UserResume {
+  id: string;
+  email: string;
+  nom: string;
+  prenom: string;
+}
+
+function toUserResume(u: User | null | undefined): UserResume | undefined {
+  if (!u) return undefined;
+  return { id: u.id, email: u.email, nom: u.nom, prenom: u.prenom };
+}
+
+/**
+ * Item retourné par GET /campagnes (liste enrichie). Les relations
+ * inverses `comiteMembres` et `documents` sont retirées (jamais
+ * chargées dans cette query — la liste ne les inclut pas).
+ */
+export type CampagneListItem = Omit<
+  CampagneBudgetaire,
+  'signataireDefaut' | 'comiteMembres' | 'documents'
+> & {
+  signataireDefaut?: UserResume;
+  nombreMembres: number;
+};
+
+/**
+ * Item retourné par GET /campagnes/:id (détail enrichi). `comiteMembres`
+ * remplacée par la version mappée vers UserResume ; `documents` retirée
+ * (livré en Lot 8.2.B).
+ */
+export type CampagneDetailView = Omit<
+  CampagneBudgetaire,
+  'signataireDefaut' | 'comiteMembres' | 'documents'
+> & {
+  signataireDefaut?: UserResume;
+  comiteMembres: Array<
+    Omit<CampagneComiteMembre, 'user'> & { user?: UserResume }
+  >;
+};
+
 @Injectable()
 export class CampagneService {
   constructor(
@@ -205,36 +258,79 @@ export class CampagneService {
   // ─── Lot 8.1.C : lectures pour les controllers ───────────────────
 
   /**
-   * Liste les campagnes triées par exercice fiscal DESC (plus récente
-   * en premier). Pas de pagination au Lot 8.1.C — moins de 10 campagnes
-   * attendues sur la durée de vie MIZNAS. Filtrage périmètre ajoutable
-   * au Lot 8.2 si volumétrie augmente.
+   * Liste les campagnes triées par exercice fiscal DESC.
+   *
+   * Hotfix Lot 8.2.A — chaque ligne est enrichie de :
+   *  - `signataireDefaut` : vue allégée (sans motDePasseHash)
+   *  - `nombreMembres`    : COUNT(comiteMembre) calculé en 1 requête
+   *                         groupée (anti N+1).
+   * Le frontend en a besoin pour les colonnes "Signataire" et "Membres"
+   * du tableau ; avant ce fix, ces colonnes affichaient `—` et `0`
+   * pour toutes les lignes.
    */
-  async listerCampagnes(): Promise<CampagneBudgetaire[]> {
-    return this.campagneRepo.find({
+  async listerCampagnes(): Promise<CampagneListItem[]> {
+    const campagnes = await this.campagneRepo.find({
+      relations: ['signataireDefaut'],
       order: { exerciceFiscal: 'DESC' },
+    });
+    if (campagnes.length === 0) return [];
+
+    // Compte des membres par campagne en 1 requête groupée (anti N+1).
+    const ids = campagnes.map((c) => c.id);
+    const counts = await this.comiteRepo
+      .createQueryBuilder('m')
+      .select('m.fkCampagne', 'fkCampagne')
+      .addSelect('COUNT(m.id)', 'count')
+      .where('m.fkCampagne IN (:...ids)', { ids })
+      .groupBy('m.fkCampagne')
+      .getRawMany<{ fkCampagne: string; count: string }>();
+    const countMap = new Map(
+      counts.map((c) => [c.fkCampagne, Number(c.count)]),
+    );
+
+    return campagnes.map((c) => {
+      const { signataireDefaut, ...rest } = c;
+      return {
+        ...rest,
+        signataireDefaut: toUserResume(signataireDefaut),
+        nombreMembres: countMap.get(c.id) ?? 0,
+      };
     });
   }
 
   /**
    * Détail d'une campagne avec ses membres comité ordonnés.
    *
+   * Hotfix Lot 8.2.A — retour APLATI (et plus `{ campagne, membres }`)
+   * pour matcher le contrat `CampagneDetail` attendu par le frontend.
+   * Relations `signataireDefaut` et `comiteMembres.user` chargées et
+   * mappées vers `UserResume` (sécurité : pas de motDePasseHash dans
+   * la réponse JSON).
+   *
    * @throws NotFoundException si campagne introuvable.
    */
-  async detailCampagne(campagneId: string): Promise<{
-    campagne: CampagneBudgetaire;
-    membres: CampagneComiteMembre[];
-  }> {
+  async detailCampagne(campagneId: string): Promise<CampagneDetailView> {
     const campagne = await this.campagneRepo.findOne({
       where: { id: campagneId },
+      relations: ['signataireDefaut'],
     });
     if (!campagne) {
       throw new NotFoundException(`Campagne ${campagneId} introuvable.`);
     }
     const membres = await this.comiteRepo.find({
       where: { fkCampagne: campagneId },
+      relations: ['user'],
       order: { ordre: 'ASC' },
     });
-    return { campagne, membres };
+
+    const { signataireDefaut, ...rest } = campagne;
+    return {
+      ...rest,
+      signataireDefaut: toUserResume(signataireDefaut),
+      comiteMembres: membres.map((m) => {
+        const { user, ...mRest } = m;
+        return { ...mRest, user: toUserResume(user) };
+      }),
+    };
   }
 }
