@@ -35,6 +35,7 @@ import { DataSource, type EntityManager } from 'typeorm';
 
 import { AuditLog } from '../../audit/entities/audit-log.entity';
 import { User } from '../../users/entities/user.entity';
+import { type UserResume, toUserResume } from '../../users/utils/user-resume';
 import { ApporterVisaDto } from '../dto/apporter-visa.dto';
 import { CreerDocumentDto } from '../dto/creer-document.dto';
 import { EditerDocumentDto } from '../dto/editer-document.dto';
@@ -48,6 +49,53 @@ import { DocumentOfficiel } from '../entities/document-officiel.entity';
 import { DocumentSignature } from '../entities/document-signature.entity';
 import { DocumentVisa } from '../entities/document-visa.entity';
 import { DocumentHashService } from './document-hash.service';
+
+/**
+ * Lot 8.1.E Palier 2 — types de vue API pour `listerDocuments` et
+ * `detailDocument`. Les relations TypeORM (`emetteur`, `signataire`,
+ * `visas`, `campagne`, `versionBudget`) sont retirées de l'entité
+ * via `Omit` puis remplacées par des shapes adaptés au frontend :
+ *  - `emetteur`/`signataire` mappés en `UserResume` (4 champs)
+ *  - `visas[].user` mappé en `UserResume` (clé renommée depuis
+ *    l'entité `visa.viseur` pour matcher le contrat frontend
+ *    `DocumentVisaResume.user`)
+ *  - `signature` conservée telle quelle (entité avec snapshot
+ *    `emailSignataire`/`nomSignataire`, pas de relation supplémentaire)
+ *
+ * Symétrie avec `CampagneListItem`/`CampagneDetailView` introduits
+ * en hotfix Lot 8.2.A.
+ */
+export type DocumentOfficielListItem = Omit<
+  DocumentOfficiel,
+  | 'emetteur'
+  | 'signataire'
+  | 'visas'
+  | 'campagne'
+  | 'versionBudget'
+  | 'signature'
+> & {
+  emetteur?: UserResume;
+  signataire?: UserResume;
+};
+
+export type DocumentVisaWithUser = Omit<DocumentVisa, 'viseur' | 'document'> & {
+  user?: UserResume;
+};
+
+export type DocumentOfficielDetailView = Omit<
+  DocumentOfficiel,
+  | 'emetteur'
+  | 'signataire'
+  | 'visas'
+  | 'campagne'
+  | 'versionBudget'
+  | 'signature'
+> & {
+  emetteur?: UserResume;
+  signataire?: UserResume;
+  visas: DocumentVisaWithUser[];
+  signature: DocumentSignature | null;
+};
 
 /**
  * Contexte utilisateur passé par le controller Lot 8.1.C. Évite N
@@ -557,13 +605,22 @@ export class DocumentWorkflowService {
 
   // ─── 10. listerDocuments ─────────────────────────────────────────
 
+  /**
+   * Lot 8.1.E Palier 2 — enrichissement émetteur + signataire pour
+   * que le tableau frontend (DocumentsPage) affiche les noms réels
+   * au lieu de "user.id=10" / "—". Mapping `UserResume` (4 champs
+   * id/email/nom/prenom seulement, défense en profondeur après le
+   * `@Exclude motDePasseHash` global du Palier 1).
+   */
   async listerDocuments(
     query: ListerDocumentsQueryDto,
     actor: ActorContext,
-  ): Promise<DocumentOfficiel[]> {
+  ): Promise<DocumentOfficielListItem[]> {
     const qb = this.dataSource
       .getRepository(DocumentOfficiel)
-      .createQueryBuilder('d');
+      .createQueryBuilder('d')
+      .leftJoinAndSelect('d.emetteur', 'emetteur')
+      .leftJoinAndSelect('d.signataire', 'signataire');
 
     if (query.statut)
       qb.andWhere('d.statut = :statut', { statut: query.statut });
@@ -609,7 +666,15 @@ export class DocumentWorkflowService {
       'DESC',
     );
 
-    return qb.getMany();
+    const docs = await qb.getMany();
+    return docs.map((d) => {
+      const { emetteur, signataire, ...rest } = d;
+      return {
+        ...rest,
+        emetteur: toUserResume(emetteur),
+        signataire: toUserResume(signataire),
+      };
+    });
   }
 
   // ─── 11. detailDocument (Lot 8.1.C) ──────────────────────────────
@@ -622,24 +687,45 @@ export class DocumentWorkflowService {
    * @throws NotFoundException si document introuvable.
    * @throws ForbiddenException si actor n'a aucun rôle sur le document.
    */
+  /**
+   * Lot 8.1.E Palier 2 — refonte du retour pour matcher le contrat
+   * frontend `DocumentOfficiel` (Lot 8.2.B) :
+   *
+   * Avant : `{ document, visas, signature }` (nested, sans enrichissements)
+   * → frontend forcé d'aplatir au boundary (lib/api/documents.ts) +
+   * cartouche détail affiche "user.id=10" car relation non chargée.
+   *
+   * Après : `{ ...document, emetteur, signataire, visas, signature }`
+   * (aplati) avec :
+   *  - `emetteur` / `signataire` chargés via relations TypeORM puis
+   *    mappés en `UserResume` (id/email/nom/prenom — minimise la surface
+   *    API + défense en profondeur après @Exclude motDePasseHash global).
+   *  - `visas[].user` (clé renommée depuis l'entité `visa.viseur` pour
+   *    aligner sur le contrat frontend `DocumentVisaResume.user`).
+   *  - `signature` conservée telle quelle — l'entité contient déjà
+   *    `emailSignataire` / `nomSignataire` capturés au snapshot
+   *    signature, pas besoin de relation supplémentaire.
+   *
+   * Symétrie avec le hotfix `campagne.service.detailCampagne`
+   * (Lot 8.2.A) qui avait corrigé le même pattern.
+   */
   async detailDocument(
     documentId: string,
     actor: ActorContext,
-  ): Promise<{
-    document: DocumentOfficiel;
-    visas: DocumentVisa[];
-    signature: DocumentSignature | null;
-  }> {
-    const doc = await this.dataSource
-      .getRepository(DocumentOfficiel)
-      .findOne({ where: { id: documentId } });
+  ): Promise<DocumentOfficielDetailView> {
+    const doc = await this.dataSource.getRepository(DocumentOfficiel).findOne({
+      where: { id: documentId },
+      relations: ['emetteur', 'signataire'],
+    });
     if (!doc) {
       throw new NotFoundException(`Document ${documentId} introuvable.`);
     }
 
-    const visas = await this.dataSource
-      .getRepository(DocumentVisa)
-      .find({ where: { fkDocument: documentId } });
+    const visas = await this.dataSource.getRepository(DocumentVisa).find({
+      where: { fkDocument: documentId },
+      relations: ['viseur'],
+      order: { ordreVisa: 'ASC' },
+    });
 
     // Check d'accès métier (RBAC technique reste sur le controller).
     if (!actor.isAdmin) {
@@ -657,7 +743,17 @@ export class DocumentWorkflowService {
       .getRepository(DocumentSignature)
       .findOne({ where: { fkDocument: documentId } });
 
-    return { document: doc, visas, signature };
+    const { emetteur, signataire, ...rest } = doc;
+    return {
+      ...rest,
+      emetteur: toUserResume(emetteur),
+      signataire: toUserResume(signataire),
+      visas: visas.map((v) => {
+        const { viseur, ...vRest } = v;
+        return { ...vRest, user: toUserResume(viseur) };
+      }),
+      signature,
+    };
   }
 
   // ─── 12. historiqueDocument (Lot 8.1.C) ──────────────────────────
