@@ -411,14 +411,19 @@ describe('DocumentWorkflowService (Lot 8.1.B Palier 3)', () => {
 
   // ─── detailDocument (Lot 8.1.C) ─────────────────────────────────
 
-  it('detailDocument — happy path (émetteur) retourne doc + visas + signature', async () => {
+  it('detailDocument — happy path (émetteur) retourne objet APLATI (Lot 8.1.E)', async () => {
     repos.doc.findOne.mockResolvedValue(mockDoc()); // emetteur = '23' = actor
     repos.visa.find.mockResolvedValue([mockVisa()]);
     repos.signature.findOne.mockResolvedValue(null);
     const result = await service.detailDocument('doc-uuid-1', actor);
-    expect(result.document.id).toBe('doc-uuid-1');
+    // Lot 8.1.E Palier 2 : retour APLATI {...doc, visas, signature}
+    // (avant : { document, visas, signature } nested).
+    expect(result.id).toBe('doc-uuid-1');
     expect(result.visas).toHaveLength(1);
     expect(result.signature).toBeNull();
+    // Mapping `visa.viseur` → `visa.user` côté API (alignement contrat
+    // frontend `DocumentVisaResume.user`). Aucun motDePasseHash exposé.
+    expect(JSON.stringify(result)).not.toContain('motDePasseHash');
   });
 
   it('detailDocument — user ni emetteur ni viseur ni signataire → 403', async () => {

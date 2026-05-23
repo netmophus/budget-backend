@@ -25,35 +25,23 @@ import { Repository } from 'typeorm';
 
 import { AuditService } from '../../audit/audit.service';
 import { User } from '../../users/entities/user.entity';
+import { type UserResume, toUserResume } from '../../users/utils/user-resume';
 import { AjouterComiteMembreDto } from '../dto/ajouter-comite-membre.dto';
 import { CreerCampagneDto } from '../dto/creer-campagne.dto';
 import { CampagneBudgetaire } from '../entities/campagne-budgetaire.entity';
 import { CampagneComiteMembre } from '../entities/campagne-comite-membre.entity';
 
 /**
- * Vue allégée d'un User sans champs sensibles (motDePasseHash,
- * dateExpirationMdp, doitChangerMdp, ...). Le projet n'utilise PAS
- * `ClassSerializerInterceptor` ni `@Exclude` — la sérialisation des
- * réponses API est explicite côté service (cf. users.service.spec.ts
- * "Critical: hash must not appear anywhere in the response").
+ * Lot 8.1.E Palier 2 : `UserResume` + `toUserResume` extraits dans
+ * `src/users/utils/user-resume.ts` (helper partagé avec
+ * `document-workflow.service`). Cf. ce fichier pour la
+ * documentation complète + la stratégie de défense en profondeur
+ * (couche 1 = @Exclude global ; couche 2 = ce helper).
  *
- * Hotfix Lot 8.2.A : avant ce fix, listerCampagnes/detailCampagne ne
- * chargeaient pas la relation User → pas de risque. Le fix l'introduit
- * via `relations: ['signataireDefaut']`, donc le mapping vers cette
- * vue allégée est obligatoire pour ne pas leaker motDePasseHash dans
- * la réponse JSON.
+ * Re-export pour rétrocompatibilité au cas où un code externe
+ * importait `UserResume` depuis ce fichier.
  */
-export interface UserResume {
-  id: string;
-  email: string;
-  nom: string;
-  prenom: string;
-}
-
-function toUserResume(u: User | null | undefined): UserResume | undefined {
-  if (!u) return undefined;
-  return { id: u.id, email: u.email, nom: u.nom, prenom: u.prenom };
-}
+export { UserResume };
 
 /**
  * Item retourné par GET /campagnes (liste enrichie). Les relations

@@ -1,3 +1,4 @@
+import { Exclude } from 'class-transformer';
 import {
   Column,
   Entity,
@@ -16,7 +17,27 @@ export class User {
   @Column({ name: 'email', type: 'varchar', length: 255 })
   email!: string;
 
+  /**
+   * Hash bcrypt du mot de passe. **JAMAIS exposé dans une réponse
+   * HTTP** (sérialisation via ClassSerializerInterceptor global +
+   * `@Exclude({ toPlainOnly: true })` ici).
+   *
+   * `toPlainOnly: true` n'affecte QUE la sérialisation `instanceToPlain` :
+   * la lecture en mémoire côté serveur (notamment `bcrypt.compare` dans
+   * `auth.service`) continue de fonctionner normalement. C'est le
+   * pattern recommandé NestJS pour protéger les champs sensibles
+   * (cf. docs NestJS / class-transformer "Excluding properties").
+   *
+   * Hotfix Lot 8.1.E (cross-cutting) : avant cette protection, tout
+   * endpoint qui chargeait la relation `User` via TypeORM
+   * (`relations: ['emetteur']`, etc.) exposait le hash dans la
+   * réponse JSON → vulnérabilité bruteforce hors-ligne en cas de
+   * fuite. Mapping manuel `UserResume` reste utilisé localement par
+   * `campagne.service` comme défense en profondeur (sélection
+   * explicite des champs).
+   */
   @Column({ name: 'mot_de_passe_hash', type: 'varchar', length: 255 })
+  @Exclude({ toPlainOnly: true })
   motDePasseHash!: string;
 
   @Column({ name: 'nom', type: 'varchar', length: 100 })
