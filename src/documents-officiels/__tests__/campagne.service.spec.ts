@@ -61,6 +61,7 @@ describe('CampagneService (Lot 8.1.B)', () => {
   beforeEach(async () => {
     const repoMock = (): Record<string, jest.Mock> => ({
       findOne: jest.fn(),
+      find: jest.fn(),
       create: jest.fn((dto: unknown) => dto),
       save: jest.fn(),
       count: jest.fn(),
@@ -186,6 +187,107 @@ describe('CampagneService (Lot 8.1.B)', () => {
     userRepo.findOne.mockResolvedValue(null);
     await expect(
       service.creerCampagne(dtoCreer, 'dg@bsic.ne'),
+    ).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  // ─── listerCampagnes — hotfix Lot 8.2.A ──────────────────────────
+
+  it('listerCampagnes — enrichit signataireDefaut (sans motDePasseHash) + nombreMembres calculé', async () => {
+    const campagneAvecSignataire = mockCampagne({
+      signataireDefaut: {
+        ...mockUser,
+        motDePasseHash: 'must-not-leak',
+      } as User,
+    });
+    campagneRepo.find.mockResolvedValue([campagneAvecSignataire]);
+    // QueryBuilder pour le COUNT groupé
+    const qb = {
+      select: jest.fn().mockReturnThis(),
+      addSelect: jest.fn().mockReturnThis(),
+      where: jest.fn().mockReturnThis(),
+      groupBy: jest.fn().mockReturnThis(),
+      getRawMany: jest
+        .fn()
+        .mockResolvedValue([{ fkCampagne: 'camp-uuid-1', count: '3' }]),
+    } as unknown as SelectQueryBuilder<CampagneComiteMembre>;
+    comiteRepo.createQueryBuilder.mockReturnValue(qb);
+
+    const result = await service.listerCampagnes();
+
+    expect(result).toHaveLength(1);
+    expect(result[0].nombreMembres).toBe(3);
+    expect(result[0].signataireDefaut).toEqual({
+      id: '23',
+      email: 'dg@bsic.ne',
+      nom: 'BARRY',
+      prenom: 'Issoufou',
+    });
+    // CRITICAL : pas de motDePasseHash dans la réponse JSON
+    expect(JSON.stringify(result)).not.toContain('motDePasseHash');
+    expect(JSON.stringify(result)).not.toContain('must-not-leak');
+  });
+
+  it('listerCampagnes — liste vide n’appelle pas le COUNT', async () => {
+    campagneRepo.find.mockResolvedValue([]);
+    const result = await service.listerCampagnes();
+    expect(result).toEqual([]);
+    expect(comiteRepo.createQueryBuilder).not.toHaveBeenCalled();
+  });
+
+  // ─── detailCampagne — hotfix Lot 8.2.A ───────────────────────────
+
+  it('detailCampagne — retour APLATI {...campagne, comiteMembres} (pas {campagne, membres})', async () => {
+    const camp = mockCampagne({
+      signataireDefaut: {
+        ...mockUser,
+        motDePasseHash: 'must-not-leak',
+      } as User,
+    });
+    campagneRepo.findOne.mockResolvedValue(camp);
+    comiteRepo.find.mockResolvedValue([
+      {
+        id: 'mem-1',
+        fkCampagne: 'camp-uuid-1',
+        fkUser: '24',
+        ordre: 1,
+        estObligatoire: true,
+        libelleFonction: 'DGA Ops',
+        dateCreation: new Date(),
+        utilisateurCreation: 'dg@bsic.ne',
+        user: {
+          id: '24',
+          email: 'dga@bsic.ne',
+          nom: 'DIALLO',
+          prenom: 'Aissatou',
+          motDePasseHash: 'must-not-leak-also',
+        } as User,
+      } as CampagneComiteMembre,
+    ]);
+
+    const result = await service.detailCampagne('camp-uuid-1');
+
+    // Structure APLATIE : pas de nesting `campagne` ni `membres`
+    expect(result.code).toBe('CAMPAGNE_2027');
+    expect(result.statut).toBe('PARAMETRAGE');
+    expect(Array.isArray(result.comiteMembres)).toBe(true);
+    expect(result.comiteMembres).toHaveLength(1);
+    // Membres enrichis avec user (sans hash)
+    expect(result.comiteMembres[0].user).toEqual({
+      id: '24',
+      email: 'dga@bsic.ne',
+      nom: 'DIALLO',
+      prenom: 'Aissatou',
+    });
+    expect(result.signataireDefaut?.email).toBe('dg@bsic.ne');
+    // CRITICAL : pas de motDePasseHash dans la réponse JSON
+    expect(JSON.stringify(result)).not.toContain('motDePasseHash');
+    expect(JSON.stringify(result)).not.toContain('must-not-leak');
+  });
+
+  it('detailCampagne — campagne introuvable → 404', async () => {
+    campagneRepo.findOne.mockResolvedValue(null);
+    await expect(
+      service.detailCampagne('camp-uuid-inexistante'),
     ).rejects.toBeInstanceOf(NotFoundException);
   });
 });
