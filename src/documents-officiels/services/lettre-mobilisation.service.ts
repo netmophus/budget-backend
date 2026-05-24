@@ -72,9 +72,12 @@ export class LettreMobilisationService {
     if (!document) {
       throw new NotFoundException(`Document ${documentId} introuvable.`);
     }
-    if (document.typeDocument !== 'D5_LETTRE_MOBILISATION') {
+    if (document.typeDocument !== 'D5_LETTRE_DG') {
+      // Identifiant technique : 'D5_LETTRE_DG' (cohérent enum
+      // `creer-document.dto.ts` + frontend `types/document.ts`).
+      // Label métier affiché côté frontend : "Lettre de mobilisation".
       throw new ConflictException(
-        `Le détail mobilisation n'est applicable qu'aux documents D5_LETTRE_MOBILISATION ` +
+        `Le détail mobilisation n'est applicable qu'aux documents D5_LETTRE_DG ` +
           `(reçu : '${document.typeDocument}').`,
       );
     }

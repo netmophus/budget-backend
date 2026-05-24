@@ -791,7 +791,7 @@ export class DocumentWorkflowService {
             .findOne({ where: { fkDocument: documentId } })
         : null;
     const lettreMobilisationDetail =
-      doc.typeDocument === 'D5_LETTRE_MOBILISATION'
+      doc.typeDocument === 'D5_LETTRE_DG'
         ? await this.dataSource
             .getRepository(LettreMobilisationDetail)
             .findOne({ where: { fkDocument: documentId } })

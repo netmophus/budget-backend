@@ -36,7 +36,10 @@ interface FakeDoc {
 function makeDoc(over: Partial<FakeDoc> = {}): FakeDoc {
   return {
     id: 'doc-uuid-1',
-    typeDocument: 'D5_LETTRE_MOBILISATION',
+    // Identifiant technique projet : D5_LETTRE_DG (cohérent enum
+    // creer-document.dto.ts + frontend). Label métier "Lettre de
+    // mobilisation" via TYPE_DOCUMENT_LABEL.
+    typeDocument: 'D5_LETTRE_DG',
     statut: 'BROUILLON',
     fkUserEmetteur: '23',
     ...over,
@@ -165,7 +168,7 @@ describe('LettreMobilisationService (Lot 8.3.B P1)', () => {
 
   // ─── Erreurs métier ────────────────────────────────────────────
 
-  it('5. creerOuMettreAJour — type document ≠ D5_LETTRE_MOBILISATION → 409', async () => {
+  it('5. creerOuMettreAJour — type document ≠ D5_LETTRE_DG → 409', async () => {
     docRepo.findOne.mockResolvedValue(
       makeDoc({ typeDocument: 'D3_NOTE_ORIENTATION' }),
     );

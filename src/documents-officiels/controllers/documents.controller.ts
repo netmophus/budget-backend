@@ -525,8 +525,7 @@ export class DocumentsController {
   @ApiOkResponse({ description: 'Détail enregistré.' })
   @ApiNotFoundResponse({ description: 'Document introuvable.' })
   @ApiConflictResponse({
-    description:
-      'Type document ≠ D5_LETTRE_MOBILISATION OU statut ≠ BROUILLON.',
+    description: 'Type document ≠ D5_LETTRE_DG OU statut ≠ BROUILLON.',
   })
   @ApiForbiddenResponse({
     description: "Modification réservée à l'émetteur du document.",
