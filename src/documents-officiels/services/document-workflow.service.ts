@@ -49,6 +49,7 @@ import { DocumentOfficiel } from '../entities/document-officiel.entity';
 import { DocumentSignature } from '../entities/document-signature.entity';
 import { DocumentVisa } from '../entities/document-visa.entity';
 import { LettreCadrageDetail } from '../entities/lettre-cadrage-detail.entity';
+import { NoteOrientationDetail } from '../entities/note-orientation-detail.entity';
 import { DocumentHashService } from './document-hash.service';
 
 /**
@@ -103,6 +104,15 @@ export type DocumentOfficielDetailView = Omit<
    * créé).
    */
   lettreCadrageDetail: LettreCadrageDetail | null;
+  /**
+   * Lot 8.3.A — détail métier structuré, présent UNIQUEMENT pour les
+   * documents de type `D3_NOTE_ORIENTATION` (Note interne avec analyse
+   * macro + axes stratégiques). `null` si type ≠ D3 ou si le DG n'a
+   * pas encore renseigné le détail. Au plus un des 2 détails métier
+   * (lettreCadrageDetail OU noteOrientationDetail) est non-null pour
+   * un même document — exclusion mutuelle par typeDocument.
+   */
+  noteOrientationDetail: NoteOrientationDetail | null;
 };
 
 /**
@@ -751,13 +761,21 @@ export class DocumentWorkflowService {
       .getRepository(DocumentSignature)
       .findOne({ where: { fkDocument: documentId } });
 
-    // Lot 8.2.C — chargement conditionnel du détail métier
-    // UNIQUEMENT si type D2_LETTRE_CADRAGE. Évite un round-trip DB
-    // inutile pour les autres 6 types de documents.
+    // Lot 8.2.C — chargement conditionnel du détail métier D2.
+    // Lot 8.3.A — chargement conditionnel du détail métier D3.
+    // Exclusion mutuelle par typeDocument : au plus un des 2 SELECT
+    // est exécuté pour un document donné. Pour les 5 autres types
+    // (D1, D5, D11, D12, R3, R5), aucun round-trip supplémentaire.
     const lettreCadrageDetail =
       doc.typeDocument === 'D2_LETTRE_CADRAGE'
         ? await this.dataSource
             .getRepository(LettreCadrageDetail)
+            .findOne({ where: { fkDocument: documentId } })
+        : null;
+    const noteOrientationDetail =
+      doc.typeDocument === 'D3_NOTE_ORIENTATION'
+        ? await this.dataSource
+            .getRepository(NoteOrientationDetail)
             .findOne({ where: { fkDocument: documentId } })
         : null;
 
@@ -772,6 +790,7 @@ export class DocumentWorkflowService {
       }),
       signature,
       lettreCadrageDetail,
+      noteOrientationDetail,
     };
   }
 

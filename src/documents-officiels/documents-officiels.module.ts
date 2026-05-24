@@ -25,6 +25,7 @@ import { DocumentOfficiel } from './entities/document-officiel.entity';
 import { DocumentSignature } from './entities/document-signature.entity';
 import { DocumentVisa } from './entities/document-visa.entity';
 import { LettreCadrageDetail } from './entities/lettre-cadrage-detail.entity';
+import { NoteOrientationDetail } from './entities/note-orientation-detail.entity';
 import { CampagnesController } from './controllers/campagnes.controller';
 import { DocumentsController } from './controllers/documents.controller';
 import { CampagneService } from './services/campagne.service';
@@ -32,6 +33,7 @@ import { DocumentFichierService } from './services/document-fichier.service';
 import { DocumentHashService } from './services/document-hash.service';
 import { DocumentWorkflowService } from './services/document-workflow.service';
 import { LettreCadrageService } from './services/lettre-cadrage.service';
+import { NoteOrientationService } from './services/note-orientation.service';
 
 @Module({
   imports: [
@@ -42,6 +44,7 @@ import { LettreCadrageService } from './services/lettre-cadrage.service';
       DocumentVisa,
       DocumentSignature,
       LettreCadrageDetail, // Lot 8.2.C — détail métier D2_LETTRE_CADRAGE
+      NoteOrientationDetail, // Lot 8.3.A — détail métier D3_NOTE_ORIENTATION
       User, // pour lookup signataire dans CampagneService + bcrypt dans DocumentWorkflowService
     ]),
     AuditModule, // pour AuditService dans CampagneService
@@ -53,6 +56,7 @@ import { LettreCadrageService } from './services/lettre-cadrage.service';
     DocumentWorkflowService,
     DocumentFichierService,
     LettreCadrageService,
+    NoteOrientationService,
   ],
   exports: [
     TypeOrmModule,
@@ -61,6 +65,7 @@ import { LettreCadrageService } from './services/lettre-cadrage.service';
     DocumentWorkflowService,
     DocumentFichierService,
     LettreCadrageService,
+    NoteOrientationService,
   ],
 })
 export class DocumentsOfficielsModule {}
