@@ -18,6 +18,7 @@ import {
 import { DocumentsController } from '../controllers/documents.controller';
 import { DocumentFichierService } from '../services/document-fichier.service';
 import { DocumentWorkflowService } from '../services/document-workflow.service';
+import { LettreCadrageService } from '../services/lettre-cadrage.service';
 
 const mockUser: AuthUser = { userId: '23', email: 'dg@bsic.ne' };
 
@@ -39,6 +40,10 @@ describe('DocumentsController (Lot 8.1.C Palier 3)', () => {
     telechargerFichier: jest.Mock;
     supprimerFichier: jest.Mock;
   };
+  let lettreCadrageService: {
+    lireDetail: jest.Mock;
+    creerOuMettreAJour: jest.Mock;
+  };
 
   beforeEach(async () => {
     service = {
@@ -57,11 +62,16 @@ describe('DocumentsController (Lot 8.1.C Palier 3)', () => {
       telechargerFichier: jest.fn(),
       supprimerFichier: jest.fn(),
     };
+    lettreCadrageService = {
+      lireDetail: jest.fn(),
+      creerOuMettreAJour: jest.fn(),
+    };
     const moduleRef = await Test.createTestingModule({
       controllers: [DocumentsController],
       providers: [
         { provide: DocumentWorkflowService, useValue: service },
         { provide: DocumentFichierService, useValue: fichierService },
+        { provide: LettreCadrageService, useValue: lettreCadrageService },
       ],
     }).compile();
     controller = moduleRef.get(DocumentsController);
@@ -235,5 +245,45 @@ describe('DocumentsController (Lot 8.1.C Palier 3)', () => {
       'Content-Disposition': 'attachment; filename="lettre-cadrage.pdf"',
     });
     expect(result).toBeDefined();
+  });
+
+  // ─── Lot 8.2.C — endpoints cadrage-detail ──────────────────────
+
+  it('lireDetailCadrage : @RequirePermissions(DOCUMENT.LIRE) + délègue au service', async () => {
+    const meta = Reflect.getMetadata(
+      PERMISSIONS_KEY,
+      controller.lireDetailCadrage,
+    ) as PermissionsMetadata;
+    expect(meta.permissions).toContain('DOCUMENT.LIRE');
+
+    const fakeDetail = { id: 'lcd-1', fkDocument: 'doc-uuid-1' };
+    lettreCadrageService.lireDetail.mockResolvedValue(fakeDetail);
+    const result = await controller.lireDetailCadrage('doc-uuid-1');
+    expect(lettreCadrageService.lireDetail).toHaveBeenCalledWith('doc-uuid-1');
+    expect(result).toBe(fakeDetail);
+  });
+
+  it('mettreAJourDetailCadrage : @RequirePermissions(DOCUMENT.CREER) + délègue (id, dto, user.email)', async () => {
+    const meta = Reflect.getMetadata(
+      PERMISSIONS_KEY,
+      controller.mettreAJourDetailCadrage,
+    ) as PermissionsMetadata;
+    expect(meta.permissions).toContain('DOCUMENT.CREER');
+
+    const dto = {
+      pnbCibleMfcfa: '12500.00',
+      croissanceCreditsPct: '12.50',
+    };
+    lettreCadrageService.creerOuMettreAJour.mockResolvedValue({
+      id: 'lcd-1',
+      fkDocument: 'doc-uuid-1',
+      pnbCibleMfcfa: '12500.00',
+    });
+    await controller.mettreAJourDetailCadrage('doc-uuid-1', dto, mockUser);
+    expect(lettreCadrageService.creerOuMettreAJour).toHaveBeenCalledWith(
+      'doc-uuid-1',
+      dto,
+      'dg@bsic.ne',
+    );
   });
 });

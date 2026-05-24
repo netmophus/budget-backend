@@ -24,6 +24,7 @@ import { CampagneComiteMembre } from '../entities/campagne-comite-membre.entity'
 import { DocumentOfficiel } from '../entities/document-officiel.entity';
 import { DocumentSignature } from '../entities/document-signature.entity';
 import { DocumentVisa } from '../entities/document-visa.entity';
+import { LettreCadrageDetail } from '../entities/lettre-cadrage-detail.entity';
 import { DocumentHashService } from '../services/document-hash.service';
 import {
   type ActorContext,
@@ -56,6 +57,7 @@ interface ReposMock {
   comite: ReturnType<typeof makeRepoMock>;
   user: ReturnType<typeof makeRepoMock>;
   auditLog: ReturnType<typeof makeRepoMock>;
+  lettreCadrageDetail: ReturnType<typeof makeRepoMock>;
 }
 
 function makeDataSourceMock(repos: ReposMock): {
@@ -73,6 +75,7 @@ function makeDataSourceMock(repos: ReposMock): {
     if (entity === CampagneComiteMembre) return repos.comite;
     if (entity === User) return repos.user;
     if (entity === AuditLog) return repos.auditLog;
+    if (entity === LettreCadrageDetail) return repos.lettreCadrageDetail;
     throw new Error(`Unmocked entity: ${String(entity)}`);
   });
   const manager = { getRepository };
@@ -174,6 +177,7 @@ describe('DocumentWorkflowService (Lot 8.1.B Palier 3)', () => {
       comite: makeRepoMock(),
       user: makeRepoMock(),
       auditLog: makeRepoMock(),
+      lettreCadrageDetail: makeRepoMock(),
     };
     const { dataSource } = makeDataSourceMock(repos);
     const moduleRef = await Test.createTestingModule({
