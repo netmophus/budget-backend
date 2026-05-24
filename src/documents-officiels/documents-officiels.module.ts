@@ -25,6 +25,7 @@ import { DocumentOfficiel } from './entities/document-officiel.entity';
 import { DocumentSignature } from './entities/document-signature.entity';
 import { DocumentVisa } from './entities/document-visa.entity';
 import { LettreCadrageDetail } from './entities/lettre-cadrage-detail.entity';
+import { LettreMobilisationDetail } from './entities/lettre-mobilisation-detail.entity';
 import { NoteOrientationDetail } from './entities/note-orientation-detail.entity';
 import { CampagnesController } from './controllers/campagnes.controller';
 import { DocumentsController } from './controllers/documents.controller';
@@ -33,6 +34,7 @@ import { DocumentFichierService } from './services/document-fichier.service';
 import { DocumentHashService } from './services/document-hash.service';
 import { DocumentWorkflowService } from './services/document-workflow.service';
 import { LettreCadrageService } from './services/lettre-cadrage.service';
+import { LettreMobilisationService } from './services/lettre-mobilisation.service';
 import { NoteOrientationService } from './services/note-orientation.service';
 
 @Module({
@@ -45,6 +47,7 @@ import { NoteOrientationService } from './services/note-orientation.service';
       DocumentSignature,
       LettreCadrageDetail, // Lot 8.2.C — détail métier D2_LETTRE_CADRAGE
       NoteOrientationDetail, // Lot 8.3.A — détail métier D3_NOTE_ORIENTATION
+      LettreMobilisationDetail, // Lot 8.3.B — détail métier D5_LETTRE_MOBILISATION
       User, // pour lookup signataire dans CampagneService + bcrypt dans DocumentWorkflowService
     ]),
     AuditModule, // pour AuditService dans CampagneService
@@ -57,6 +60,7 @@ import { NoteOrientationService } from './services/note-orientation.service';
     DocumentFichierService,
     LettreCadrageService,
     NoteOrientationService,
+    LettreMobilisationService,
   ],
   exports: [
     TypeOrmModule,
@@ -66,6 +70,7 @@ import { NoteOrientationService } from './services/note-orientation.service';
     DocumentFichierService,
     LettreCadrageService,
     NoteOrientationService,
+    LettreMobilisationService,
   ],
 })
 export class DocumentsOfficielsModule {}

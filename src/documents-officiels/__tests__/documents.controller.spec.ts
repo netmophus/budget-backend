@@ -19,6 +19,7 @@ import { DocumentsController } from '../controllers/documents.controller';
 import { DocumentFichierService } from '../services/document-fichier.service';
 import { DocumentWorkflowService } from '../services/document-workflow.service';
 import { LettreCadrageService } from '../services/lettre-cadrage.service';
+import { LettreMobilisationService } from '../services/lettre-mobilisation.service';
 import { NoteOrientationService } from '../services/note-orientation.service';
 
 const mockUser: AuthUser = { userId: '23', email: 'dg@bsic.ne' };
@@ -49,6 +50,10 @@ describe('DocumentsController (Lot 8.1.C Palier 3)', () => {
     lireDetail: jest.Mock;
     creerOuMettreAJour: jest.Mock;
   };
+  let lettreMobilisationService: {
+    lireDetail: jest.Mock;
+    creerOuMettreAJour: jest.Mock;
+  };
 
   beforeEach(async () => {
     service = {
@@ -75,6 +80,10 @@ describe('DocumentsController (Lot 8.1.C Palier 3)', () => {
       lireDetail: jest.fn(),
       creerOuMettreAJour: jest.fn(),
     };
+    lettreMobilisationService = {
+      lireDetail: jest.fn(),
+      creerOuMettreAJour: jest.fn(),
+    };
     const moduleRef = await Test.createTestingModule({
       controllers: [DocumentsController],
       providers: [
@@ -84,6 +93,10 @@ describe('DocumentsController (Lot 8.1.C Palier 3)', () => {
         {
           provide: NoteOrientationService,
           useValue: noteOrientationService,
+        },
+        {
+          provide: LettreMobilisationService,
+          useValue: lettreMobilisationService,
         },
       ],
     }).compile();
@@ -341,6 +354,54 @@ describe('DocumentsController (Lot 8.1.C Palier 3)', () => {
       mockUser,
     );
     expect(noteOrientationService.creerOuMettreAJour).toHaveBeenCalledWith(
+      'doc-uuid-1',
+      dto,
+      'dg@bsic.ne',
+    );
+  });
+
+  // ─── Lot 8.3.B — endpoints lettre-mobilisation-detail ──────────
+
+  it('lireDetailLettreMobilisation : @RequirePermissions(DOCUMENT.LIRE) + délègue au service', async () => {
+    const meta = Reflect.getMetadata(
+      PERMISSIONS_KEY,
+      controller.lireDetailLettreMobilisation,
+    ) as PermissionsMetadata;
+    expect(meta.permissions).toContain('DOCUMENT.LIRE');
+
+    const fakeDetail = { id: 'lmd-1', fkDocument: 'doc-uuid-1' };
+    lettreMobilisationService.lireDetail.mockResolvedValue(fakeDetail);
+    const result = await controller.lireDetailLettreMobilisation('doc-uuid-1');
+    expect(lettreMobilisationService.lireDetail).toHaveBeenCalledWith(
+      'doc-uuid-1',
+    );
+    expect(result).toBe(fakeDetail);
+  });
+
+  it('mettreAJourDetailLettreMobilisation : @RequirePermissions(DOCUMENT.CREER) + délègue (id, dto, user.email)', async () => {
+    const meta = Reflect.getMetadata(
+      PERMISSIONS_KEY,
+      controller.mettreAJourDetailLettreMobilisation,
+    ) as PermissionsMetadata;
+    expect(meta.permissions).toContain('DOCUMENT.CREER');
+
+    const dto = {
+      referenceLettre: 'DG/BSIC-NIGER/2028/MOBIL-01',
+      exerciceConcerne: 2028,
+      pnbConsolideMfcfa: '14500.00',
+      nbObjectifsPrioritaires: 12,
+    };
+    lettreMobilisationService.creerOuMettreAJour.mockResolvedValue({
+      id: 'lmd-1',
+      fkDocument: 'doc-uuid-1',
+      referenceLettre: 'DG/BSIC-NIGER/2028/MOBIL-01',
+    });
+    await controller.mettreAJourDetailLettreMobilisation(
+      'doc-uuid-1',
+      dto,
+      mockUser,
+    );
+    expect(lettreMobilisationService.creerOuMettreAJour).toHaveBeenCalledWith(
       'doc-uuid-1',
       dto,
       'dg@bsic.ne',
