@@ -66,6 +66,7 @@ import { ApporterVisaDto } from '../dto/apporter-visa.dto';
 import { CreerDocumentDto } from '../dto/creer-document.dto';
 import { EditerDocumentDto } from '../dto/editer-document.dto';
 import { CreerOuMettreAJourLettreCadrageDetailDto } from '../dto/lettre-cadrage-detail.dto';
+import { CreerOuMettreAJourLettreMobilisationDetailDto } from '../dto/lettre-mobilisation-detail.dto';
 import { ListerDocumentsQueryDto } from '../dto/lister-documents-query.dto';
 import { CreerOuMettreAJourNoteOrientationDetailDto } from '../dto/note-orientation-detail.dto';
 import { SignerDocumentDto } from '../dto/signer-document.dto';
@@ -77,6 +78,7 @@ import {
 import type { ActorContext } from '../services/document-workflow.service';
 import { DocumentWorkflowService } from '../services/document-workflow.service';
 import { LettreCadrageService } from '../services/lettre-cadrage.service';
+import { LettreMobilisationService } from '../services/lettre-mobilisation.service';
 import { NoteOrientationService } from '../services/note-orientation.service';
 
 @ApiTags('documents-officiels')
@@ -88,6 +90,7 @@ export class DocumentsController {
     private readonly fichierService: DocumentFichierService,
     private readonly lettreCadrageService: LettreCadrageService,
     private readonly noteOrientationService: NoteOrientationService,
+    private readonly lettreMobilisationService: LettreMobilisationService,
   ) {}
 
   /**
@@ -486,6 +489,54 @@ export class DocumentsController {
     @CurrentUser() user: AuthUser,
   ) {
     return this.noteOrientationService.creerOuMettreAJour(
+      documentId,
+      dto,
+      user.email,
+    );
+  }
+
+  // ─── 16. GET /:id/lettre-mobilisation-detail — Lot 8.3.B ─────────
+
+  @Get(':id/lettre-mobilisation-detail')
+  @RequirePermissions('DOCUMENT.LIRE')
+  @ApiOperation({
+    summary:
+      "Détail métier d'une Lettre de mobilisation (objectifs globaux, indicateurs mobilisation, échéances, message DG TipTap).",
+  })
+  @ApiOkResponse({
+    description:
+      'Détail trouvé OU null si pas encore renseigné (BROUILLON fraîchement créé).',
+  })
+  async lireDetailLettreMobilisation(
+    @Param('id', ParseUUIDPipe) documentId: string,
+  ) {
+    return this.lettreMobilisationService.lireDetail(documentId);
+  }
+
+  // ─── 17. PUT /:id/lettre-mobilisation-detail — Lot 8.3.B ─────────
+
+  @Put(':id/lettre-mobilisation-detail')
+  @HttpCode(HttpStatus.OK)
+  @RequirePermissions('DOCUMENT.CREER')
+  @ApiOperation({
+    summary:
+      "Crée OU met à jour le détail métier d'une Lettre de mobilisation (UPSERT). Réservé à l'émetteur en BROUILLON.",
+  })
+  @ApiOkResponse({ description: 'Détail enregistré.' })
+  @ApiNotFoundResponse({ description: 'Document introuvable.' })
+  @ApiConflictResponse({
+    description:
+      'Type document ≠ D5_LETTRE_MOBILISATION OU statut ≠ BROUILLON.',
+  })
+  @ApiForbiddenResponse({
+    description: "Modification réservée à l'émetteur du document.",
+  })
+  async mettreAJourDetailLettreMobilisation(
+    @Param('id', ParseUUIDPipe) documentId: string,
+    @Body() dto: CreerOuMettreAJourLettreMobilisationDetailDto,
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.lettreMobilisationService.creerOuMettreAJour(
       documentId,
       dto,
       user.email,

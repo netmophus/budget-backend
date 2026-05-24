@@ -49,6 +49,7 @@ import { DocumentOfficiel } from '../entities/document-officiel.entity';
 import { DocumentSignature } from '../entities/document-signature.entity';
 import { DocumentVisa } from '../entities/document-visa.entity';
 import { LettreCadrageDetail } from '../entities/lettre-cadrage-detail.entity';
+import { LettreMobilisationDetail } from '../entities/lettre-mobilisation-detail.entity';
 import { NoteOrientationDetail } from '../entities/note-orientation-detail.entity';
 import { DocumentHashService } from './document-hash.service';
 
@@ -108,11 +109,21 @@ export type DocumentOfficielDetailView = Omit<
    * Lot 8.3.A — détail métier structuré, présent UNIQUEMENT pour les
    * documents de type `D3_NOTE_ORIENTATION` (Note interne avec analyse
    * macro + axes stratégiques). `null` si type ≠ D3 ou si le DG n'a
-   * pas encore renseigné le détail. Au plus un des 2 détails métier
-   * (lettreCadrageDetail OU noteOrientationDetail) est non-null pour
-   * un même document — exclusion mutuelle par typeDocument.
+   * pas encore renseigné le détail.
    */
   noteOrientationDetail: NoteOrientationDetail | null;
+  /**
+   * Lot 8.3.B — détail métier structuré, présent UNIQUEMENT pour les
+   * documents de type `D5_LETTRE_MOBILISATION` (Lettre motivationnelle
+   * DG → Directeurs après cadrage + orientation). `null` si type ≠ D5
+   * ou si le DG n'a pas encore renseigné le détail.
+   *
+   * **Exclusion mutuelle** : au plus UN des 3 détails métier
+   * (lettreCadrageDetail / noteOrientationDetail /
+   * lettreMobilisationDetail) est non-null pour un document donné,
+   * car déterminé par `typeDocument`.
+   */
+  lettreMobilisationDetail: LettreMobilisationDetail | null;
 };
 
 /**
@@ -763,9 +774,10 @@ export class DocumentWorkflowService {
 
     // Lot 8.2.C — chargement conditionnel du détail métier D2.
     // Lot 8.3.A — chargement conditionnel du détail métier D3.
-    // Exclusion mutuelle par typeDocument : au plus un des 2 SELECT
-    // est exécuté pour un document donné. Pour les 5 autres types
-    // (D1, D5, D11, D12, R3, R5), aucun round-trip supplémentaire.
+    // Lot 8.3.B — chargement conditionnel du détail métier D5.
+    // Exclusion mutuelle par typeDocument : au plus un des 3 SELECT
+    // est exécuté pour un document donné. Pour les 4 autres types
+    // (D1, D11, D12, R3, R5), aucun round-trip supplémentaire.
     const lettreCadrageDetail =
       doc.typeDocument === 'D2_LETTRE_CADRAGE'
         ? await this.dataSource
@@ -776,6 +788,12 @@ export class DocumentWorkflowService {
       doc.typeDocument === 'D3_NOTE_ORIENTATION'
         ? await this.dataSource
             .getRepository(NoteOrientationDetail)
+            .findOne({ where: { fkDocument: documentId } })
+        : null;
+    const lettreMobilisationDetail =
+      doc.typeDocument === 'D5_LETTRE_MOBILISATION'
+        ? await this.dataSource
+            .getRepository(LettreMobilisationDetail)
             .findOne({ where: { fkDocument: documentId } })
         : null;
 
@@ -791,6 +809,7 @@ export class DocumentWorkflowService {
       signature,
       lettreCadrageDetail,
       noteOrientationDetail,
+      lettreMobilisationDetail,
     };
   }
 
