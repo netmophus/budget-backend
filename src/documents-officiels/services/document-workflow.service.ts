@@ -48,6 +48,7 @@ import { CampagneComiteMembre } from '../entities/campagne-comite-membre.entity'
 import { DocumentOfficiel } from '../entities/document-officiel.entity';
 import { DocumentSignature } from '../entities/document-signature.entity';
 import { DocumentVisa } from '../entities/document-visa.entity';
+import { LettreCadrageDetail } from '../entities/lettre-cadrage-detail.entity';
 import { DocumentHashService } from './document-hash.service';
 
 /**
@@ -95,6 +96,13 @@ export type DocumentOfficielDetailView = Omit<
   signataire?: UserResume;
   visas: DocumentVisaWithUser[];
   signature: DocumentSignature | null;
+  /**
+   * Lot 8.2.C — détail métier structuré, présent UNIQUEMENT pour les
+   * documents de type `D2_LETTRE_CADRAGE`. `null` si type ≠ D2 ou si
+   * le DG n'a pas encore renseigné le détail (BROUILLON fraîchement
+   * créé).
+   */
+  lettreCadrageDetail: LettreCadrageDetail | null;
 };
 
 /**
@@ -743,6 +751,16 @@ export class DocumentWorkflowService {
       .getRepository(DocumentSignature)
       .findOne({ where: { fkDocument: documentId } });
 
+    // Lot 8.2.C — chargement conditionnel du détail métier
+    // UNIQUEMENT si type D2_LETTRE_CADRAGE. Évite un round-trip DB
+    // inutile pour les autres 6 types de documents.
+    const lettreCadrageDetail =
+      doc.typeDocument === 'D2_LETTRE_CADRAGE'
+        ? await this.dataSource
+            .getRepository(LettreCadrageDetail)
+            .findOne({ where: { fkDocument: documentId } })
+        : null;
+
     const { emetteur, signataire, ...rest } = doc;
     return {
       ...rest,
@@ -753,6 +771,7 @@ export class DocumentWorkflowService {
         return { ...vRest, user: toUserResume(viseur) };
       }),
       signature,
+      lettreCadrageDetail,
     };
   }
 

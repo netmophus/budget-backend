@@ -24,12 +24,14 @@ import { CampagneComiteMembre } from './entities/campagne-comite-membre.entity';
 import { DocumentOfficiel } from './entities/document-officiel.entity';
 import { DocumentSignature } from './entities/document-signature.entity';
 import { DocumentVisa } from './entities/document-visa.entity';
+import { LettreCadrageDetail } from './entities/lettre-cadrage-detail.entity';
 import { CampagnesController } from './controllers/campagnes.controller';
 import { DocumentsController } from './controllers/documents.controller';
 import { CampagneService } from './services/campagne.service';
 import { DocumentFichierService } from './services/document-fichier.service';
 import { DocumentHashService } from './services/document-hash.service';
 import { DocumentWorkflowService } from './services/document-workflow.service';
+import { LettreCadrageService } from './services/lettre-cadrage.service';
 
 @Module({
   imports: [
@@ -39,6 +41,7 @@ import { DocumentWorkflowService } from './services/document-workflow.service';
       DocumentOfficiel,
       DocumentVisa,
       DocumentSignature,
+      LettreCadrageDetail, // Lot 8.2.C — détail métier D2_LETTRE_CADRAGE
       User, // pour lookup signataire dans CampagneService + bcrypt dans DocumentWorkflowService
     ]),
     AuditModule, // pour AuditService dans CampagneService
@@ -49,6 +52,7 @@ import { DocumentWorkflowService } from './services/document-workflow.service';
     CampagneService,
     DocumentWorkflowService,
     DocumentFichierService,
+    LettreCadrageService,
   ],
   exports: [
     TypeOrmModule,
@@ -56,6 +60,7 @@ import { DocumentWorkflowService } from './services/document-workflow.service';
     CampagneService,
     DocumentWorkflowService,
     DocumentFichierService,
+    LettreCadrageService,
   ],
 })
 export class DocumentsOfficielsModule {}

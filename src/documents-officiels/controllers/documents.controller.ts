@@ -34,6 +34,7 @@ import {
   ParseUUIDPipe,
   Patch,
   Post,
+  Put,
   Query,
   Req,
   Res,
@@ -64,6 +65,7 @@ import { RequirePermissions } from '../../auth/decorators/require-permissions.de
 import { ApporterVisaDto } from '../dto/apporter-visa.dto';
 import { CreerDocumentDto } from '../dto/creer-document.dto';
 import { EditerDocumentDto } from '../dto/editer-document.dto';
+import { CreerOuMettreAJourLettreCadrageDetailDto } from '../dto/lettre-cadrage-detail.dto';
 import { ListerDocumentsQueryDto } from '../dto/lister-documents-query.dto';
 import { SignerDocumentDto } from '../dto/signer-document.dto';
 import { SoumettreVisaDto } from '../dto/soumettre-visa.dto';
@@ -73,6 +75,7 @@ import {
 } from '../services/document-fichier.service';
 import type { ActorContext } from '../services/document-workflow.service';
 import { DocumentWorkflowService } from '../services/document-workflow.service';
+import { LettreCadrageService } from '../services/lettre-cadrage.service';
 
 @ApiTags('documents-officiels')
 @ApiBearerAuth()
@@ -81,6 +84,7 @@ export class DocumentsController {
   constructor(
     private readonly workflowService: DocumentWorkflowService,
     private readonly fichierService: DocumentFichierService,
+    private readonly lettreCadrageService: LettreCadrageService,
   ) {}
 
   /**
@@ -391,5 +395,50 @@ export class DocumentsController {
       'Content-Disposition': `attachment; filename="${fichierNom}"`,
     });
     return new StreamableFile(stream);
+  }
+
+  // ─── 12. GET /:id/cadrage-detail — Lot 8.2.C ─────────────────────
+
+  @Get(':id/cadrage-detail')
+  @RequirePermissions('DOCUMENT.LIRE')
+  @ApiOperation({
+    summary:
+      "Détail métier d'une Lettre de cadrage (objectifs PNB/RN, ratios BCEAO, calendrier 5 jalons, orientations).",
+  })
+  @ApiOkResponse({
+    description:
+      'Détail trouvé OU null si pas encore renseigné (BROUILLON fraîchement créé).',
+  })
+  async lireDetailCadrage(@Param('id', ParseUUIDPipe) documentId: string) {
+    return this.lettreCadrageService.lireDetail(documentId);
+  }
+
+  // ─── 13. PUT /:id/cadrage-detail — Lot 8.2.C ─────────────────────
+
+  @Put(':id/cadrage-detail')
+  @HttpCode(HttpStatus.OK)
+  @RequirePermissions('DOCUMENT.CREER')
+  @ApiOperation({
+    summary:
+      "Crée OU met à jour le détail métier d'une Lettre de cadrage (UPSERT). Réservé à l'émetteur en BROUILLON.",
+  })
+  @ApiOkResponse({ description: 'Détail enregistré.' })
+  @ApiNotFoundResponse({ description: 'Document introuvable.' })
+  @ApiConflictResponse({
+    description: 'Type document ≠ D2_LETTRE_CADRAGE OU statut ≠ BROUILLON.',
+  })
+  @ApiForbiddenResponse({
+    description: "Modification réservée à l'émetteur du document.",
+  })
+  async mettreAJourDetailCadrage(
+    @Param('id', ParseUUIDPipe) documentId: string,
+    @Body() dto: CreerOuMettreAJourLettreCadrageDetailDto,
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.lettreCadrageService.creerOuMettreAJour(
+      documentId,
+      dto,
+      user.email,
+    );
   }
 }
