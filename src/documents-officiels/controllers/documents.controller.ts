@@ -67,6 +67,7 @@ import { CreerDocumentDto } from '../dto/creer-document.dto';
 import { EditerDocumentDto } from '../dto/editer-document.dto';
 import { CreerOuMettreAJourLettreCadrageDetailDto } from '../dto/lettre-cadrage-detail.dto';
 import { ListerDocumentsQueryDto } from '../dto/lister-documents-query.dto';
+import { CreerOuMettreAJourNoteOrientationDetailDto } from '../dto/note-orientation-detail.dto';
 import { SignerDocumentDto } from '../dto/signer-document.dto';
 import { SoumettreVisaDto } from '../dto/soumettre-visa.dto';
 import {
@@ -76,6 +77,7 @@ import {
 import type { ActorContext } from '../services/document-workflow.service';
 import { DocumentWorkflowService } from '../services/document-workflow.service';
 import { LettreCadrageService } from '../services/lettre-cadrage.service';
+import { NoteOrientationService } from '../services/note-orientation.service';
 
 @ApiTags('documents-officiels')
 @ApiBearerAuth()
@@ -85,6 +87,7 @@ export class DocumentsController {
     private readonly workflowService: DocumentWorkflowService,
     private readonly fichierService: DocumentFichierService,
     private readonly lettreCadrageService: LettreCadrageService,
+    private readonly noteOrientationService: NoteOrientationService,
   ) {}
 
   /**
@@ -436,6 +439,53 @@ export class DocumentsController {
     @CurrentUser() user: AuthUser,
   ) {
     return this.lettreCadrageService.creerOuMettreAJour(
+      documentId,
+      dto,
+      user.email,
+    );
+  }
+
+  // ─── 14. GET /:id/note-orientation-detail — Lot 8.3.A ────────────
+
+  @Get(':id/note-orientation-detail')
+  @RequirePermissions('DOCUMENT.LIRE')
+  @ApiOperation({
+    summary:
+      "Détail métier d'une Note d'orientation (analyse macro, axes stratégiques, description riche TipTap).",
+  })
+  @ApiOkResponse({
+    description:
+      'Détail trouvé OU null si pas encore renseigné (BROUILLON fraîchement créé).',
+  })
+  async lireDetailNoteOrientation(
+    @Param('id', ParseUUIDPipe) documentId: string,
+  ) {
+    return this.noteOrientationService.lireDetail(documentId);
+  }
+
+  // ─── 15. PUT /:id/note-orientation-detail — Lot 8.3.A ────────────
+
+  @Put(':id/note-orientation-detail')
+  @HttpCode(HttpStatus.OK)
+  @RequirePermissions('DOCUMENT.CREER')
+  @ApiOperation({
+    summary:
+      "Crée OU met à jour le détail métier d'une Note d'orientation (UPSERT). Réservé à l'émetteur en BROUILLON.",
+  })
+  @ApiOkResponse({ description: 'Détail enregistré.' })
+  @ApiNotFoundResponse({ description: 'Document introuvable.' })
+  @ApiConflictResponse({
+    description: 'Type document ≠ D3_NOTE_ORIENTATION OU statut ≠ BROUILLON.',
+  })
+  @ApiForbiddenResponse({
+    description: "Modification réservée à l'émetteur du document.",
+  })
+  async mettreAJourDetailNoteOrientation(
+    @Param('id', ParseUUIDPipe) documentId: string,
+    @Body() dto: CreerOuMettreAJourNoteOrientationDetailDto,
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.noteOrientationService.creerOuMettreAJour(
       documentId,
       dto,
       user.email,
