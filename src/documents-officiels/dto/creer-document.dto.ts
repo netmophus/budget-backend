@@ -8,6 +8,7 @@ import { IsIn, IsOptional, IsString, IsUUID, MaxLength } from 'class-validator';
  * types pourront être ajoutés au fil des paliers Lot 8.x.
  */
 export const TYPES_DOCUMENT_AUTORISES = [
+  'D1_NOTE_PREPARATOIRE',
   'D2_LETTRE_CADRAGE',
   'D3_NOTE_ORIENTATION',
   'D5_LETTRE_DG',
