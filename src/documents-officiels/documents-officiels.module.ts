@@ -28,6 +28,7 @@ import { LettreCadrageDetail } from './entities/lettre-cadrage-detail.entity';
 import { LettreMobilisationDetail } from './entities/lettre-mobilisation-detail.entity';
 import { NoteOrientationDetail } from './entities/note-orientation-detail.entity';
 import { NotePreparatoireDetail } from './entities/note-preparatoire-detail.entity';
+import { PvApprobationDetail } from './entities/pv-approbation-detail.entity';
 import { CampagnesController } from './controllers/campagnes.controller';
 import { DocumentsController } from './controllers/documents.controller';
 import { CampagneService } from './services/campagne.service';
@@ -38,6 +39,7 @@ import { LettreCadrageService } from './services/lettre-cadrage.service';
 import { LettreMobilisationService } from './services/lettre-mobilisation.service';
 import { NoteOrientationService } from './services/note-orientation.service';
 import { NotePreparatoireService } from './services/note-preparatoire.service';
+import { PvApprobationService } from './services/pv-approbation.service';
 
 @Module({
   imports: [
@@ -51,6 +53,7 @@ import { NotePreparatoireService } from './services/note-preparatoire.service';
       NoteOrientationDetail, // Lot 8.3.A — détail métier D3_NOTE_ORIENTATION
       LettreMobilisationDetail, // Lot 8.3.B — détail métier D5_LETTRE_DG (libellé : Lettre de mobilisation)
       NotePreparatoireDetail, // Lot 8.3.C — détail métier D1_NOTE_PREPARATOIRE
+      PvApprobationDetail, // Lot 8.3.D — détail métier D11_PV_APPROBATION
       User, // pour lookup signataire dans CampagneService + bcrypt dans DocumentWorkflowService
     ]),
     AuditModule, // pour AuditService dans CampagneService
@@ -65,6 +68,7 @@ import { NotePreparatoireService } from './services/note-preparatoire.service';
     NoteOrientationService,
     LettreMobilisationService,
     NotePreparatoireService,
+    PvApprobationService,
   ],
   exports: [
     TypeOrmModule,
@@ -76,6 +80,7 @@ import { NotePreparatoireService } from './services/note-preparatoire.service';
     NoteOrientationService,
     LettreMobilisationService,
     NotePreparatoireService,
+    PvApprobationService,
   ],
 })
 export class DocumentsOfficielsModule {}
