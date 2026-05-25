@@ -52,6 +52,7 @@ import { LettreCadrageDetail } from '../entities/lettre-cadrage-detail.entity';
 import { LettreMobilisationDetail } from '../entities/lettre-mobilisation-detail.entity';
 import { NoteOrientationDetail } from '../entities/note-orientation-detail.entity';
 import { NotePreparatoireDetail } from '../entities/note-preparatoire-detail.entity';
+import { PvApprobationDetail } from '../entities/pv-approbation-detail.entity';
 import { DocumentHashService } from './document-hash.service';
 
 /**
@@ -127,15 +128,23 @@ export type DocumentOfficielDetailView = Omit<
    * émise AVANT la réunion du Comité en début de cycle budgétaire,
    * pour poser ordre du jour + contexte). `null` si type ≠ D1 ou si
    * le DG n'a pas encore renseigné le détail.
-   *
-   * **Exclusion mutuelle stricte** : au plus UN des 4 détails métier
-   * (lettreCadrageDetail / noteOrientationDetail /
-   * lettreMobilisationDetail / notePreparatoireDetail) est non-null
-   * pour un document donné, car déterminé par `typeDocument`. Les
-   * 3 autres types (R3, R5, D11, D12) n'ont pas de détail métier
-   * dédié à ce jour.
    */
   notePreparatoireDetail: NotePreparatoireDetail | null;
+  /**
+   * Lot 8.3.D — détail métier structuré, présent UNIQUEMENT pour les
+   * documents de type `D11_PV_APPROBATION` (PV d'approbation du
+   * Conseil d'Administration, émis APRÈS la signature de D2 — acte
+   * officiel d'approbation budgétaire). `null` si type ≠ D11 ou si
+   * le secrétaire n'a pas encore renseigné le détail.
+   *
+   * **Exclusion mutuelle stricte** : au plus UN des 5 détails métier
+   * (lettreCadrageDetail / noteOrientationDetail /
+   * lettreMobilisationDetail / notePreparatoireDetail /
+   * pvApprobationDetail) est non-null pour un document donné, car
+   * déterminé par `typeDocument`. Les 3 autres types (R3, R5, D12)
+   * n'ont pas de détail métier dédié à ce jour.
+   */
+  pvApprobationDetail: PvApprobationDetail | null;
 };
 
 /**
@@ -784,13 +793,15 @@ export class DocumentWorkflowService {
       .getRepository(DocumentSignature)
       .findOne({ where: { fkDocument: documentId } });
 
-    // Lot 8.2.C — chargement conditionnel du détail métier D2.
-    // Lot 8.3.A — chargement conditionnel du détail métier D3.
-    // Lot 8.3.B — chargement conditionnel du détail métier D5.
-    // Lot 8.3.C — chargement conditionnel du détail métier D1.
-    // Exclusion mutuelle par typeDocument : au plus un des 4 SELECT
-    // est exécuté pour un document donné. Pour les 3 autres types
-    // (R3, R5, D11, D12), aucun round-trip supplémentaire.
+    // 5 types métier supportés (chargement conditionnel par typeDocument) :
+    //  - Lot 8.2.C : D2_LETTRE_CADRAGE     → lettreCadrageDetail
+    //  - Lot 8.3.A : D3_NOTE_ORIENTATION   → noteOrientationDetail
+    //  - Lot 8.3.B : D5_LETTRE_DG          → lettreMobilisationDetail
+    //  - Lot 8.3.C : D1_NOTE_PREPARATOIRE  → notePreparatoireDetail
+    //  - Lot 8.3.D : D11_PV_APPROBATION    → pvApprobationDetail
+    // Exclusion mutuelle stricte par typeDocument : au plus UN des 5
+    // SELECT est exécuté pour un document donné. Pour les 3 autres
+    // types (R3, R5, D12), aucun round-trip supplémentaire.
     const lettreCadrageDetail =
       doc.typeDocument === 'D2_LETTRE_CADRAGE'
         ? await this.dataSource
@@ -815,6 +826,12 @@ export class DocumentWorkflowService {
             .getRepository(NotePreparatoireDetail)
             .findOne({ where: { fkDocument: documentId } })
         : null;
+    const pvApprobationDetail =
+      doc.typeDocument === 'D11_PV_APPROBATION'
+        ? await this.dataSource
+            .getRepository(PvApprobationDetail)
+            .findOne({ where: { fkDocument: documentId } })
+        : null;
 
     const { emetteur, signataire, ...rest } = doc;
     return {
@@ -830,6 +847,7 @@ export class DocumentWorkflowService {
       noteOrientationDetail,
       lettreMobilisationDetail,
       notePreparatoireDetail,
+      pvApprobationDetail,
     };
   }
 

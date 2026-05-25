@@ -70,6 +70,7 @@ import { CreerOuMettreAJourLettreMobilisationDetailDto } from '../dto/lettre-mob
 import { ListerDocumentsQueryDto } from '../dto/lister-documents-query.dto';
 import { CreerOuMettreAJourNoteOrientationDetailDto } from '../dto/note-orientation-detail.dto';
 import { CreerOuMettreAJourNotePreparatoireDetailDto } from '../dto/note-preparatoire-detail.dto';
+import { CreerOuMettreAJourPvApprobationDetailDto } from '../dto/pv-approbation-detail.dto';
 import { SignerDocumentDto } from '../dto/signer-document.dto';
 import { SoumettreVisaDto } from '../dto/soumettre-visa.dto';
 import {
@@ -82,6 +83,7 @@ import { LettreCadrageService } from '../services/lettre-cadrage.service';
 import { LettreMobilisationService } from '../services/lettre-mobilisation.service';
 import { NoteOrientationService } from '../services/note-orientation.service';
 import { NotePreparatoireService } from '../services/note-preparatoire.service';
+import { PvApprobationService } from '../services/pv-approbation.service';
 
 @ApiTags('documents-officiels')
 @ApiBearerAuth()
@@ -94,6 +96,7 @@ export class DocumentsController {
     private readonly noteOrientationService: NoteOrientationService,
     private readonly lettreMobilisationService: LettreMobilisationService,
     private readonly notePreparatoireService: NotePreparatoireService,
+    private readonly pvApprobationService: PvApprobationService,
   ) {}
 
   /**
@@ -586,6 +589,53 @@ export class DocumentsController {
     @CurrentUser() user: AuthUser,
   ) {
     return this.notePreparatoireService.creerOuMettreAJour(
+      documentId,
+      dto,
+      user.email,
+    );
+  }
+
+  // ─── 20. GET /:id/pv-approbation-detail — Lot 8.3.D ──────────────
+
+  @Get(':id/pv-approbation-detail')
+  @RequirePermissions('DOCUMENT.LIRE')
+  @ApiOperation({
+    summary:
+      "Détail métier d'un PV d'approbation CA (identification + présidence + quorum + ordre du jour TipTap + décisions TipTap + vote + commentaire président).",
+  })
+  @ApiOkResponse({
+    description:
+      'Détail trouvé OU null si pas encore renseigné (BROUILLON fraîchement créé).',
+  })
+  async lireDetailPvApprobation(
+    @Param('id', ParseUUIDPipe) documentId: string,
+  ) {
+    return this.pvApprobationService.lireDetail(documentId);
+  }
+
+  // ─── 21. PUT /:id/pv-approbation-detail — Lot 8.3.D ──────────────
+
+  @Put(':id/pv-approbation-detail')
+  @HttpCode(HttpStatus.OK)
+  @RequirePermissions('DOCUMENT.CREER')
+  @ApiOperation({
+    summary:
+      "Crée OU met à jour le détail métier d'un PV d'approbation CA (UPSERT). Réservé à l'émetteur en BROUILLON.",
+  })
+  @ApiOkResponse({ description: 'Détail enregistré.' })
+  @ApiNotFoundResponse({ description: 'Document introuvable.' })
+  @ApiConflictResponse({
+    description: 'Type document ≠ D11_PV_APPROBATION OU statut ≠ BROUILLON.',
+  })
+  @ApiForbiddenResponse({
+    description: "Modification réservée à l'émetteur du document.",
+  })
+  async mettreAJourDetailPvApprobation(
+    @Param('id', ParseUUIDPipe) documentId: string,
+    @Body() dto: CreerOuMettreAJourPvApprobationDetailDto,
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.pvApprobationService.creerOuMettreAJour(
       documentId,
       dto,
       user.email,

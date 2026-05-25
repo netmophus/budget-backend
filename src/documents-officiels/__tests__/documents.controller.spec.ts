@@ -22,6 +22,7 @@ import { LettreCadrageService } from '../services/lettre-cadrage.service';
 import { LettreMobilisationService } from '../services/lettre-mobilisation.service';
 import { NoteOrientationService } from '../services/note-orientation.service';
 import { NotePreparatoireService } from '../services/note-preparatoire.service';
+import { PvApprobationService } from '../services/pv-approbation.service';
 
 const mockUser: AuthUser = { userId: '23', email: 'dg@bsic.ne' };
 
@@ -59,6 +60,10 @@ describe('DocumentsController (Lot 8.1.C Palier 3)', () => {
     lireDetail: jest.Mock;
     creerOuMettreAJour: jest.Mock;
   };
+  let pvApprobationService: {
+    lireDetail: jest.Mock;
+    creerOuMettreAJour: jest.Mock;
+  };
 
   beforeEach(async () => {
     service = {
@@ -93,6 +98,10 @@ describe('DocumentsController (Lot 8.1.C Palier 3)', () => {
       lireDetail: jest.fn(),
       creerOuMettreAJour: jest.fn(),
     };
+    pvApprobationService = {
+      lireDetail: jest.fn(),
+      creerOuMettreAJour: jest.fn(),
+    };
     const moduleRef = await Test.createTestingModule({
       controllers: [DocumentsController],
       providers: [
@@ -110,6 +119,10 @@ describe('DocumentsController (Lot 8.1.C Palier 3)', () => {
         {
           provide: NotePreparatoireService,
           useValue: notePreparatoireService,
+        },
+        {
+          provide: PvApprobationService,
+          useValue: pvApprobationService,
         },
       ],
     }).compile();
@@ -467,5 +480,90 @@ describe('DocumentsController (Lot 8.1.C Palier 3)', () => {
       dto,
       'dg@bsic.ne',
     );
+  });
+
+  // ─── Lot 8.3.D — endpoints pv-approbation-detail ────────────────
+
+  it('lireDetailPvApprobation : @RequirePermissions(DOCUMENT.LIRE) + délègue au service', async () => {
+    const meta = Reflect.getMetadata(
+      PERMISSIONS_KEY,
+      controller.lireDetailPvApprobation,
+    ) as PermissionsMetadata;
+    expect(meta.permissions).toContain('DOCUMENT.LIRE');
+
+    const fakeDetail = { id: 'pad-1', fkDocument: 'doc-uuid-1' };
+    pvApprobationService.lireDetail.mockResolvedValue(fakeDetail);
+    const result = await controller.lireDetailPvApprobation('doc-uuid-1');
+    expect(pvApprobationService.lireDetail).toHaveBeenCalledWith('doc-uuid-1');
+    expect(result).toBe(fakeDetail);
+  });
+
+  it('mettreAJourDetailPvApprobation : @RequirePermissions(DOCUMENT.CREER) + délègue (id, dto, user.email)', async () => {
+    const meta = Reflect.getMetadata(
+      PERMISSIONS_KEY,
+      controller.mettreAJourDetailPvApprobation,
+    ) as PermissionsMetadata;
+    expect(meta.permissions).toContain('DOCUMENT.CREER');
+
+    const dto = {
+      numeroResolution: 'CA-BSIC-2027-007',
+      dateSeanceCa: '2027-12-18',
+      nbAdministrateursPresents: 8,
+      nbAdministrateursTotal: 10,
+      quorumAtteint: true,
+      voteResultat: 'UNANIMITE' as const,
+    };
+    pvApprobationService.creerOuMettreAJour.mockResolvedValue({
+      id: 'pad-1',
+      fkDocument: 'doc-uuid-1',
+      numeroResolution: 'CA-BSIC-2027-007',
+    });
+    await controller.mettreAJourDetailPvApprobation(
+      'doc-uuid-1',
+      dto,
+      mockUser,
+    );
+    expect(pvApprobationService.creerOuMettreAJour).toHaveBeenCalledWith(
+      'doc-uuid-1',
+      dto,
+      'dg@bsic.ne',
+    );
+  });
+
+  it('detailDocument : doc D11_PV_APPROBATION → contrat retour expose pvApprobationDetail, exclusion mutuelle 5 types', async () => {
+    // Simule le retour de workflowService.detailDocument pour un D11 :
+    // pvApprobationDetail rempli, les 4 autres détails à null
+    // (vérification du contrat 5 types après refonte detailDocument).
+    const fakeDocD11 = {
+      id: 'doc-uuid-11',
+      typeDocument: 'D11_PV_APPROBATION',
+      statut: 'BROUILLON',
+      visas: [],
+      signature: null,
+      lettreCadrageDetail: null,
+      noteOrientationDetail: null,
+      lettreMobilisationDetail: null,
+      notePreparatoireDetail: null,
+      pvApprobationDetail: {
+        id: 'pad-1',
+        fkDocument: 'doc-uuid-11',
+        numeroResolution: 'CA-BSIC-2027-007',
+      },
+    };
+    service.detailDocument.mockResolvedValue(fakeDocD11);
+
+    const result = await controller.detail('doc-uuid-11', mockUser);
+
+    expect(service.detailDocument).toHaveBeenCalledWith(
+      'doc-uuid-11',
+      expect.objectContaining({ userId: '23', userEmail: 'dg@bsic.ne' }),
+    );
+    expect(result).toBe(fakeDocD11);
+    // Exclusion mutuelle : pvApprobationDetail non-null, les 4 autres null
+    expect(result.pvApprobationDetail).not.toBeNull();
+    expect(result.lettreCadrageDetail).toBeNull();
+    expect(result.noteOrientationDetail).toBeNull();
+    expect(result.lettreMobilisationDetail).toBeNull();
+    expect(result.notePreparatoireDetail).toBeNull();
   });
 });
