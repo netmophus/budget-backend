@@ -69,6 +69,7 @@ import { CreerOuMettreAJourLettreCadrageDetailDto } from '../dto/lettre-cadrage-
 import { CreerOuMettreAJourLettreMobilisationDetailDto } from '../dto/lettre-mobilisation-detail.dto';
 import { ListerDocumentsQueryDto } from '../dto/lister-documents-query.dto';
 import { CreerOuMettreAJourNoteOrientationDetailDto } from '../dto/note-orientation-detail.dto';
+import { CreerOuMettreAJourLettreOfficialisationDetailDto } from '../dto/lettre-officialisation-detail.dto';
 import { CreerOuMettreAJourNotePreparatoireDetailDto } from '../dto/note-preparatoire-detail.dto';
 import { CreerOuMettreAJourPvApprobationDetailDto } from '../dto/pv-approbation-detail.dto';
 import { SignerDocumentDto } from '../dto/signer-document.dto';
@@ -82,6 +83,7 @@ import { DocumentWorkflowService } from '../services/document-workflow.service';
 import { LettreCadrageService } from '../services/lettre-cadrage.service';
 import { LettreMobilisationService } from '../services/lettre-mobilisation.service';
 import { NoteOrientationService } from '../services/note-orientation.service';
+import { LettreOfficialisationService } from '../services/lettre-officialisation.service';
 import { NotePreparatoireService } from '../services/note-preparatoire.service';
 import { PvApprobationService } from '../services/pv-approbation.service';
 
@@ -97,6 +99,7 @@ export class DocumentsController {
     private readonly lettreMobilisationService: LettreMobilisationService,
     private readonly notePreparatoireService: NotePreparatoireService,
     private readonly pvApprobationService: PvApprobationService,
+    private readonly lettreOfficialisationService: LettreOfficialisationService,
   ) {}
 
   /**
@@ -636,6 +639,54 @@ export class DocumentsController {
     @CurrentUser() user: AuthUser,
   ) {
     return this.pvApprobationService.creerOuMettreAJour(
+      documentId,
+      dto,
+      user.email,
+    );
+  }
+
+  // ─── 22. GET /:id/lettre-officialisation-detail — Lot 8.3.E ──────
+
+  @Get(':id/lettre-officialisation-detail')
+  @RequirePermissions('DOCUMENT.LIRE')
+  @ApiOperation({
+    summary:
+      "Détail métier d'une Lettre d'officialisation (identification + destinataires + référence PV CA + corps TipTap + signature + cachet apposé).",
+  })
+  @ApiOkResponse({
+    description:
+      'Détail trouvé OU null si pas encore renseigné (BROUILLON fraîchement créé).',
+  })
+  async lireDetailLettreOfficialisation(
+    @Param('id', ParseUUIDPipe) documentId: string,
+  ) {
+    return this.lettreOfficialisationService.lireDetail(documentId);
+  }
+
+  // ─── 23. PUT /:id/lettre-officialisation-detail — Lot 8.3.E ──────
+
+  @Put(':id/lettre-officialisation-detail')
+  @HttpCode(HttpStatus.OK)
+  @RequirePermissions('DOCUMENT.CREER')
+  @ApiOperation({
+    summary:
+      "Crée OU met à jour le détail métier d'une Lettre d'officialisation (UPSERT). Réservé à l'émetteur en BROUILLON.",
+  })
+  @ApiOkResponse({ description: 'Détail enregistré.' })
+  @ApiNotFoundResponse({ description: 'Document introuvable.' })
+  @ApiConflictResponse({
+    description:
+      'Type document ≠ D12_LETTRE_OFFICIALISATION OU statut ≠ BROUILLON.',
+  })
+  @ApiForbiddenResponse({
+    description: "Modification réservée à l'émetteur du document.",
+  })
+  async mettreAJourDetailLettreOfficialisation(
+    @Param('id', ParseUUIDPipe) documentId: string,
+    @Body() dto: CreerOuMettreAJourLettreOfficialisationDetailDto,
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.lettreOfficialisationService.creerOuMettreAJour(
       documentId,
       dto,
       user.email,
