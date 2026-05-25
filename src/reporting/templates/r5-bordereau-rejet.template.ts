@@ -1,0 +1,221 @@
+/**
+ * Template R5 — Bordereau de rejet (Lot 8.4).
+ *
+ * Atteste qu'un document métier MIZNAS a été rejeté par un viseur du
+ * Comité de validation. Généré à la volée par
+ * `BordereauService.genererBordereauRejet()` dès qu'au moins un
+ * `document_visa` au statut `REJETE` existe pour le document.
+ *
+ * Format consolidé sur le 1er rejet trouvé. Si plusieurs rejets dans
+ * l'historique (cas rare), seul le 1er rejet trouvé par ordre_visa
+ * ASC est documenté.
+ *
+ * Charte alignée R04 BCEAO mais accent visuel distinctif **rouge**
+ * pour signaler immédiatement qu'il s'agit d'un rejet :
+ *  - Titre encadré rouge
+ *  - Bloc rejet avec fond rouge clair + bordure rouge
+ *  - Mention "REJET" en filigrane
+ */
+import type {
+  BordereauR5Data,
+  BordereauVisaEntry,
+} from '../services/bordereau.service';
+import {
+  BSIC_BRAND,
+  type PdfBuilderService,
+} from '../generators/pdf-builder.service';
+
+function formatDateFr(iso: string | null | undefined): string {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '—';
+  return d.toLocaleDateString('fr-FR', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  });
+}
+
+function formatNomComplet(v: BordereauVisaEntry): string {
+  if (!v.viseurNom && !v.viseurPrenom) return v.viseurEmail ?? '—';
+  return `${v.viseurPrenom ?? ''} ${v.viseurNom ?? ''}`.trim();
+}
+
+export function buildR5Pdf(
+  doc: PDFKit.PDFDocument,
+  data: BordereauR5Data,
+  pdf: PdfBuilderService,
+): void {
+  const { document, visaRejete } = data;
+  const pageWidth = doc.page.width;
+  const contentX = BSIC_BRAND.marges.gauche;
+  const contentWidth =
+    pageWidth - BSIC_BRAND.marges.gauche - BSIC_BRAND.marges.droite;
+
+  // ─── 1. Logo + en-tête institutionnel ────────────────────────────
+  pdf.drawLogoPlaceholder(doc, contentX, BSIC_BRAND.marges.haut, 100, 50);
+
+  doc
+    .font(BSIC_BRAND.fonts.body)
+    .fontSize(BSIC_BRAND.fontSizes.bodySmall)
+    .fillColor(BSIC_BRAND.colors.grisFonce)
+    .text(
+      'BSIC NIGER S.A.\nBoulevard de la Liberté, BP 12 080, Niamey\nDirection Générale',
+      contentX + 110,
+      BSIC_BRAND.marges.haut + 5,
+      { width: contentWidth - 110 },
+    );
+
+  doc.y = BSIC_BRAND.marges.haut + 60;
+  doc.moveDown(1.5);
+
+  // ─── 2. Titre encadré "BORDEREAU DE REJET" (ROUGE distinctif) ───
+  const titleY = doc.y;
+  const titleHeight = 40;
+  doc
+    .save()
+    .rect(contentX, titleY, contentWidth, titleHeight)
+    .lineWidth(2)
+    .strokeColor(BSIC_BRAND.colors.rouge)
+    .fillColor('#FCEEEE')
+    .fillAndStroke();
+  doc
+    .font(BSIC_BRAND.fonts.titre)
+    .fontSize(18)
+    .fillColor(BSIC_BRAND.colors.rouge)
+    .text('BORDEREAU DE REJET', contentX, titleY + 11, {
+      width: contentWidth,
+      align: 'center',
+      lineBreak: false,
+    });
+  doc.restore();
+  doc.y = titleY + titleHeight + 20;
+
+  // ─── 3. Identification document (drawInfoBox) ───────────────────
+  pdf.drawInfoBox(doc, contentX, doc.y, contentWidth, [
+    { label: 'Type de document', value: document.typeDocument },
+    { label: 'Référence', value: document.codeDocument },
+    { label: 'Titre', value: document.titre },
+    {
+      label: 'Exercice budgétaire',
+      value: document.exerciceFiscal ? String(document.exerciceFiscal) : '—',
+    },
+    {
+      label: 'Émetteur',
+      value:
+        document.emetteurNom || document.emetteurPrenom
+          ? `${document.emetteurPrenom ?? ''} ${document.emetteurNom ?? ''}`.trim()
+          : (document.emetteurEmail ?? '—'),
+    },
+    { label: 'Date émission', value: formatDateFr(document.dateCreation) },
+    { label: 'Statut actuel', value: document.statut },
+  ]);
+  doc.y += 10;
+  doc.moveDown(1);
+
+  // ─── 4. Bloc rejet — fond rouge clair distinctif ────────────────
+  doc
+    .font(BSIC_BRAND.fonts.titre)
+    .fontSize(BSIC_BRAND.fontSizes.section)
+    .fillColor(BSIC_BRAND.colors.rouge)
+    .text('Détail du rejet', contentX, doc.y);
+  doc.moveDown(0.5);
+
+  const blocY = doc.y;
+  const blocHeight = 110;
+  doc
+    .save()
+    .rect(contentX, blocY, contentWidth, blocHeight)
+    .lineWidth(1.2)
+    .strokeColor(BSIC_BRAND.colors.rouge)
+    .fillColor('#FCEEEE')
+    .fillAndStroke();
+  doc.restore();
+
+  const labelX = contentX + 12;
+  const valueX = contentX + 150;
+  const valueWidth = contentWidth - 162;
+  let blocCursor = blocY + 12;
+  const lineHeight = 22;
+
+  const rows: Array<{ label: string; value: string }> = [
+    { label: 'Auteur du rejet :', value: formatNomComplet(visaRejete) },
+    { label: 'Fonction :', value: visaRejete.libelleFonction ?? '—' },
+    { label: 'Date du rejet :', value: formatDateFr(visaRejete.dateAction) },
+    {
+      label: 'Motif :',
+      value: visaRejete.commentaire ?? '(motif non précisé)',
+    },
+  ];
+  for (const r of rows) {
+    doc
+      .font(BSIC_BRAND.fonts.titre)
+      .fontSize(BSIC_BRAND.fontSizes.body)
+      .fillColor(BSIC_BRAND.colors.rouge)
+      .text(r.label, labelX, blocCursor, { width: 130, lineBreak: false });
+    doc
+      .font(BSIC_BRAND.fonts.body)
+      .fontSize(BSIC_BRAND.fontSizes.body)
+      .fillColor(BSIC_BRAND.colors.bleuNuitDark)
+      .text(r.value, valueX, blocCursor, { width: valueWidth });
+    blocCursor += lineHeight;
+  }
+  doc.y = blocY + blocHeight + 18;
+
+  // ─── 5. Bloc instructions ───────────────────────────────────────
+  doc
+    .font(BSIC_BRAND.fonts.italic)
+    .fontSize(BSIC_BRAND.fontSizes.body)
+    .fillColor(BSIC_BRAND.colors.grisFonce)
+    .text(
+      "Le document susvisé fait l'objet d'un rejet et devra être révisé " +
+        'par son émetteur avant une nouvelle soumission au workflow de ' +
+        "validation. Le présent bordereau fait foi pour l'audit BCEAO " +
+        '(conservation 10 ans).',
+      contentX,
+      doc.y,
+      { width: contentWidth, align: 'justify' },
+    );
+  doc.moveDown(1.5);
+
+  // ─── 6. Cachet officiel + date de génération ────────────────────
+  const stampY = doc.y;
+  const stampWidth = 220;
+  pdf.drawBceaoStamp(
+    doc,
+    contentX + contentWidth - stampWidth,
+    stampY,
+    stampWidth,
+    `R5-${document.codeDocument}`,
+  );
+
+  doc
+    .font(BSIC_BRAND.fonts.body)
+    .fontSize(BSIC_BRAND.fontSizes.body)
+    .fillColor(BSIC_BRAND.colors.bleuNuitDark)
+    .text(
+      `Niamey, le ${formatDateFr(new Date().toISOString())}`,
+      contentX,
+      stampY + 30,
+      { width: stampWidth, align: 'left' },
+    );
+  doc.y = stampY + 110;
+
+  // Mention de génération
+  doc
+    .font(BSIC_BRAND.fonts.italic)
+    .fontSize(BSIC_BRAND.fontSizes.bodySmall)
+    .fillColor(BSIC_BRAND.colors.grisFonce)
+    .text(
+      `Bordereau généré automatiquement par MIZNAS le ${formatDateFr(new Date().toISOString())}.`,
+      contentX,
+      doc.y,
+      { width: contentWidth, align: 'center' },
+    );
+
+  // ─── 7. Footer ──────────────────────────────────────────────────
+  pdf.applyFooterToAllPages(doc, {
+    left: `BSIC NIGER S.A. — R5 Bordereau Rejet — ${document.codeDocument}`,
+    center: 'CONFIDENTIEL',
+  });
+}
