@@ -86,6 +86,7 @@ import { NoteOrientationService } from '../services/note-orientation.service';
 import { LettreOfficialisationService } from '../services/lettre-officialisation.service';
 import { NotePreparatoireService } from '../services/note-preparatoire.service';
 import { PvApprobationService } from '../services/pv-approbation.service';
+import { BordereauService } from '../../reporting/services/bordereau.service';
 
 @ApiTags('documents-officiels')
 @ApiBearerAuth()
@@ -100,6 +101,7 @@ export class DocumentsController {
     private readonly notePreparatoireService: NotePreparatoireService,
     private readonly pvApprobationService: PvApprobationService,
     private readonly lettreOfficialisationService: LettreOfficialisationService,
+    private readonly bordereauService: BordereauService,
   ) {}
 
   /**
@@ -691,5 +693,70 @@ export class DocumentsController {
       dto,
       user.email,
     );
+  }
+
+  // ─── 24. GET /:id/bordereau-validation — Lot 8.4 (R3) ────────────
+
+  @Get(':id/bordereau-validation')
+  @RequirePermissions('DOCUMENT.LIRE')
+  @ApiOperation({
+    summary:
+      'Télécharge le bordereau de validation R3 (PDF officiel BSIC). Disponible UNIQUEMENT si statut du document = VISE ou SIGNE. Format consolidé listant tous les viseurs ayant validé positivement.',
+  })
+  @ApiOkResponse({
+    description:
+      'PDF binaire (application/pdf), Content-Disposition: attachment. Format consolidé.',
+  })
+  @ApiNotFoundResponse({ description: 'Document introuvable.' })
+  @ApiConflictResponse({
+    description:
+      'Statut document ≠ VISE et ≠ SIGNE (bordereau non encore disponible).',
+  })
+  @ApiForbiddenResponse({ description: 'Permission DOCUMENT.LIRE manquante.' })
+  async telechargerBordereauValidation(
+    @Param('id', ParseUUIDPipe) documentId: string,
+    @Res() res: Response,
+  ): Promise<void> {
+    // Validation faite dans le service (404/409 levés en amont).
+    const data = await this.bordereauService.extractDataR3(documentId);
+    const buffer =
+      await this.bordereauService.genererBordereauValidation(documentId);
+    const filename = `R3-bordereau-validation-${data.document.codeDocument}.pdf`;
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.setHeader('Content-Length', String(buffer.length));
+    res.send(buffer);
+  }
+
+  // ─── 25. GET /:id/bordereau-rejet — Lot 8.4 (R5) ─────────────────
+
+  @Get(':id/bordereau-rejet')
+  @RequirePermissions('DOCUMENT.LIRE')
+  @ApiOperation({
+    summary:
+      'Télécharge le bordereau de rejet R5 (PDF officiel BSIC). Disponible UNIQUEMENT si au moins un visa REJETE existe sur le document. Atteste du rejet (auteur, fonction, date, motif).',
+  })
+  @ApiOkResponse({
+    description:
+      'PDF binaire (application/pdf), Content-Disposition: attachment.',
+  })
+  @ApiNotFoundResponse({ description: 'Document introuvable.' })
+  @ApiConflictResponse({
+    description:
+      'Aucun visa REJETE sur ce document (bordereau non applicable).',
+  })
+  @ApiForbiddenResponse({ description: 'Permission DOCUMENT.LIRE manquante.' })
+  async telechargerBordereauRejet(
+    @Param('id', ParseUUIDPipe) documentId: string,
+    @Res() res: Response,
+  ): Promise<void> {
+    const data = await this.bordereauService.extractDataR5(documentId);
+    const buffer =
+      await this.bordereauService.genererBordereauRejet(documentId);
+    const filename = `R5-bordereau-rejet-${data.document.codeDocument}.pdf`;
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.setHeader('Content-Length', String(buffer.length));
+    res.send(buffer);
   }
 }

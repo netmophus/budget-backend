@@ -18,6 +18,7 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 
 import { AuditModule } from '../audit/audit.module';
+import { ReportingModule } from '../reporting/reporting.module';
 import { User } from '../users/entities/user.entity';
 import { CampagneBudgetaire } from './entities/campagne-budgetaire.entity';
 import { CampagneComiteMembre } from './entities/campagne-comite-membre.entity';
@@ -60,6 +61,7 @@ import { LettreOfficialisationService } from './services/lettre-officialisation.
       User, // pour lookup signataire dans CampagneService + bcrypt dans DocumentWorkflowService
     ]),
     AuditModule, // pour AuditService dans CampagneService
+    ReportingModule, // Lot 8.4 — pour BordereauService injecté dans DocumentsController (endpoints R3/R5)
   ],
   controllers: [CampagnesController, DocumentsController],
   providers: [
