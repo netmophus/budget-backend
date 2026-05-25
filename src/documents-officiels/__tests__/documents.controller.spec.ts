@@ -21,6 +21,7 @@ import { DocumentWorkflowService } from '../services/document-workflow.service';
 import { LettreCadrageService } from '../services/lettre-cadrage.service';
 import { LettreMobilisationService } from '../services/lettre-mobilisation.service';
 import { NoteOrientationService } from '../services/note-orientation.service';
+import { LettreOfficialisationService } from '../services/lettre-officialisation.service';
 import { NotePreparatoireService } from '../services/note-preparatoire.service';
 import { PvApprobationService } from '../services/pv-approbation.service';
 
@@ -64,6 +65,10 @@ describe('DocumentsController (Lot 8.1.C Palier 3)', () => {
     lireDetail: jest.Mock;
     creerOuMettreAJour: jest.Mock;
   };
+  let lettreOfficialisationService: {
+    lireDetail: jest.Mock;
+    creerOuMettreAJour: jest.Mock;
+  };
 
   beforeEach(async () => {
     service = {
@@ -102,6 +107,10 @@ describe('DocumentsController (Lot 8.1.C Palier 3)', () => {
       lireDetail: jest.fn(),
       creerOuMettreAJour: jest.fn(),
     };
+    lettreOfficialisationService = {
+      lireDetail: jest.fn(),
+      creerOuMettreAJour: jest.fn(),
+    };
     const moduleRef = await Test.createTestingModule({
       controllers: [DocumentsController],
       providers: [
@@ -123,6 +132,10 @@ describe('DocumentsController (Lot 8.1.C Palier 3)', () => {
         {
           provide: PvApprobationService,
           useValue: pvApprobationService,
+        },
+        {
+          provide: LettreOfficialisationService,
+          useValue: lettreOfficialisationService,
         },
       ],
     }).compile();
@@ -530,10 +543,10 @@ describe('DocumentsController (Lot 8.1.C Palier 3)', () => {
     );
   });
 
-  it('detailDocument : doc D11_PV_APPROBATION → contrat retour expose pvApprobationDetail, exclusion mutuelle 5 types', async () => {
+  it('detailDocument : doc D11_PV_APPROBATION → contrat retour expose pvApprobationDetail, exclusion mutuelle 6 types', async () => {
     // Simule le retour de workflowService.detailDocument pour un D11 :
-    // pvApprobationDetail rempli, les 4 autres détails à null
-    // (vérification du contrat 5 types après refonte detailDocument).
+    // pvApprobationDetail rempli, les 5 autres détails à null
+    // (vérification du contrat 6 types après refonte detailDocument).
     const fakeDocD11 = {
       id: 'doc-uuid-11',
       typeDocument: 'D11_PV_APPROBATION',
@@ -549,6 +562,7 @@ describe('DocumentsController (Lot 8.1.C Palier 3)', () => {
         fkDocument: 'doc-uuid-11',
         numeroResolution: 'CA-BSIC-2027-007',
       },
+      lettreOfficialisationDetail: null,
     };
     service.detailDocument.mockResolvedValue(fakeDocD11);
 
@@ -559,11 +573,94 @@ describe('DocumentsController (Lot 8.1.C Palier 3)', () => {
       expect.objectContaining({ userId: '23', userEmail: 'dg@bsic.ne' }),
     );
     expect(result).toBe(fakeDocD11);
-    // Exclusion mutuelle : pvApprobationDetail non-null, les 4 autres null
+    // Exclusion mutuelle : pvApprobationDetail non-null, les 5 autres null
     expect(result.pvApprobationDetail).not.toBeNull();
     expect(result.lettreCadrageDetail).toBeNull();
     expect(result.noteOrientationDetail).toBeNull();
     expect(result.lettreMobilisationDetail).toBeNull();
     expect(result.notePreparatoireDetail).toBeNull();
+    expect(result.lettreOfficialisationDetail).toBeNull();
+  });
+
+  // ─── Lot 8.3.E — endpoints lettre-officialisation-detail ────────
+
+  it('lireDetailLettreOfficialisation : @RequirePermissions(DOCUMENT.LIRE) + délègue au service', async () => {
+    const meta = Reflect.getMetadata(
+      PERMISSIONS_KEY,
+      controller.lireDetailLettreOfficialisation,
+    ) as PermissionsMetadata;
+    expect(meta.permissions).toContain('DOCUMENT.LIRE');
+
+    const fakeDetail = { id: 'lod-1', fkDocument: 'doc-uuid-1' };
+    lettreOfficialisationService.lireDetail.mockResolvedValue(fakeDetail);
+    const result =
+      await controller.lireDetailLettreOfficialisation('doc-uuid-1');
+    expect(lettreOfficialisationService.lireDetail).toHaveBeenCalledWith(
+      'doc-uuid-1',
+    );
+    expect(result).toBe(fakeDetail);
+  });
+
+  it('mettreAJourDetailLettreOfficialisation : @RequirePermissions(DOCUMENT.CREER) + délègue (id, dto, user.email)', async () => {
+    const meta = Reflect.getMetadata(
+      PERMISSIONS_KEY,
+      controller.mettreAJourDetailLettreOfficialisation,
+    ) as PermissionsMetadata;
+    expect(meta.permissions).toContain('DOCUMENT.CREER');
+
+    const dto = {
+      numeroLettre: 'LOFF-BSIC-2027-001',
+      dateEmission: '2027-12-22',
+      objet: 'Officialisation du budget 2028',
+      referencePvCa: 'CA-BSIC-2027-007',
+      cachetAppose: true,
+    };
+    lettreOfficialisationService.creerOuMettreAJour.mockResolvedValue({
+      id: 'lod-1',
+      fkDocument: 'doc-uuid-1',
+      numeroLettre: 'LOFF-BSIC-2027-001',
+    });
+    await controller.mettreAJourDetailLettreOfficialisation(
+      'doc-uuid-1',
+      dto,
+      mockUser,
+    );
+    expect(
+      lettreOfficialisationService.creerOuMettreAJour,
+    ).toHaveBeenCalledWith('doc-uuid-1', dto, 'dg@bsic.ne');
+  });
+
+  it('detailDocument : doc D12_LETTRE_OFFICIALISATION → contrat retour expose lettreOfficialisationDetail, exclusion mutuelle 6 types', async () => {
+    // Simule le retour pour un D12 : lettreOfficialisationDetail rempli,
+    // les 5 autres détails à null.
+    const fakeDocD12 = {
+      id: 'doc-uuid-12',
+      typeDocument: 'D12_LETTRE_OFFICIALISATION',
+      statut: 'BROUILLON',
+      visas: [],
+      signature: null,
+      lettreCadrageDetail: null,
+      noteOrientationDetail: null,
+      lettreMobilisationDetail: null,
+      notePreparatoireDetail: null,
+      pvApprobationDetail: null,
+      lettreOfficialisationDetail: {
+        id: 'lod-1',
+        fkDocument: 'doc-uuid-12',
+        numeroLettre: 'LOFF-BSIC-2027-001',
+      },
+    };
+    service.detailDocument.mockResolvedValue(fakeDocD12);
+
+    const result = await controller.detail('doc-uuid-12', mockUser);
+
+    expect(result).toBe(fakeDocD12);
+    // Exclusion mutuelle : lettreOfficialisationDetail non-null, les 5 autres null
+    expect(result.lettreOfficialisationDetail).not.toBeNull();
+    expect(result.lettreCadrageDetail).toBeNull();
+    expect(result.noteOrientationDetail).toBeNull();
+    expect(result.lettreMobilisationDetail).toBeNull();
+    expect(result.notePreparatoireDetail).toBeNull();
+    expect(result.pvApprobationDetail).toBeNull();
   });
 });

@@ -26,6 +26,7 @@ import { DocumentSignature } from './entities/document-signature.entity';
 import { DocumentVisa } from './entities/document-visa.entity';
 import { LettreCadrageDetail } from './entities/lettre-cadrage-detail.entity';
 import { LettreMobilisationDetail } from './entities/lettre-mobilisation-detail.entity';
+import { LettreOfficialisationDetail } from './entities/lettre-officialisation-detail.entity';
 import { NoteOrientationDetail } from './entities/note-orientation-detail.entity';
 import { NotePreparatoireDetail } from './entities/note-preparatoire-detail.entity';
 import { PvApprobationDetail } from './entities/pv-approbation-detail.entity';
@@ -40,6 +41,7 @@ import { LettreMobilisationService } from './services/lettre-mobilisation.servic
 import { NoteOrientationService } from './services/note-orientation.service';
 import { NotePreparatoireService } from './services/note-preparatoire.service';
 import { PvApprobationService } from './services/pv-approbation.service';
+import { LettreOfficialisationService } from './services/lettre-officialisation.service';
 
 @Module({
   imports: [
@@ -54,6 +56,7 @@ import { PvApprobationService } from './services/pv-approbation.service';
       LettreMobilisationDetail, // Lot 8.3.B — détail métier D5_LETTRE_DG (libellé : Lettre de mobilisation)
       NotePreparatoireDetail, // Lot 8.3.C — détail métier D1_NOTE_PREPARATOIRE
       PvApprobationDetail, // Lot 8.3.D — détail métier D11_PV_APPROBATION
+      LettreOfficialisationDetail, // Lot 8.3.E — détail métier D12_LETTRE_OFFICIALISATION
       User, // pour lookup signataire dans CampagneService + bcrypt dans DocumentWorkflowService
     ]),
     AuditModule, // pour AuditService dans CampagneService
@@ -69,6 +72,7 @@ import { PvApprobationService } from './services/pv-approbation.service';
     LettreMobilisationService,
     NotePreparatoireService,
     PvApprobationService,
+    LettreOfficialisationService,
   ],
   exports: [
     TypeOrmModule,
@@ -81,6 +85,7 @@ import { PvApprobationService } from './services/pv-approbation.service';
     LettreMobilisationService,
     NotePreparatoireService,
     PvApprobationService,
+    LettreOfficialisationService,
   ],
 })
 export class DocumentsOfficielsModule {}

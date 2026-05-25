@@ -50,6 +50,7 @@ import { DocumentSignature } from '../entities/document-signature.entity';
 import { DocumentVisa } from '../entities/document-visa.entity';
 import { LettreCadrageDetail } from '../entities/lettre-cadrage-detail.entity';
 import { LettreMobilisationDetail } from '../entities/lettre-mobilisation-detail.entity';
+import { LettreOfficialisationDetail } from '../entities/lettre-officialisation-detail.entity';
 import { NoteOrientationDetail } from '../entities/note-orientation-detail.entity';
 import { NotePreparatoireDetail } from '../entities/note-preparatoire-detail.entity';
 import { PvApprobationDetail } from '../entities/pv-approbation-detail.entity';
@@ -136,15 +137,24 @@ export type DocumentOfficielDetailView = Omit<
    * Conseil d'Administration, émis APRÈS la signature de D2 — acte
    * officiel d'approbation budgétaire). `null` si type ≠ D11 ou si
    * le secrétaire n'a pas encore renseigné le détail.
-   *
-   * **Exclusion mutuelle stricte** : au plus UN des 5 détails métier
-   * (lettreCadrageDetail / noteOrientationDetail /
-   * lettreMobilisationDetail / notePreparatoireDetail /
-   * pvApprobationDetail) est non-null pour un document donné, car
-   * déterminé par `typeDocument`. Les 3 autres types (R3, R5, D12)
-   * n'ont pas de détail métier dédié à ce jour.
    */
   pvApprobationDetail: PvApprobationDetail | null;
+  /**
+   * Lot 8.3.E — détail métier structuré, présent UNIQUEMENT pour les
+   * documents de type `D12_LETTRE_OFFICIALISATION` (Lettre
+   * d'officialisation BSIC, émise APRÈS la signature du PV CA pour
+   * notifier l'approbation du budget aux parties prenantes). `null`
+   * si type ≠ D12 ou si le DG n'a pas encore renseigné le détail.
+   *
+   * **Exclusion mutuelle stricte** : au plus UN des 6 détails métier
+   * (lettreCadrageDetail / noteOrientationDetail /
+   * lettreMobilisationDetail / notePreparatoireDetail /
+   * pvApprobationDetail / lettreOfficialisationDetail) est non-null
+   * pour un document donné, car déterminé par `typeDocument`. Les
+   * 2 autres types (R3, R5) n'ont pas de détail métier dédié — ils
+   * relèvent de la phase 8.4 (bordereaux de validation/rejet workflow).
+   */
+  lettreOfficialisationDetail: LettreOfficialisationDetail | null;
 };
 
 /**
@@ -793,15 +803,17 @@ export class DocumentWorkflowService {
       .getRepository(DocumentSignature)
       .findOne({ where: { fkDocument: documentId } });
 
-    // 5 types métier supportés (chargement conditionnel par typeDocument) :
-    //  - Lot 8.2.C : D2_LETTRE_CADRAGE     → lettreCadrageDetail
-    //  - Lot 8.3.A : D3_NOTE_ORIENTATION   → noteOrientationDetail
-    //  - Lot 8.3.B : D5_LETTRE_DG          → lettreMobilisationDetail
-    //  - Lot 8.3.C : D1_NOTE_PREPARATOIRE  → notePreparatoireDetail
-    //  - Lot 8.3.D : D11_PV_APPROBATION    → pvApprobationDetail
-    // Exclusion mutuelle stricte par typeDocument : au plus UN des 5
-    // SELECT est exécuté pour un document donné. Pour les 3 autres
-    // types (R3, R5, D12), aucun round-trip supplémentaire.
+    // 6 types métier supportés (chargement conditionnel par typeDocument) :
+    //  - Lot 8.2.C : D2_LETTRE_CADRAGE          → lettreCadrageDetail
+    //  - Lot 8.3.A : D3_NOTE_ORIENTATION        → noteOrientationDetail
+    //  - Lot 8.3.B : D5_LETTRE_DG               → lettreMobilisationDetail
+    //  - Lot 8.3.C : D1_NOTE_PREPARATOIRE       → notePreparatoireDetail
+    //  - Lot 8.3.D : D11_PV_APPROBATION         → pvApprobationDetail
+    //  - Lot 8.3.E : D12_LETTRE_OFFICIALISATION → lettreOfficialisationDetail
+    // Exclusion mutuelle stricte par typeDocument : au plus UN des 6
+    // SELECT est exécuté pour un document donné. Pour les 2 autres
+    // types (R3, R5 — phase 8.4 bordereaux workflow), aucun round-trip
+    // supplémentaire.
     const lettreCadrageDetail =
       doc.typeDocument === 'D2_LETTRE_CADRAGE'
         ? await this.dataSource
@@ -832,6 +844,12 @@ export class DocumentWorkflowService {
             .getRepository(PvApprobationDetail)
             .findOne({ where: { fkDocument: documentId } })
         : null;
+    const lettreOfficialisationDetail =
+      doc.typeDocument === 'D12_LETTRE_OFFICIALISATION'
+        ? await this.dataSource
+            .getRepository(LettreOfficialisationDetail)
+            .findOne({ where: { fkDocument: documentId } })
+        : null;
 
     const { emetteur, signataire, ...rest } = doc;
     return {
@@ -848,6 +866,7 @@ export class DocumentWorkflowService {
       lettreMobilisationDetail,
       notePreparatoireDetail,
       pvApprobationDetail,
+      lettreOfficialisationDetail,
     };
   }
 
