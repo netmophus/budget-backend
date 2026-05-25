@@ -51,6 +51,7 @@ import { DocumentVisa } from '../entities/document-visa.entity';
 import { LettreCadrageDetail } from '../entities/lettre-cadrage-detail.entity';
 import { LettreMobilisationDetail } from '../entities/lettre-mobilisation-detail.entity';
 import { NoteOrientationDetail } from '../entities/note-orientation-detail.entity';
+import { NotePreparatoireDetail } from '../entities/note-preparatoire-detail.entity';
 import { DocumentHashService } from './document-hash.service';
 
 /**
@@ -114,16 +115,27 @@ export type DocumentOfficielDetailView = Omit<
   noteOrientationDetail: NoteOrientationDetail | null;
   /**
    * Lot 8.3.B — détail métier structuré, présent UNIQUEMENT pour les
-   * documents de type `D5_LETTRE_MOBILISATION` (Lettre motivationnelle
-   * DG → Directeurs après cadrage + orientation). `null` si type ≠ D5
-   * ou si le DG n'a pas encore renseigné le détail.
-   *
-   * **Exclusion mutuelle** : au plus UN des 3 détails métier
-   * (lettreCadrageDetail / noteOrientationDetail /
-   * lettreMobilisationDetail) est non-null pour un document donné,
-   * car déterminé par `typeDocument`.
+   * documents de type `D5_LETTRE_DG` (Lettre motivationnelle DG →
+   * Directeurs après cadrage + orientation, libellé "Lettre de
+   * mobilisation"). `null` si type ≠ D5 ou si le DG n'a pas encore
+   * renseigné le détail.
    */
   lettreMobilisationDetail: LettreMobilisationDetail | null;
+  /**
+   * Lot 8.3.C — détail métier structuré, présent UNIQUEMENT pour les
+   * documents de type `D1_NOTE_PREPARATOIRE` (Note préparatoire DG
+   * émise AVANT la réunion du Comité en début de cycle budgétaire,
+   * pour poser ordre du jour + contexte). `null` si type ≠ D1 ou si
+   * le DG n'a pas encore renseigné le détail.
+   *
+   * **Exclusion mutuelle stricte** : au plus UN des 4 détails métier
+   * (lettreCadrageDetail / noteOrientationDetail /
+   * lettreMobilisationDetail / notePreparatoireDetail) est non-null
+   * pour un document donné, car déterminé par `typeDocument`. Les
+   * 3 autres types (R3, R5, D11, D12) n'ont pas de détail métier
+   * dédié à ce jour.
+   */
+  notePreparatoireDetail: NotePreparatoireDetail | null;
 };
 
 /**
@@ -775,9 +787,10 @@ export class DocumentWorkflowService {
     // Lot 8.2.C — chargement conditionnel du détail métier D2.
     // Lot 8.3.A — chargement conditionnel du détail métier D3.
     // Lot 8.3.B — chargement conditionnel du détail métier D5.
-    // Exclusion mutuelle par typeDocument : au plus un des 3 SELECT
-    // est exécuté pour un document donné. Pour les 4 autres types
-    // (D1, D11, D12, R3, R5), aucun round-trip supplémentaire.
+    // Lot 8.3.C — chargement conditionnel du détail métier D1.
+    // Exclusion mutuelle par typeDocument : au plus un des 4 SELECT
+    // est exécuté pour un document donné. Pour les 3 autres types
+    // (R3, R5, D11, D12), aucun round-trip supplémentaire.
     const lettreCadrageDetail =
       doc.typeDocument === 'D2_LETTRE_CADRAGE'
         ? await this.dataSource
@@ -796,6 +809,12 @@ export class DocumentWorkflowService {
             .getRepository(LettreMobilisationDetail)
             .findOne({ where: { fkDocument: documentId } })
         : null;
+    const notePreparatoireDetail =
+      doc.typeDocument === 'D1_NOTE_PREPARATOIRE'
+        ? await this.dataSource
+            .getRepository(NotePreparatoireDetail)
+            .findOne({ where: { fkDocument: documentId } })
+        : null;
 
     const { emetteur, signataire, ...rest } = doc;
     return {
@@ -810,6 +829,7 @@ export class DocumentWorkflowService {
       lettreCadrageDetail,
       noteOrientationDetail,
       lettreMobilisationDetail,
+      notePreparatoireDetail,
     };
   }
 

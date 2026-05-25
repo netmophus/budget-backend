@@ -21,6 +21,7 @@ import { DocumentWorkflowService } from '../services/document-workflow.service';
 import { LettreCadrageService } from '../services/lettre-cadrage.service';
 import { LettreMobilisationService } from '../services/lettre-mobilisation.service';
 import { NoteOrientationService } from '../services/note-orientation.service';
+import { NotePreparatoireService } from '../services/note-preparatoire.service';
 
 const mockUser: AuthUser = { userId: '23', email: 'dg@bsic.ne' };
 
@@ -54,6 +55,10 @@ describe('DocumentsController (Lot 8.1.C Palier 3)', () => {
     lireDetail: jest.Mock;
     creerOuMettreAJour: jest.Mock;
   };
+  let notePreparatoireService: {
+    lireDetail: jest.Mock;
+    creerOuMettreAJour: jest.Mock;
+  };
 
   beforeEach(async () => {
     service = {
@@ -84,6 +89,10 @@ describe('DocumentsController (Lot 8.1.C Palier 3)', () => {
       lireDetail: jest.fn(),
       creerOuMettreAJour: jest.fn(),
     };
+    notePreparatoireService = {
+      lireDetail: jest.fn(),
+      creerOuMettreAJour: jest.fn(),
+    };
     const moduleRef = await Test.createTestingModule({
       controllers: [DocumentsController],
       providers: [
@@ -97,6 +106,10 @@ describe('DocumentsController (Lot 8.1.C Palier 3)', () => {
         {
           provide: LettreMobilisationService,
           useValue: lettreMobilisationService,
+        },
+        {
+          provide: NotePreparatoireService,
+          useValue: notePreparatoireService,
         },
       ],
     }).compile();
@@ -402,6 +415,54 @@ describe('DocumentsController (Lot 8.1.C Palier 3)', () => {
       mockUser,
     );
     expect(lettreMobilisationService.creerOuMettreAJour).toHaveBeenCalledWith(
+      'doc-uuid-1',
+      dto,
+      'dg@bsic.ne',
+    );
+  });
+
+  // ─── Lot 8.3.C — endpoints note-preparatoire-detail ────────────
+
+  it('lireDetailNotePreparatoire : @RequirePermissions(DOCUMENT.LIRE) + délègue au service', async () => {
+    const meta = Reflect.getMetadata(
+      PERMISSIONS_KEY,
+      controller.lireDetailNotePreparatoire,
+    ) as PermissionsMetadata;
+    expect(meta.permissions).toContain('DOCUMENT.LIRE');
+
+    const fakeDetail = { id: 'npd-1', fkDocument: 'doc-uuid-1' };
+    notePreparatoireService.lireDetail.mockResolvedValue(fakeDetail);
+    const result = await controller.lireDetailNotePreparatoire('doc-uuid-1');
+    expect(notePreparatoireService.lireDetail).toHaveBeenCalledWith(
+      'doc-uuid-1',
+    );
+    expect(result).toBe(fakeDetail);
+  });
+
+  it('mettreAJourDetailNotePreparatoire : @RequirePermissions(DOCUMENT.CREER) + délègue (id, dto, user.email)', async () => {
+    const meta = Reflect.getMetadata(
+      PERMISSIONS_KEY,
+      controller.mettreAJourDetailNotePreparatoire,
+    ) as PermissionsMetadata;
+    expect(meta.permissions).toContain('DOCUMENT.CREER');
+
+    const dto = {
+      referenceNote: 'DG/BSIC-NIGER/2028/PREP-01',
+      exerciceConcerne: 2028,
+      lieuReunion: 'Salle CODIR — Siège BSIC NIGER',
+      pointsClesDebattre: 'Priorités investissement IT 2028.',
+    };
+    notePreparatoireService.creerOuMettreAJour.mockResolvedValue({
+      id: 'npd-1',
+      fkDocument: 'doc-uuid-1',
+      referenceNote: 'DG/BSIC-NIGER/2028/PREP-01',
+    });
+    await controller.mettreAJourDetailNotePreparatoire(
+      'doc-uuid-1',
+      dto,
+      mockUser,
+    );
+    expect(notePreparatoireService.creerOuMettreAJour).toHaveBeenCalledWith(
       'doc-uuid-1',
       dto,
       'dg@bsic.ne',
