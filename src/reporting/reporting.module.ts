@@ -12,12 +12,23 @@ import { AuditModule } from '../audit/audit.module';
 import { ExcelBuilderService } from './generators/excel-builder.service';
 import { PdfBuilderService } from './generators/pdf-builder.service';
 import { ReportingController } from './reporting.controller';
+import { BordereauService } from './services/bordereau.service';
 import { R04BudgetBceaoService } from './services/r04-budget-bceao.service';
 
 @Module({
   imports: [AuditModule],
   controllers: [ReportingController],
-  providers: [PdfBuilderService, ExcelBuilderService, R04BudgetBceaoService],
-  exports: [PdfBuilderService, ExcelBuilderService, R04BudgetBceaoService],
+  providers: [
+    PdfBuilderService,
+    ExcelBuilderService,
+    R04BudgetBceaoService,
+    BordereauService,
+  ],
+  exports: [
+    PdfBuilderService,
+    ExcelBuilderService,
+    R04BudgetBceaoService,
+    BordereauService,
+  ],
 })
 export class ReportingModule {}

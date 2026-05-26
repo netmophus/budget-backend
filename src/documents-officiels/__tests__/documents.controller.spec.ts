@@ -24,6 +24,8 @@ import { NoteOrientationService } from '../services/note-orientation.service';
 import { LettreOfficialisationService } from '../services/lettre-officialisation.service';
 import { NotePreparatoireService } from '../services/note-preparatoire.service';
 import { PvApprobationService } from '../services/pv-approbation.service';
+import { BordereauService } from '../../reporting/services/bordereau.service';
+import { ConflictException, NotFoundException } from '@nestjs/common';
 
 const mockUser: AuthUser = { userId: '23', email: 'dg@bsic.ne' };
 
@@ -69,6 +71,12 @@ describe('DocumentsController (Lot 8.1.C Palier 3)', () => {
     lireDetail: jest.Mock;
     creerOuMettreAJour: jest.Mock;
   };
+  let bordereauService: {
+    extractDataR3: jest.Mock;
+    extractDataR5: jest.Mock;
+    genererBordereauValidation: jest.Mock;
+    genererBordereauRejet: jest.Mock;
+  };
 
   beforeEach(async () => {
     service = {
@@ -111,6 +119,12 @@ describe('DocumentsController (Lot 8.1.C Palier 3)', () => {
       lireDetail: jest.fn(),
       creerOuMettreAJour: jest.fn(),
     };
+    bordereauService = {
+      extractDataR3: jest.fn(),
+      extractDataR5: jest.fn(),
+      genererBordereauValidation: jest.fn(),
+      genererBordereauRejet: jest.fn(),
+    };
     const moduleRef = await Test.createTestingModule({
       controllers: [DocumentsController],
       providers: [
@@ -136,6 +150,10 @@ describe('DocumentsController (Lot 8.1.C Palier 3)', () => {
         {
           provide: LettreOfficialisationService,
           useValue: lettreOfficialisationService,
+        },
+        {
+          provide: BordereauService,
+          useValue: bordereauService,
         },
       ],
     }).compile();
@@ -628,6 +646,99 @@ describe('DocumentsController (Lot 8.1.C Palier 3)', () => {
     expect(
       lettreOfficialisationService.creerOuMettreAJour,
     ).toHaveBeenCalledWith('doc-uuid-1', dto, 'dg@bsic.ne');
+  });
+
+  // ─── Lot 8.4 — endpoints bordereaux R3/R5 (download PDF) ─────────
+
+  function makeResMock(): Response {
+    return {
+      setHeader: jest.fn(),
+      send: jest.fn(),
+    } as unknown as Response;
+  }
+
+  it('telechargerBordereauValidation : @RequirePermissions(DOCUMENT.LIRE) + délègue et stream PDF', async () => {
+    const meta = Reflect.getMetadata(
+      PERMISSIONS_KEY,
+      controller.telechargerBordereauValidation,
+    ) as PermissionsMetadata;
+    expect(meta.permissions).toContain('DOCUMENT.LIRE');
+
+    const fakeBuffer = Buffer.from('%PDF-1.4 fake content', 'utf8');
+    bordereauService.extractDataR3.mockResolvedValue({
+      document: { codeDocument: 'LETTRE_CADRAGE_2027' },
+      visasValidants: [],
+    });
+    bordereauService.genererBordereauValidation.mockResolvedValue(fakeBuffer);
+    const res = makeResMock();
+    await controller.telechargerBordereauValidation('doc-uuid-1', res);
+
+    expect(bordereauService.extractDataR3).toHaveBeenCalledWith('doc-uuid-1');
+    expect(bordereauService.genererBordereauValidation).toHaveBeenCalledWith(
+      'doc-uuid-1',
+    );
+    expect(res.setHeader).toHaveBeenCalledWith(
+      'Content-Type',
+      'application/pdf',
+    );
+    expect(res.setHeader).toHaveBeenCalledWith(
+      'Content-Disposition',
+      'attachment; filename="R3-bordereau-validation-LETTRE_CADRAGE_2027.pdf"',
+    );
+    expect(res.send).toHaveBeenCalledWith(fakeBuffer);
+  });
+
+  it('telechargerBordereauRejet : @RequirePermissions(DOCUMENT.LIRE) + délègue et stream PDF', async () => {
+    const meta = Reflect.getMetadata(
+      PERMISSIONS_KEY,
+      controller.telechargerBordereauRejet,
+    ) as PermissionsMetadata;
+    expect(meta.permissions).toContain('DOCUMENT.LIRE');
+
+    const fakeBuffer = Buffer.from('%PDF-1.4 rejet content', 'utf8');
+    bordereauService.extractDataR5.mockResolvedValue({
+      document: { codeDocument: 'NOTE_ORIENTATION_2028_TEST' },
+      visaRejete: { ordreVisa: 1 },
+    });
+    bordereauService.genererBordereauRejet.mockResolvedValue(fakeBuffer);
+    const res = makeResMock();
+    await controller.telechargerBordereauRejet('doc-uuid-2', res);
+
+    expect(bordereauService.extractDataR5).toHaveBeenCalledWith('doc-uuid-2');
+    expect(bordereauService.genererBordereauRejet).toHaveBeenCalledWith(
+      'doc-uuid-2',
+    );
+    expect(res.setHeader).toHaveBeenCalledWith(
+      'Content-Type',
+      'application/pdf',
+    );
+    expect(res.setHeader).toHaveBeenCalledWith(
+      'Content-Disposition',
+      'attachment; filename="R5-bordereau-rejet-NOTE_ORIENTATION_2028_TEST.pdf"',
+    );
+    expect(res.send).toHaveBeenCalledWith(fakeBuffer);
+  });
+
+  it('telechargerBordereauValidation : statut incompatible → 409 propagé sans send', async () => {
+    bordereauService.extractDataR3.mockRejectedValue(
+      new ConflictException('Statut BROUILLON incompatible'),
+    );
+    const res = makeResMock();
+    await expect(
+      controller.telechargerBordereauValidation('doc-uuid-1', res),
+    ).rejects.toBeInstanceOf(ConflictException);
+    expect(res.send).not.toHaveBeenCalled();
+  });
+
+  it('telechargerBordereauRejet : document inexistant → 404 propagé sans send', async () => {
+    bordereauService.extractDataR5.mockRejectedValue(
+      new NotFoundException('Document doc-uuid-inexistante introuvable.'),
+    );
+    const res = makeResMock();
+    await expect(
+      controller.telechargerBordereauRejet('doc-uuid-inexistante', res),
+    ).rejects.toBeInstanceOf(NotFoundException);
+    expect(res.send).not.toHaveBeenCalled();
   });
 
   it('detailDocument : doc D12_LETTRE_OFFICIALISATION → contrat retour expose lettreOfficialisationDetail, exclusion mutuelle 6 types', async () => {
