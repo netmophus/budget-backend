@@ -159,17 +159,13 @@ export function buildR3Pdf(
     );
   doc.moveDown(1.5);
 
-  // ─── 6. Cachet officiel + date de génération ────────────────────
-  const stampY = doc.y;
-  const stampWidth = 220;
-  pdf.drawBceaoStamp(
-    doc,
-    contentX + contentWidth - stampWidth,
-    stampY,
-    stampWidth,
-    `R3-${document.codeDocument}`,
-  );
-
+  // ─── 6. Date de génération + mention MIZNAS ─────────────────────
+  // Hotfix Lot 8.4 : suppression du bloc "BUDGET GELÉ BCEAO / Conservation
+  // 10 ans" (`drawBceaoStamp`) initialement hérité par mimétisme du
+  // template R04. Sémantiquement faux sur un bordereau de workflow visa :
+  // R3/R5 ne sont PAS des budgets gelés ; la mention "Conservation 10 ans
+  // BCEAO" relève des documents finaux (R04, documents signés), pas des
+  // bordereaux dérivés. Le cachet `drawBceaoStamp` reste légitime sur R04.
   doc
     .font(BSIC_BRAND.fonts.body)
     .fontSize(BSIC_BRAND.fontSizes.body)
@@ -177,10 +173,10 @@ export function buildR3Pdf(
     .text(
       `Niamey, le ${formatDateFr(new Date().toISOString())}`,
       contentX,
-      stampY + 30,
-      { width: stampWidth, align: 'left' },
+      doc.y,
+      { width: contentWidth, align: 'left' },
     );
-  doc.y = stampY + 110;
+  doc.moveDown(1);
 
   // Mention de génération (avant le footer technique)
   doc
