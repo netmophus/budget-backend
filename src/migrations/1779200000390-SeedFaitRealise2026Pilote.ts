@@ -66,6 +66,14 @@ interface CountRow {
   n: string | number;
 }
 
+interface RefCountsRow {
+  compte: number;
+  centre: number;
+  ligne_metier: number;
+  temps: number;
+  devise: number;
+}
+
 /** Plan d'écarts par compte (1 CR par compte, alignement tableau du brief). */
 interface PlanEntry {
   code: string;
@@ -171,6 +179,51 @@ export class SeedFaitRealise2026Pilote1779200000390 implements MigrationInterfac
     if (existingCount > 0) {
       console.log(
         `[Migration 8.5.A] Seed déjà appliqué (${existingCount} lignes existantes). Skip up().`,
+      );
+      return;
+    }
+
+    // ─── 0.bis. Garde défensive — référentiels métier prérequis ────
+    // Hotfix Lot 8.5.A : si l'environnement n'a pas les référentiels
+    // prérequis (dim_compte / dim_centre_responsabilite /
+    // dim_ligne_metier / dim_temps / dim_devise), le seed plantait
+    // avec "Compte X introuvable dans dim_compte" en lieu et place
+    // d'un skip propre. Cas observé : pipeline CI e2e (testcontainers
+    // Postgres + Redis fraîchement créés, seed auth uniquement —
+    // 16 perms / 2 roles / 2 users — aucun référentiel métier).
+    //
+    // Comportement attendu après ce hotfix :
+    //   - Env local dev (référentiels présents) → seed s'applique
+    //     normalement (42 lignes)
+    //   - Env CI e2e (référentiels absents) → skip propre avec
+    //     WARNING détaillé, pipeline continue
+    //   - Tout env vide futur → idem CI
+    //
+    // Note `dim_devise` ajouté au check (vs brief qui listait 4
+    // tables) par conservatisme : le seed hardcode `fk_devise = 1`
+    // dans l'INSERT, sans `dim_devise` populé la FK casserait.
+    const refCounts = (await queryRunner.query(`
+      SELECT
+        (SELECT COUNT(*)::int FROM dim_compte) AS compte,
+        (SELECT COUNT(*)::int FROM dim_centre_responsabilite) AS centre,
+        (SELECT COUNT(*)::int FROM dim_ligne_metier) AS ligne_metier,
+        (SELECT COUNT(*)::int FROM dim_temps) AS temps,
+        (SELECT COUNT(*)::int FROM dim_devise) AS devise
+    `)) as RefCountsRow[];
+    const ref = refCounts[0];
+    const missing: string[] = [];
+    if (ref.compte === 0) missing.push('dim_compte');
+    if (ref.centre === 0) missing.push('dim_centre_responsabilite');
+    if (ref.ligne_metier === 0) missing.push('dim_ligne_metier');
+    if (ref.temps === 0) missing.push('dim_temps');
+    if (ref.devise === 0) missing.push('dim_devise');
+    if (missing.length > 0) {
+      console.log(
+        `[Migration 8.5.A] ⚠️ Référentiels métier absents (${missing.join(', ')}) — seed pilote skip. ` +
+          `Probablement env e2e ou env vide. Pour appliquer le seed, charger d'abord ` +
+          `les référentiels Phase 5.x. Détail : dim_compte=${ref.compte}, ` +
+          `dim_centre_responsabilite=${ref.centre}, dim_ligne_metier=${ref.ligne_metier}, ` +
+          `dim_temps=${ref.temps}, dim_devise=${ref.devise}.`,
       );
       return;
     }
