@@ -9,6 +9,7 @@
  *   PATCH  /realise/:id          (REALISE.SAISIR)   modif (statut=IMPORTE)
  *   DELETE /realise/:id          (REALISE.SUPPRIMER) suppression (statut=IMPORTE)
  *   POST   /realise/import       (REALISE.IMPORTER) upload Excel/CSV
+ *   GET    /realise/template-xlsx (REALISE.IMPORTER) téléchargement template (Lot 8.5.D)
  *   POST   /realise/valider      (REALISE.VALIDER)  validation en lot
  */
 import {
@@ -23,6 +24,7 @@ import {
   Patch,
   Post,
   Query,
+  Res,
   UploadedFile,
   UseInterceptors,
 } from '@nestjs/common';
@@ -34,8 +36,10 @@ import {
   ApiCreatedResponse,
   ApiOkResponse,
   ApiOperation,
+  ApiProduces,
   ApiTags,
 } from '@nestjs/swagger';
+import type { Response } from 'express';
 
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { AuthUser } from '../auth/decorators/current-user.decorator';
@@ -50,6 +54,7 @@ import {
 } from './dto/realise.dto';
 import { RealiseImportService } from './services/realise-import.service';
 import { RealiseService } from './services/realise.service';
+import { RealiseTemplateService } from './services/realise-template.service';
 
 const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024; // 10 MB
 
@@ -67,6 +72,7 @@ export class RealiseController {
   constructor(
     private readonly svc: RealiseService,
     private readonly importSvc: RealiseImportService,
+    private readonly templateSvc: RealiseTemplateService,
   ) {}
 
   @Get()
@@ -100,6 +106,33 @@ export class RealiseController {
       );
     }
     return this.svc.getGrille({ crId, moisDebut, moisFin });
+  }
+
+  @Get('template-xlsx')
+  @RequirePermissions('REALISE.IMPORTER')
+  @ApiOperation({
+    summary:
+      'Téléchargement du template XLSX d’import réalisé (Lot 8.5.D). Workbook 2 onglets (Donnees + Notice), reflète à 100% le format attendu par POST /realise/import.',
+  })
+  @ApiProduces(
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  )
+  @ApiOkResponse({
+    description:
+      'XLSX binaire (application/vnd.openxmlformats-officedocument.spreadsheetml.sheet), Content-Disposition: attachment ; filename="MIZNAS_Realise_Template.xlsx".',
+  })
+  async downloadTemplate(@Res() res: Response): Promise<void> {
+    const buffer = await this.templateSvc.genererTemplateXlsx();
+    res.setHeader(
+      'Content-Type',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    );
+    res.setHeader(
+      'Content-Disposition',
+      'attachment; filename="MIZNAS_Realise_Template.xlsx"',
+    );
+    res.setHeader('Content-Length', String(buffer.length));
+    res.send(buffer);
   }
 
   @Get(':id')

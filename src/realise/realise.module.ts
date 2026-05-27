@@ -8,6 +8,7 @@ import { FaitRealise } from './entities/fait-realise.entity';
 import { RealiseController } from './realise.controller';
 import { RealiseImportService } from './services/realise-import.service';
 import { RealiseService } from './services/realise.service';
+import { RealiseTemplateService } from './services/realise-template.service';
 
 /**
  * RealiseModule (Lot 5.1) — module métier "réalisé budgétaire".
@@ -23,7 +24,7 @@ import { RealiseService } from './services/realise.service';
     BudgetModule, // pour PerimetreService
   ],
   controllers: [RealiseController],
-  providers: [RealiseService, RealiseImportService],
+  providers: [RealiseService, RealiseImportService, RealiseTemplateService],
   exports: [RealiseService],
 })
 export class RealiseModule {}

@@ -11,11 +11,13 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { RealiseController } from './realise.controller';
 import { RealiseImportService } from './services/realise-import.service';
 import { RealiseService } from './services/realise.service';
+import { RealiseTemplateService } from './services/realise-template.service';
 
 describe('RealiseController', () => {
   let controller: RealiseController;
   let svc: jest.Mocked<RealiseService>;
   let importSvc: jest.Mocked<RealiseImportService>;
+  let templateSvc: jest.Mocked<RealiseTemplateService>;
   const auteur = { userId: '10', email: 'admin@test.local' };
 
   beforeEach(async () => {
@@ -31,12 +33,16 @@ describe('RealiseController', () => {
     importSvc = {
       importFichier: jest.fn(),
     } as unknown as jest.Mocked<RealiseImportService>;
+    templateSvc = {
+      genererTemplateXlsx: jest.fn(),
+    } as unknown as jest.Mocked<RealiseTemplateService>;
 
     const moduleRef: TestingModule = await Test.createTestingModule({
       controllers: [RealiseController],
       providers: [
         { provide: RealiseService, useValue: svc },
         { provide: RealiseImportService, useValue: importSvc },
+        { provide: RealiseTemplateService, useValue: templateSvc },
       ],
     }).compile();
     controller = moduleRef.get(RealiseController);
@@ -133,5 +139,28 @@ describe('RealiseController', () => {
     };
     await controller.importer(file as never, auteur);
     expect(importSvc.importFichier).toHaveBeenCalledWith(file, auteur);
+  });
+
+  it('GET /realise/template-xlsx (Lot 8.5.D) stream le buffer avec headers XLSX', async () => {
+    const fakeBuffer = Buffer.from('FAKE_XLSX_CONTENT');
+    templateSvc.genererTemplateXlsx.mockResolvedValue(fakeBuffer);
+    const setHeader = jest.fn();
+    const send = jest.fn();
+    const res = { setHeader, send } as never;
+    await controller.downloadTemplate(res);
+    expect(templateSvc.genererTemplateXlsx).toHaveBeenCalled();
+    expect(setHeader).toHaveBeenCalledWith(
+      'Content-Type',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    );
+    expect(setHeader).toHaveBeenCalledWith(
+      'Content-Disposition',
+      'attachment; filename="MIZNAS_Realise_Template.xlsx"',
+    );
+    expect(setHeader).toHaveBeenCalledWith(
+      'Content-Length',
+      String(fakeBuffer.length),
+    );
+    expect(send).toHaveBeenCalledWith(fakeBuffer);
   });
 });
