@@ -47,6 +47,39 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
  *   - `source = 'SAISIE'` (simule saisie manuelle pilote)
  *   - `statut = 'VALIDE'` + `valide_le = NOW()` + `fk_valide_par = admin`
  *     (cohérent `chk_fait_realise_valide_coherence`)
+ *
+ * ───────────────────────────────────────────────────────────────────
+ * **Hotfix v2 — ligne_metier=4 (Opérations de change)**
+ *
+ * L'audit préalable initial (v1) avait recommandé un mix de
+ * `fk_ligne_metier = 1` (RETAIL) et `fk_ligne_metier = 3` (TRESORERIE)
+ * pour les 8 comptes ciblés, en alignement avec l'intuition métier
+ * (salaires/charges → RETAIL, intérêts/titres → TRESORERIE).
+ *
+ * En pratique, l'audit réel de `fait_budget` a montré que le budget
+ * BSIC stocke **uniquement** `fk_ligne_metier = 4` (Opérations de
+ * change) pour les 8 comptes du seed (641000, 702121, 601735, 703201,
+ * 707210, 623200, 702930, 622100). Toute autre valeur faisait échouer
+ * le matching budget vs réalisé sur la dimension ligne_metier → tous
+ * les comptes ressortaient en niveau "Manquant" dans le dashboard
+ * `TableauBordBudgetVsRealisePage`, masquant les écarts pilote.
+ *
+ * Requête de vérification appliquée :
+ *   SELECT DISTINCT dc.code_compte, fb.fk_ligne_metier, COUNT(*)
+ *   FROM fait_budget fb
+ *   JOIN dim_compte dc ON dc.id = fb.fk_compte
+ *   WHERE dc.code_compte IN ('641000','702121','601735','703201',
+ *                            '707210','623200','702930','622100')
+ *   GROUP BY dc.code_compte, fb.fk_ligne_metier;
+ *   → tous les 8 comptes utilisent UNIQUEMENT fk_ligne_metier = 4.
+ *
+ * **Règle à retenir pour tout futur seed dimensionnel** : avant
+ * d'insérer dans `fait_realise`, vérifier que les `fk_*` choisis
+ * correspondent à ceux utilisés par `fait_budget` pour les mêmes
+ * comptes. Le service `AnalyseEcartsService` matche budget et
+ * réalisé sur l'ensemble des dimensions (compte + centre +
+ * ligne_metier + temps) — un décalage sur n'importe laquelle casse
+ * silencieusement la jointure et bascule tout en MANQUANT.
  */
 
 interface CompteRow {
@@ -87,56 +120,56 @@ const PLAN: PlanEntry[] = [
   {
     code: '641000',
     crId: 8, // CR_DARH
-    ligneMetierId: 1, // RETAIL
+    ligneMetierId: 4, // CHANGE — cf. audit v2 (ci-dessous § "Hotfix v2 — ligne_metier=4")
     profil: 'NORMAL',
     libelleProfil: 'Salaires conformes au budget (variation ±3%)',
   },
   {
     code: '702121',
     crId: 9, // CR_FINANCE
-    ligneMetierId: 3, // TRESORERIE
+    ligneMetierId: 4, // CHANGE (cf. § Hotfix v2)
     profil: 'NORMAL',
     libelleProfil: "Produits d'intérêts conformes (variation ±3%)",
   },
   {
     code: '601735',
     crId: 9,
-    ligneMetierId: 3,
+    ligneMetierId: 4,
     profil: 'NORMAL',
     libelleProfil: 'Intérêts emprunts au jour le jour conformes (±3%)',
   },
   {
     code: '703201',
     crId: 9,
-    ligneMetierId: 3,
+    ligneMetierId: 4,
     profil: 'NORMAL',
     libelleProfil: 'Gains sur titres conformes (±3%)',
   },
   {
     code: '623200',
     crId: 8, // CR_DARH
-    ligneMetierId: 1,
+    ligneMetierId: 4,
     profil: 'ATTENTION',
     libelleProfil: 'Indemnités en hausse +7% (seuil ATTENTION franchi)',
   },
   {
     code: '702930',
     crId: 15, // CR_AG_SIEGE
-    ligneMetierId: 1,
+    ligneMetierId: 4,
     profil: 'CRITIQUE',
     libelleProfil: 'Commissions effets en sous-réalisation -18% (CRITIQUE)',
   },
   {
     code: '707210',
     crId: 13, // CR_ENGAGEMENT
-    ligneMetierId: 1, // RETAIL (en l'absence de Corporate pure ; brief proposait RETAIL+TRESORERIE seulement)
+    ligneMetierId: 4, // CHANGE (cf. § Hotfix v2 — réalité budget BSIC)
     profil: 'NORMAL',
     libelleProfil: 'Produits engagements garantis conformes (±3%)',
   },
   {
     code: '622100',
     crId: 9, // CR_FINANCE
-    ligneMetierId: 3,
+    ligneMetierId: 4,
     profil: 'MANQUANT',
     libelleProfil:
       'AUCUNE INSERTION (illustre niveau MANQUANT — réalisé non saisi)',
