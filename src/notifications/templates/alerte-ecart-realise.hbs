@@ -1,0 +1,67 @@
+<p>Bonjour {{destinataire.prenom}} {{destinataire.nom}},</p>
+
+<p><strong>{{nbCritique}}</strong> écart(s) <span style="color:#cf222e;">CRITIQUE</span> et <strong>{{nbAttention}}</strong> écart(s) <span style="color:#9a6700;">ATTENTION</span> ont été détectés sur le réalisé de <strong>{{moisLabel}}</strong>.</p>
+
+<p style="background:#f6f8fa; border-left:3px solid #0969da; padding:8px 12px; margin:12px 0; font-size:13px;">
+Seuils MIZNAS : <strong>ATTENTION ≥ 5 %</strong> du budget, <strong>CRITIQUE ≥ 10 %</strong>. Les écarts en niveau NORMAL et les lignes MANQUANT ne sont pas listés ici (consultez le dashboard pour la vue complète).
+</p>
+
+{{#if critiques.length}}
+<h3 style="font-size:14px; color:#cf222e; margin:16px 0 6px;">🔴 Écarts critiques (≥ 10 %)</h3>
+<table cellpadding="0" cellspacing="0" style="font-size:13px; border-collapse:collapse; width:100%;">
+<thead>
+<tr style="background:#f6f8fa; color:#656d76;">
+<th style="text-align:left; padding:6px 10px; border-bottom:1px solid #d0d7de;">Compte</th>
+<th style="text-align:left; padding:6px 10px; border-bottom:1px solid #d0d7de;">CR</th>
+<th style="text-align:right; padding:6px 10px; border-bottom:1px solid #d0d7de;">Budget</th>
+<th style="text-align:right; padding:6px 10px; border-bottom:1px solid #d0d7de;">Réalisé</th>
+<th style="text-align:right; padding:6px 10px; border-bottom:1px solid #d0d7de;">Écart</th>
+</tr>
+</thead>
+<tbody>
+{{#each critiques}}
+<tr>
+<td style="padding:4px 10px; border-bottom:1px solid #eaeef2;"><strong>{{codeCompte}}</strong> {{libelleCompte}}</td>
+<td style="padding:4px 10px; border-bottom:1px solid #eaeef2;">{{codeCr}}</td>
+<td style="padding:4px 10px; border-bottom:1px solid #eaeef2; text-align:right;">{{montantBudgetFormatte}}</td>
+<td style="padding:4px 10px; border-bottom:1px solid #eaeef2; text-align:right;">{{montantRealiseFormatte}}</td>
+<td style="padding:4px 10px; border-bottom:1px solid #eaeef2; text-align:right; color:#cf222e;"><strong>{{ecartPctFormatte}}</strong></td>
+</tr>
+{{/each}}
+</tbody>
+</table>
+{{/if}}
+
+{{#if attentions.length}}
+<h3 style="font-size:14px; color:#9a6700; margin:16px 0 6px;">🟠 Écarts attention (≥ 5 %)</h3>
+<table cellpadding="0" cellspacing="0" style="font-size:13px; border-collapse:collapse; width:100%;">
+<thead>
+<tr style="background:#f6f8fa; color:#656d76;">
+<th style="text-align:left; padding:6px 10px; border-bottom:1px solid #d0d7de;">Compte</th>
+<th style="text-align:left; padding:6px 10px; border-bottom:1px solid #d0d7de;">CR</th>
+<th style="text-align:right; padding:6px 10px; border-bottom:1px solid #d0d7de;">Budget</th>
+<th style="text-align:right; padding:6px 10px; border-bottom:1px solid #d0d7de;">Réalisé</th>
+<th style="text-align:right; padding:6px 10px; border-bottom:1px solid #d0d7de;">Écart</th>
+</tr>
+</thead>
+<tbody>
+{{#each attentions}}
+<tr>
+<td style="padding:4px 10px; border-bottom:1px solid #eaeef2;"><strong>{{codeCompte}}</strong> {{libelleCompte}}</td>
+<td style="padding:4px 10px; border-bottom:1px solid #eaeef2;">{{codeCr}}</td>
+<td style="padding:4px 10px; border-bottom:1px solid #eaeef2; text-align:right;">{{montantBudgetFormatte}}</td>
+<td style="padding:4px 10px; border-bottom:1px solid #eaeef2; text-align:right;">{{montantRealiseFormatte}}</td>
+<td style="padding:4px 10px; border-bottom:1px solid #eaeef2; text-align:right; color:#9a6700;"><strong>{{ecartPctFormatte}}</strong></td>
+</tr>
+{{/each}}
+</tbody>
+</table>
+{{/if}}
+
+<p style="margin:20px 0;">
+<a href="{{app_base_url}}/tableau-de-bord/budget-vs-realise" style="background:#0969da; color:#ffffff; padding:8px 16px; border-radius:6px; text-decoration:none; display:inline-block;">Voir le dashboard complet</a>
+</p>
+
+<p style="font-size:12px; color:#656d76; margin-top:16px;">
+Cet email est envoyé automatiquement le 5 de chaque mois à 06:00 (heure serveur). Le contenu reflète l'analyse au moment de l'envoi : <strong>version {{codeVersion}}</strong>, <strong>scenario {{codeScenario}}</strong>.
+</p>

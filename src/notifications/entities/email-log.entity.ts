@@ -56,7 +56,12 @@ export type TypeEvenement =
   // Lot 6.6 — ouverture campagne budgétaire. Notification proactive
   // envoyée aux saisisseurs + validateurs au démarrage officiel de la
   // phase de saisie (BSIC NIGER, Annexe A6 Email N°1).
-  | 'CAMPAGNE_OUVERTE'; // E14
+  | 'CAMPAGNE_OUVERTE' // E14
+  // Lot 8.5.E — alerte mensuelle écarts budget vs réalisé. Cron du
+  // 5 du mois à 06:00 ; payload contient les écarts ATTENTION+CRITIQUE
+  // du mois M-1 (déjà formatés FCFA côté service). Destinataires =
+  // tous les users avec permission REALISE.VALIDER.
+  | 'ALERTE_ECART_REALISE'; // E15
 
 /**
  * email_log (Lot 4.3) — trace de chaque envoi d'email (réel ou

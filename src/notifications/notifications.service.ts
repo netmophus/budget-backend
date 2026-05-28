@@ -86,6 +86,7 @@ const SUJETS: Record<TypeEvenement, string> = {
   DELEGATION_RAPPEL_J3_DELEGATAIRE:
     '[MIZNAS] Délégation reçue : expiration dans 3 jours',
   CAMPAGNE_OUVERTE: '[MIZNAS] Ouverture de la campagne budgétaire',
+  ALERTE_ECART_REALISE: '[MIZNAS] Alertes écarts mensuelles réalisé',
 };
 
 const TEMPLATES: Record<TypeEvenement, string> = {
@@ -102,6 +103,7 @@ const TEMPLATES: Record<TypeEvenement, string> = {
   DELEGATION_RAPPEL_J3_DELEGANT: 'delegation-rappel-delegant',
   DELEGATION_RAPPEL_J3_DELEGATAIRE: 'delegation-rappel-delegataire',
   CAMPAGNE_OUVERTE: 'campagne-ouverte',
+  ALERTE_ECART_REALISE: 'alerte-ecart-realise',
 };
 
 @Injectable()
@@ -273,6 +275,11 @@ export class NotificationsService {
         for (const u of [...saisisseurs, ...validateurs]) dedup.set(u.id, u);
         return [...dedup.values()];
       }
+      case 'ALERTE_ECART_REALISE':
+        // E15 (Lot 8.5.E) — cron mensuel système. Aucun `auteurId` à
+        // exclure : l'alerte vient du système, tous les VALIDER doivent
+        // recevoir le mail (y compris l'admin s'il a la permission).
+        return this.usersAvecPermission('REALISE.VALIDER', undefined);
       default:
         return [];
     }
