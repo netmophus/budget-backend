@@ -93,7 +93,7 @@ export type TypeAction =
   | 'SIGNER_DOCUMENT'
   // Lot 8.5.E — alerte mensuelle écarts réalisé. Code seedé via
   // migration 1779200000410 (AjouterCodeAuditAlerteEcart). Cron du
-  // 5 du mois à 06:00 ; 1 ligne par exécution (récap destinataires +
+  // 5 du mois à 06h00, 1 ligne par exécution (récap destinataires +
   // compteurs ATTENTION/CRITIQUE), `id_cible` = mois M-1 (YYYY-MM).
   | 'ALERTE_ECART_REALISE_ENVOYEE';
 
