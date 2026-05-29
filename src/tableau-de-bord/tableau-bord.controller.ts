@@ -20,9 +20,12 @@ import {
   ApiBearerAuth,
   ApiOkResponse,
   ApiOperation,
+  ApiProduces,
   ApiTags,
 } from '@nestjs/swagger';
 import type { Response } from 'express';
+import { InjectDataSource } from '@nestjs/typeorm';
+import { DataSource } from 'typeorm';
 
 import {
   AiAnalyseRateLimiterService,
@@ -33,9 +36,14 @@ import { AuditService } from '../audit/audit.service';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { AuthUser } from '../auth/decorators/current-user.decorator';
 import { RequirePermissions } from '../auth/decorators/require-permissions.decorator';
-import { EcartsResponseDto, FiltresEcartsDto } from './dto/tableau-bord.dto';
+import {
+  EcartsResponseDto,
+  ExportPdfDto,
+  FiltresEcartsDto,
+} from './dto/tableau-bord.dto';
 import { AnalyseEcartsService } from './services/analyse-ecarts.service';
 import { ExportExcelService } from './services/export-excel.service';
+import { ExportPdfService } from './services/export-pdf.service';
 
 interface AiAnalyseReponseHttp {
   analyse: string;
@@ -58,6 +66,9 @@ export class TableauBordController {
     private readonly anthropicSvc: AnthropicService,
     private readonly aiRateLimiter: AiAnalyseRateLimiterService,
     private readonly auditSvc: AuditService,
+    private readonly exportPdfSvc: ExportPdfService,
+    @InjectDataSource()
+    private readonly dataSource: DataSource,
   ) {}
 
   @Get('budget-vs-realise')
@@ -236,5 +247,148 @@ export class TableauBordController {
         502,
       );
     }
+  }
+
+  // ─── Lot 8.6.B — Export PDF Analyse Budget vs Réalisé ────────────
+  @Post('export-pdf')
+  @HttpCode(HttpStatus.OK)
+  @RequirePermissions({ all: ['BUDGET.LIRE', 'REALISE.LIRE'] })
+  @ApiOperation({
+    summary:
+      'Export PDF du dashboard Budget vs Réalisé. 3 pages compactes (KPI / graphiques natifs / top 10 écarts) + 1 page optionnelle d’analyse MIZNAS AI si le frontend la transmet dans le body. Streamé en attachment (pas de stockage). 1 ligne audit_log EXPORT_PDF_TABLEAU_BORD par appel. Lot 8.6.B.',
+  })
+  @ApiProduces('application/pdf')
+  @ApiOkResponse({
+    description:
+      'PDF binaire (application/pdf), Content-Disposition: attachment ; filename="MIZNAS_AnalyseBudget_<codeVersion>_<periode>_<date>.pdf".',
+  })
+  async exporterPdf(
+    @Body() body: ExportPdfDto,
+    @CurrentUser() user: AuthUser,
+    @Res() res: Response,
+  ): Promise<void> {
+    const start = Date.now();
+    let ecarts: EcartsResponseDto;
+
+    // 1. Récupération des écarts (même appel que l'endpoint GET).
+    try {
+      ecarts = await this.analyseSvc.getBudgetVsRealise(body.filtres, user);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      this.logger.error(`[PDF] Échec récupération écarts : ${msg}`);
+      await this.auditSvc.log({
+        utilisateur: user.email,
+        typeAction: 'EXPORT_PDF_TABLEAU_BORD',
+        entiteCible: 'tableau_bord',
+        idCible: body.filtres.versionId,
+        statut: 'failure',
+        commentaire: 'Échec récupération écarts avant génération PDF.',
+        payloadApres: { etape: 'getBudgetVsRealise' },
+        dureeMs: Date.now() - start,
+      });
+      throw new HttpException(
+        {
+          statusCode: 500,
+          message:
+            "Impossible de récupérer les écarts. Lancez d'abord une analyse classique puis réessayez.",
+        },
+        500,
+      );
+    }
+
+    // 2. Résolution des libellés metadata pour l'en-tête PDF
+    //    (code_version + code_scenario via 2 SELECT légers).
+    let codeVersion = body.filtres.versionId;
+    let codeScenario = body.filtres.scenarioId;
+    try {
+      const versionRows = (await this.analyseSvc['dataSource']?.query<
+        Array<{ code_version: string }>
+      >(`SELECT code_version FROM dim_version WHERE id = $1 LIMIT 1`, [
+        body.filtres.versionId,
+      ])) as Array<{ code_version: string }> | undefined;
+      if (versionRows && versionRows.length > 0) {
+        codeVersion = versionRows[0].code_version;
+      }
+      const scenarioRows = (await this.analyseSvc['dataSource']?.query<
+        Array<{ code_scenario: string }>
+      >(`SELECT code_scenario FROM dim_scenario WHERE id = $1 LIMIT 1`, [
+        body.filtres.scenarioId,
+      ])) as Array<{ code_scenario: string }> | undefined;
+      if (scenarioRows && scenarioRows.length > 0) {
+        codeScenario = scenarioRows[0].code_scenario;
+      }
+    } catch {
+      // Fallback silencieux : on garde les ids comme libellés.
+    }
+
+    // 3. Génération du PDF.
+    let buffer: Buffer;
+    try {
+      buffer = await this.exportPdfSvc.genererPdf(
+        ecarts,
+        {
+          codeVersion,
+          codeScenario,
+          crsLibelles: [], // MVP : pas de libellé CR détaillé dans le header
+          userEmail: user.email,
+        },
+        body.analyseIa,
+      );
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      this.logger.error(`[PDF] Échec génération PDF : ${msg}`);
+      await this.auditSvc.log({
+        utilisateur: user.email,
+        typeAction: 'EXPORT_PDF_TABLEAU_BORD',
+        entiteCible: 'tableau_bord',
+        idCible: body.filtres.versionId,
+        statut: 'failure',
+        commentaire: `Échec génération PDFKit (${msg}).`,
+        payloadApres: { etape: 'genererPdf' },
+        dureeMs: Date.now() - start,
+      });
+      throw new HttpException(
+        {
+          statusCode: 500,
+          message:
+            "Échec de génération PDF. Réessayez ou contactez l'administrateur.",
+        },
+        500,
+      );
+    }
+
+    // 4. Audit succès — récap complet pour traçabilité BCEAO.
+    await this.auditSvc.log({
+      utilisateur: user.email,
+      typeAction: 'EXPORT_PDF_TABLEAU_BORD',
+      entiteCible: 'tableau_bord',
+      idCible: body.filtres.versionId,
+      statut: 'success',
+      commentaire:
+        `Export PDF ${codeVersion} (${body.filtres.moisDebut} → ${body.filtres.moisFin}) ` +
+        `— ${String(ecarts.lignes.length)} ligne(s) analysée(s)` +
+        (body.analyseIa ? ` avec analyse MIZNAS AI` : '') +
+        `, ${String(buffer.length)} octets en ${String(Date.now() - start)} ms.`,
+      payloadApres: {
+        codeVersion,
+        codeScenario,
+        moisDebut: body.filtres.moisDebut,
+        moisFin: body.filtres.moisFin,
+        nbLignesAnalysees: ecarts.lignes.length,
+        avecAnalyseIa: !!body.analyseIa,
+        modeleIa: body.analyseIa?.model,
+        tailleOctets: buffer.length,
+      },
+      dureeMs: Date.now() - start,
+    });
+
+    // 5. Réponse : streaming buffer + Content-Disposition.
+    const today = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+    const safeVersion = codeVersion.replace(/[^A-Za-z0-9._-]/g, '_');
+    const filename = `MIZNAS_AnalyseBudget_${safeVersion}_${body.filtres.moisDebut}_${body.filtres.moisFin}_${today}.pdf`;
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.setHeader('Content-Length', String(buffer.length));
+    res.end(buffer);
   }
 }
