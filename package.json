@@ -40,6 +40,7 @@
     "seed:lot-8-1-a-campagne": "ts-node src/seeds/lot-8-1-a-campagne-test-seed.ts"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.100.1",
     "@nestjs-modules/mailer": "^2.3.4",
     "@nestjs/bullmq": "^11.0.4",
     "@nestjs/common": "^11.0.1",
