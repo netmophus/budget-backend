@@ -95,7 +95,15 @@ export type TypeAction =
   // migration 1779200000410 (AjouterCodeAuditAlerteEcart). Cron du
   // 5 du mois à 06h00, 1 ligne par exécution (récap destinataires +
   // compteurs ATTENTION/CRITIQUE), `id_cible` = mois M-1 (YYYY-MM).
-  | 'ALERTE_ECART_REALISE_ENVOYEE';
+  | 'ALERTE_ECART_REALISE_ENVOYEE'
+  // Lot 8.6.A — analyse MIZNAS AI du dashboard Budget vs Réalisé.
+  // Code seedé via migration 1779200000420 (CreerPermissionAiEtCodeAudit).
+  // 1 ligne par appel POST /tableau-de-bord/analyse-ai contenant
+  // un récap (filtres, modèle, tokens, durée). Le prompt et la
+  // réponse Claude ne sont PAS persistés (volatile côté client).
+  // ATTENTION cf hotfix Lot 8.5.E, ne pas insérer de point-virgule
+  // dans ce commentaire (regex CI fragile).
+  | 'AI_ANALYSE_DEMANDEE';
 
 export type AuditStatut = 'success' | 'failure';
 
