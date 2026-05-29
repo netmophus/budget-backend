@@ -103,7 +103,15 @@ export type TypeAction =
   // réponse Claude ne sont PAS persistés (volatile côté client).
   // ATTENTION cf hotfix Lot 8.5.E, ne pas insérer de point-virgule
   // dans ce commentaire (regex CI fragile).
-  | 'AI_ANALYSE_DEMANDEE';
+  | 'AI_ANALYSE_DEMANDEE'
+  // Lot 8.6.B — export PDF du tableau de bord Budget vs Réalisé.
+  // Code seedé via migration 1779200000430. 1 ligne par appel
+  // POST /tableau-de-bord/export-pdf contenant codeVersion,
+  // codeScenario, periode, nbLignesAnalysees, avecAnalyseIa,
+  // modeleIa, tailleOctets, dureeMs. Le PDF est streamé directement
+  // au client, jamais persisté côté serveur. Pas de point-virgule
+  // dans ce commentaire (regex CI fragile cf hotfix Lot 8.5.E).
+  | 'EXPORT_PDF_TABLEAU_BORD';
 
 export type AuditStatut = 'success' | 'failure';
 

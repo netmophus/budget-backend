@@ -4,8 +4,10 @@ import { AiModule } from '../ai/ai.module';
 import { AuditModule } from '../audit/audit.module';
 import { AuthModule } from '../auth/auth.module';
 import { BudgetModule } from '../budget/budget.module';
+import { ReportingModule } from '../reporting/reporting.module';
 import { AnalyseEcartsService } from './services/analyse-ecarts.service';
 import { ExportExcelService } from './services/export-excel.service';
+import { ExportPdfService } from './services/export-pdf.service';
 import { TableauBordController } from './tableau-bord.controller';
 
 /**
@@ -18,9 +20,15 @@ import { TableauBordController } from './tableau-bord.controller';
  * AuditModule (1 ligne audit_log AI_ANALYSE_DEMANDEE par appel).
  */
 @Module({
-  imports: [AuthModule, BudgetModule, AiModule, AuditModule],
+  imports: [
+    AuthModule,
+    BudgetModule,
+    AiModule,
+    AuditModule,
+    ReportingModule, // Lot 8.6.B — pour PdfBuilderService
+  ],
   controllers: [TableauBordController],
-  providers: [AnalyseEcartsService, ExportExcelService],
+  providers: [AnalyseEcartsService, ExportExcelService, ExportPdfService],
   exports: [AnalyseEcartsService],
 })
 export class TableauBordModule {}

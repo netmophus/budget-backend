@@ -2,12 +2,16 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform, Type } from 'class-transformer';
 import {
   IsArray,
+  IsBoolean,
   IsInt,
+  IsNumber,
   IsOptional,
   IsString,
   Matches,
   Max,
+  MaxLength,
   Min,
+  ValidateNested,
 } from 'class-validator';
 
 /**
@@ -166,4 +170,69 @@ export class EcartsResponseDto {
   kpi!: KpiEcartsDto;
   @ApiProperty({ type: [LigneEcartDto] })
   lignes!: LigneEcartDto[];
+}
+
+/**
+ * Snapshot d'analyse MIZNAS AI inclus dans le body de l'export PDF
+ * (Lot 8.6.B). Optionnel — si absent, le PDF généré n'inclut pas la
+ * page 4 dédiée. Miroir du type frontend `AnalyseAiResponse` (Lot
+ * 8.6.A) auquel on ajoute `generatedAt` (ISO 8601) pour traçabilité
+ * du contexte d'origine de l'analyse.
+ */
+export class AnalyseIaSnapshotDto {
+  @ApiProperty({ description: 'Markdown produit par Claude (ou mock).' })
+  @IsString()
+  @MaxLength(20_000)
+  analyse!: string;
+
+  @ApiProperty()
+  @IsString()
+  @MaxLength(100)
+  model!: string;
+
+  @ApiProperty()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  tokensInput!: number;
+
+  @ApiProperty()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  tokensOutput!: number;
+
+  @ApiProperty()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  dureeMs!: number;
+
+  @ApiProperty()
+  @IsBoolean()
+  dryRun!: boolean;
+
+  @ApiPropertyOptional({ description: 'ISO 8601 du moment de génération.' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(40)
+  generatedAt?: string;
+}
+
+/**
+ * Body de POST /tableau-de-bord/export-pdf (Lot 8.6.B). Combine les
+ * filtres (mêmes champs que GET /budget-vs-realise) + un snapshot
+ * optionnel de l'analyse IA affichée côté UI au moment du clic.
+ */
+export class ExportPdfDto {
+  @ApiProperty({ type: FiltresEcartsDto })
+  @ValidateNested()
+  @Type(() => FiltresEcartsDto)
+  filtres!: FiltresEcartsDto;
+
+  @ApiPropertyOptional({ type: AnalyseIaSnapshotDto })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => AnalyseIaSnapshotDto)
+  analyseIa?: AnalyseIaSnapshotDto;
 }
