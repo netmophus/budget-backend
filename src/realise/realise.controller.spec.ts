@@ -130,6 +130,9 @@ describe('RealiseController', () => {
       nbErreurs: 0,
       erreurs: [],
       lignesIgnorees: [],
+      // Lot 8.5.G — nouveaux champs du rapport.
+      nbLignesSansBudget: 0,
+      lignesSansBudget: [],
     });
     const file = {
       buffer: Buffer.from('x'),

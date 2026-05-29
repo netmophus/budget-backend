@@ -197,4 +197,19 @@ export class RapportImportRealiseDto {
   erreurs!: Array<{ ligne: number; message: string }>;
   @ApiProperty({ type: [Object] })
   lignesIgnorees!: Array<{ ligne: number; raison: string }>;
+  // Lot 8.5.G — warning « ligne réalisé sans budget correspondant ».
+  // Détection version-agnostic : EXISTS dans n'importe quel fait_budget
+  // pour la combinaison (compte, CR, ligne_metier, devise, temps).
+  // La ligne EST quand même créée dans fait_realise (warning ≠ erreur).
+  @ApiProperty({
+    description:
+      'Nombre de lignes importées mais sans budget correspondant dans fait_budget (warning, pas erreur — la ligne est créée quand même). Lot 8.5.G.',
+  })
+  nbLignesSansBudget!: number;
+  @ApiProperty({
+    type: [Object],
+    description:
+      'Détail des lignes importées sans budget correspondant — même forme que erreurs et lignesIgnorees. Lot 8.5.G.',
+  })
+  lignesSansBudget!: Array<{ ligne: number; raison: string }>;
 }

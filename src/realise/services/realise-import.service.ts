@@ -142,6 +142,10 @@ export class RealiseImportService {
       ligne: number;
       raison: string;
     }> = [];
+    // Lot 8.5.G — warning « ligne réalisé sans budget correspondant »
+    // (la ligne est quand même créée dans fait_realise — pour
+    // affichage MANQUANT au dashboard).
+    const lignesSansBudget: Array<{ ligne: number; raison: string }> = [];
     const operations: OperationRealise[] = [];
 
     for (let i = 0; i < rowsBrutes.length; i++) {
@@ -153,6 +157,7 @@ export class RealiseImportService {
         operations,
         erreurs,
         lignesIgnoreesPourPerimetre,
+        lignesSansBudget,
       );
     }
 
@@ -181,6 +186,8 @@ export class RealiseImportService {
       nbErreurs: erreurs.length,
       erreurs,
       lignesIgnorees: [...lignesIgnoreesPourPerimetre, ...ignoreesValides],
+      nbLignesSansBudget: lignesSansBudget.length,
+      lignesSansBudget,
     };
 
     // 8. Audit (récap)
@@ -199,7 +206,8 @@ export class RealiseImportService {
       commentaire:
         `Import réalisé ${file.originalname} — ` +
         `${nbCreees} créée(s), ${nbMisesAJour} maj, ${rapport.nbLignesIgnorees} ignorée(s), ` +
-        `${rapport.nbErreurs} erreur(s).`,
+        `${rapport.nbErreurs} erreur(s), ` +
+        `${rapport.nbLignesSansBudget} sans budget correspondant.`,
     });
 
     return rapport;
@@ -281,6 +289,8 @@ export class RealiseImportService {
     operations: OperationRealise[],
     erreurs: Array<{ ligne: number; message: string }>,
     ignoreesPerimetre: Array<{ ligne: number; raison: string }>,
+    // Lot 8.5.G — warning « ligne sans budget correspondant ».
+    lignesSansBudget: Array<{ ligne: number; raison: string }>,
   ): Promise<void> {
     const parsed = ligneSchema.safeParse(raw);
     if (!parsed.success) {
@@ -375,13 +385,47 @@ export class RealiseImportService {
       return;
     }
 
+    const fkCompte = String(compte[0].id);
+    const fkLigneMetier = String(lm[0].id);
+    const fkDevise = String(dev[0].id);
+    const fkTemps = String(t[0].id);
+
+    // Lot 8.5.G — détection « ligne sans budget correspondant »
+    // (warning, pas erreur). EXISTS dans n'importe quel fait_budget
+    // pour la combinaison (compte + centre + ligne_metier + devise +
+    // temps), sans contrainte sur version/scenario (version-agnostic
+    // — cf. option a décidée dans le brief). Attention asymétrie
+    // historique du projet : fait_budget utilise `fk_centre` alors
+    // que fait_realise utilise `fk_centre_responsabilite`.
+    const budgetMatch = await this.dataSource.query<Array<{ x: number }>>(
+      `SELECT 1 AS x FROM fait_budget
+        WHERE fk_compte = $1
+          AND fk_centre = $2
+          AND fk_ligne_metier = $3
+          AND fk_devise = $4
+          AND fk_temps = $5
+        LIMIT 1`,
+      [fkCompte, fkCentre, fkLigneMetier, fkDevise, fkTemps],
+    );
+    if (budgetMatch.length === 0) {
+      lignesSansBudget.push({
+        ligne: ligneNumero,
+        raison:
+          `Combinaison compte=${data.code_compte} / CR=${data.code_cr} ` +
+          `/ ligne_metier=${data.code_ligne_metier} / mois=${data.mois} ` +
+          `absente de fait_budget.`,
+      });
+      // ⚠️ Pas de return — la ligne reste créée dans fait_realise
+      // (warning ≠ erreur — cf. décision actée Lot 8.5.G).
+    }
+
     operations.push({
       ligneNumero,
       fkCentreResponsabilite: fkCentre,
-      fkCompte: String(compte[0].id),
-      fkLigneMetier: String(lm[0].id),
-      fkTemps: String(t[0].id),
-      fkDevise: String(dev[0].id),
+      fkCompte,
+      fkLigneMetier,
+      fkTemps,
+      fkDevise,
       montant: data.montant,
       mode: data.mode as 'MNT' | 'VOL' | 'UNIT',
       commentaire: data.commentaire,
