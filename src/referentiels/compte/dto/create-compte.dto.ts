@@ -81,10 +81,16 @@ export class CreateCompteDto {
   @MaxLength(20)
   codeCompteParent?: string;
 
-  @ApiProperty({ example: 4, minimum: 1, maximum: 4 })
+  @ApiProperty({
+    example: 4,
+    minimum: 1,
+    maximum: 6,
+    description:
+      'Niveau hiérarchique du compte (1 = classe racine, 6 = compte feuille analytique le plus détaillé selon PCB UMOA Révisé BCEAO).',
+  })
   @IsInt()
   @Min(1)
-  @Max(4)
+  @Max(6)
   niveau!: number;
 
   @ApiPropertyOptional({ enum: SENS_VALUES, example: 'D' })
