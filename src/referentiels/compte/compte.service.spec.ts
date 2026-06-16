@@ -273,6 +273,30 @@ describe('CompteService', () => {
       ).rejects.toThrow(/Incohérence niveau/);
     });
 
+    it('accepte un compte niveau 6 sous un parent niveau 5 (PCB profond, Lot 8.8)', async () => {
+      const id5 = await rawInsert(dataSource, {
+        codeCompte: '60111',
+        classe: '6',
+        niveau: 5,
+        sens: 'D',
+      });
+      await service.createNewVersionCompte(
+        '601111',
+        {
+          libelle: 'Fournitures bureau',
+          classe: '6',
+          niveau: 6,
+          fkCompteParent: id5,
+          sens: 'D',
+        } as Partial<DimCompte>,
+        'tester',
+      );
+      const rows = (await dataSource.query(
+        `SELECT niveau FROM dim_compte WHERE code_compte = '601111' AND version_courante = true`,
+      )) as Array<{ niveau: number }>;
+      expect(rows[0]!.niveau).toBe(6);
+    });
+
     it('rejects when child classe != parent classe', async () => {
       const idP = await rawInsert(dataSource, {
         codeCompte: '6',

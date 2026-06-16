@@ -212,6 +212,33 @@ describe('CompteImportService', () => {
     });
   });
 
+  // ─── Lot 8.8 — profondeur PCB UMOA jusqu'à 6 niveaux
+
+  it('accepte les niveaux 5 et 6 (PCB profond) et rejette niveau 7 (Zod)', async () => {
+    const path = writeCsv('deep.csv', [
+      HEADER,
+      '6,CHARGES,6,,,1,D,,false,false',
+      '60,Charges expl,6,,6,2,D,,false,false',
+      '601,Achats,6,,60,3,D,,false,false',
+      '6011,Achats biens,6,,601,4,D,,false,false',
+      '60111,Achats locaux,6,,6011,5,D,,false,false',
+      '601111,Fournitures bureau,6,,60111,6,D,,true,false',
+      // Niveau 7 : au-delà du PCB UMOA → rejeté par Zod (max 6).
+      '6011117,Trop profond,6,,601111,7,D,,true,false',
+    ]);
+
+    const report = await importService.importCsv(path, 'insert-only', 'tester');
+
+    expect(report.imported).toBe(6);
+    expect(report.errors).toHaveLength(1);
+    expect(report.errors[0]).toMatchObject({ code: 'VALIDATION_ZOD' });
+
+    const deep = (await dataSource.query(
+      `SELECT niveau FROM dim_compte WHERE code_compte = '601111' AND version_courante = true`,
+    )) as Array<{ niveau: number }>;
+    expect(deep[0]!.niveau).toBe(6);
+  });
+
   // ─── Parent inconnu
 
   it('ligne avec parent absent du batch ET de la base → PARENT_INCONNU', async () => {

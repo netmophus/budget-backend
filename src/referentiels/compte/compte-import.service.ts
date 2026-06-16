@@ -86,7 +86,7 @@ const ligneCompteSchema = z.object({
     emptyToUndefined,
     z.string().max(20).optional(),
   ),
-  niveau: z.coerce.number().int().min(1).max(4),
+  niveau: z.coerce.number().int().min(1).max(6),
   sens: z.preprocess(emptyToUndefined, z.enum(['D', 'C', 'M']).optional()),
   code_poste_budgetaire: z.preprocess(
     emptyToUndefined,

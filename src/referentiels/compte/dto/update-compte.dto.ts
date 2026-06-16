@@ -42,11 +42,17 @@ export class UpdateCompteDto {
   @MaxLength(20)
   codeCompteParent?: string;
 
-  @ApiPropertyOptional({ example: 4, minimum: 1, maximum: 4 })
+  @ApiPropertyOptional({
+    example: 4,
+    minimum: 1,
+    maximum: 6,
+    description:
+      'Niveau hiérarchique (1 = classe racine, 6 = feuille analytique la plus détaillée, PCB UMOA Révisé BCEAO).',
+  })
   @IsOptional()
   @IsInt()
   @Min(1)
-  @Max(4)
+  @Max(6)
   niveau?: number;
 
   @ApiPropertyOptional({ enum: SENS_VALUES })
