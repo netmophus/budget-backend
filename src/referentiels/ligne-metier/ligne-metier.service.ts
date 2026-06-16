@@ -82,7 +82,13 @@ export class LigneMetierService extends Scd2Service<DimLigneMetier> {
   async findAllPaginated(
     query: ListLignesMetierQueryDto,
   ): Promise<PaginatedLignesMetierDto> {
-    const qb = this.repo.createQueryBuilder('l');
+    // Lot 8.10 — charge la relation parent pour que `toResponse` peuple
+    // `parentCourant` (sans ce join, la colonne PARENT de la liste reste
+    // vide alors que la donnée existe ; cf. findOneResponse/findCurrentByCode
+    // qui chargent déjà `relations: { parent: true }`).
+    const qb = this.repo
+      .createQueryBuilder('l')
+      .leftJoinAndSelect('l.parent', 'parent');
 
     if (query.versionCouranteUniquement !== false) {
       qb.andWhere('l.versionCourante = :true', { true: true });
