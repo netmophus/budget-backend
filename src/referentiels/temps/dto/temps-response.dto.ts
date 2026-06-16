@@ -39,4 +39,12 @@ export class TempsResponseDto {
 
   @ApiProperty({ example: 'Mai 2026' })
   libelleMois!: string;
+
+  @ApiPropertyOptional({
+    example: 'Aïd el-Fitr 2027',
+    type: String,
+    nullable: true,
+    description: 'Libellé du jour férié (saisi par l’ADMIN). Lot 8.7.A.',
+  })
+  libelleJour!: string | null;
 }

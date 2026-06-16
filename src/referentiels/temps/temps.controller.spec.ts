@@ -49,6 +49,7 @@ describe('TempsController', () => {
       estFinDAnnee: false,
       exerciceFiscal: 2026,
       libelleMois: 'Janv. 2026',
+      libelleJour: null,
     };
     tempsService.findOne.mockResolvedValue(day);
 
@@ -71,6 +72,7 @@ describe('TempsController', () => {
       estFinDAnnee: false,
       exerciceFiscal: 2026,
       libelleMois: 'Mai 2026',
+      libelleJour: null,
     };
     tempsService.findByDate.mockResolvedValue(day);
 

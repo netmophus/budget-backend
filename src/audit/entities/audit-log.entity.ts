@@ -111,7 +111,14 @@ export type TypeAction =
   // modeleIa, tailleOctets, dureeMs. Le PDF est streamé directement
   // au client, jamais persisté côté serveur. Pas de point-virgule
   // dans ce commentaire (regex CI fragile cf hotfix Lot 8.5.E).
-  | 'EXPORT_PDF_TABLEAU_BORD';
+  | 'EXPORT_PDF_TABLEAU_BORD'
+  // Lot 8.7.A — edition du referentiel calendrier (dim_temps). Codes
+  // seedes via migration 1779200000450 (AjouterCodesAuditCalendrier).
+  // MODIFIER_JOUR_CALENDRIER = PATCH d'un jour (id_cible = id du jour)
+  // ETENDRE_CALENDRIER = POST d'extension d'annees (id_cible = null)
+  // Pas de point-virgule dans ce commentaire (regex CI fragile)
+  | 'MODIFIER_JOUR_CALENDRIER'
+  | 'ETENDRE_CALENDRIER';
 
 export type AuditStatut = 'success' | 'failure';
 

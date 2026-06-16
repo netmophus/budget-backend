@@ -38,6 +38,7 @@ import {
 import { DataType, IMemoryDb, newDb } from 'pg-mem';
 import { DataSource, Repository } from 'typeorm';
 
+import { AuditService } from '../../audit/audit.service';
 import { CentreResponsabiliteService } from '../../referentiels/centre-responsabilite/centre-responsabilite.service';
 import { DimCentreResponsabilite } from '../../referentiels/centre-responsabilite/entities/dim-centre-responsabilite.entity';
 import { CompteService } from '../../referentiels/compte/compte.service';
@@ -112,7 +113,12 @@ async function createDataSource(): Promise<DataSource> {
  * donc undefined-cast est sûr ici.
  */
 function buildService(ds: DataSource): FaitBudgetService {
-  const tempsService = new TempsService(ds.getRepository(DimTemps));
+  // Lot 8.7.A — TempsService prend désormais AuditService. Non sollicité
+  // ici (createFromBusinessKeys n'appelle que findValidAt/findCurrent),
+  // donc stub jest sans implémentation.
+  const tempsService = new TempsService(ds.getRepository(DimTemps), {
+    log: jest.fn(),
+  } as unknown as AuditService);
   const structureService = new StructureService(
     ds.getRepository(DimStructure),
     ds,
