@@ -1,16 +1,29 @@
-import { Controller, Get, Param, Query } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Query,
+} from '@nestjs/common';
 import {
   ApiBearerAuth,
+  ApiCreatedResponse,
   ApiOkResponse,
   ApiOperation,
   ApiParam,
   ApiTags,
 } from '@nestjs/swagger';
 
+import { CurrentUser } from '../../auth/decorators/current-user.decorator';
+import type { AuthUser } from '../../auth/decorators/current-user.decorator';
 import { RequirePermissions } from '../../auth/decorators/require-permissions.decorator';
+import { ExtendCalendrierDto } from './dto/extend-calendrier.dto';
 import { ListTempsQueryDto } from './dto/list-temps-query.dto';
 import { PaginatedTempsDto } from './dto/paginated-temps.dto';
 import { TempsResponseDto } from './dto/temps-response.dto';
+import { UpdateJourDto } from './dto/update-jour.dto';
 import { TempsService } from './temps.service';
 
 @ApiTags('referentiels-temps')
@@ -48,5 +61,42 @@ export class TempsController {
   @ApiOkResponse({ type: TempsResponseDto })
   findOne(@Param('id') id: string): Promise<TempsResponseDto> {
     return this.tempsService.findOne(id);
+  }
+
+  @Post('etendre')
+  @RequirePermissions('REFERENTIEL.GERER')
+  @ApiOperation({
+    summary:
+      'Étend le calendrier sur une plage d’années (Lot 8.7.A). Idempotent : les jours déjà présents sont ignorés. Réservé ADMIN (REFERENTIEL.GERER).',
+  })
+  @ApiCreatedResponse({
+    schema: {
+      type: 'object',
+      properties: {
+        nbJoursAjoutes: { type: 'number', example: 730 },
+        message: { type: 'string', example: '730 jours ajoutés au calendrier' },
+      },
+    },
+  })
+  etendreCalendrier(
+    @Body() dto: ExtendCalendrierDto,
+    @CurrentUser() user: AuthUser,
+  ): Promise<{ nbJoursAjoutes: number; message: string }> {
+    return this.tempsService.etendreCalendrier(dto, user);
+  }
+
+  @Patch(':id')
+  @RequirePermissions('REFERENTIEL.GERER')
+  @ApiOperation({
+    summary:
+      'Modifie un jour du calendrier (statut ouvré, fins de période, libellé férié). Lot 8.7.A. Réservé ADMIN (REFERENTIEL.GERER).',
+  })
+  @ApiOkResponse({ type: TempsResponseDto })
+  updateJour(
+    @Param('id') id: string,
+    @Body() dto: UpdateJourDto,
+    @CurrentUser() user: AuthUser,
+  ): Promise<TempsResponseDto> {
+    return this.tempsService.updateJour(id, dto, user);
   }
 }

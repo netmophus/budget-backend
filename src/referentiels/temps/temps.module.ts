@@ -1,13 +1,14 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 
+import { AuditModule } from '../../audit/audit.module';
 import { AuthModule } from '../../auth/auth.module';
 import { DimTemps } from './entities/dim-temps.entity';
 import { TempsController } from './temps.controller';
 import { TempsService } from './temps.service';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([DimTemps]), AuthModule],
+  imports: [TypeOrmModule.forFeature([DimTemps]), AuthModule, AuditModule],
   controllers: [TempsController],
   providers: [TempsService],
   exports: [TempsService],

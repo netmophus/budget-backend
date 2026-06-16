@@ -48,4 +48,16 @@ export class DimTemps {
 
   @Column({ name: 'libelle_mois', type: 'varchar', length: 20 })
   libelleMois!: string;
+
+  // Lot 8.7.A — libellé éditable d'un jour férié (ex. Aïd el-Fitr 2027,
+  // Tabaski, décret présidentiel). Nullable, renseigné à la main par
+  // l'ADMIN via PATCH. Les fériés mobiles ne sont pas calculés (cf.
+  // temps-seed.ts qui ne pose que les 4 fériés fixes UEMOA).
+  @Column({
+    name: 'libelle_jour',
+    type: 'varchar',
+    length: 255,
+    nullable: true,
+  })
+  libelleJour!: string | null;
 }

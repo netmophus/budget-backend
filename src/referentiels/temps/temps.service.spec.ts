@@ -7,8 +7,11 @@ import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { DataType, IMemoryDb, newDb } from 'pg-mem';
 import { DataSource, Repository } from 'typeorm';
 
+import { AuditService } from '../../audit/audit.service';
 import { DimTemps } from './entities/dim-temps.entity';
 import { TempsService } from './temps.service';
+
+const auditMock = { log: jest.fn() } as unknown as AuditService;
 
 function buildMemDb(): IMemoryDb {
   const db = newDb({ autoCreateForeignKeyIndices: true });
@@ -69,7 +72,7 @@ describe('TempsService', () => {
   beforeAll(async () => {
     dataSource = await createDataSource();
     repo = dataSource.getRepository(DimTemps);
-    service = new TempsService(repo);
+    service = new TempsService(repo, auditMock);
   });
 
   afterAll(async () => {
