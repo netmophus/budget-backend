@@ -163,6 +163,23 @@ describe('LigneMetierService', () => {
       expect(roots.map((c) => c.codeLigneMetier)).toEqual(['RETAIL']);
     });
 
+    it('findAllPaginated peuple parentCourant pour les enfants (Lot 8.10)', async () => {
+      const res = await service.findAllPaginated({
+        page: 1,
+        limit: 50,
+      } as never);
+      const byCode = new Map(res.items.map((i) => [i.codeLigneMetier, i]));
+      // Racine : pas de parent.
+      expect(byCode.get('RETAIL')!.parentCourant).toBeUndefined();
+      // Enfants : parentCourant résolu (le bug Lot 8.10 le laissait vide).
+      expect(
+        byCode.get('RETAIL_PARTICULIERS')!.parentCourant?.codeLigneMetier,
+      ).toBe('RETAIL');
+      expect(byCode.get('RETAIL_PRO')!.parentCourant?.codeLigneMetier).toBe(
+        'RETAIL',
+      );
+    });
+
     it('idPro reachable via descendants regardless of insertion order', async () => {
       const descendants = await service.findDescendants(idRetail);
       expect(descendants.some((d) => String(d.id) === idPro)).toBe(true);
