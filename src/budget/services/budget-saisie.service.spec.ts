@@ -2,11 +2,14 @@
  * Tests unitaires des helpers de validation métier du
  * BudgetSaisieService (Lot 3.3, Phase B).
  *
- * Couvre les 4 garde-fous applicatifs :
- *  1. assertCompteFeuille — rejette les comptes agrégés
- *  2. assertTempsPremierDuMois — rejette les dates non-1er du mois
- *  3. assertCrAutorise — rejette si CR hors périmètre RBAC
- *  4. Service composite avec PerimetreService réel (cas admin null)
+ * Couvre les garde-fous applicatifs encore actifs :
+ *  1. assertTempsPremierDuMois — rejette les dates non-1er du mois
+ *  2. assertCrAutorise — rejette si CR hors périmètre RBAC
+ *  3. Service composite avec PerimetreService réel (cas admin null)
+ *
+ * NB : le contrôle « saisie sur compte agrégé interdite »
+ * (assertCompteFeuille) a été levé — politique BSIC NIGER :
+ * parents ET feuilles saisissables.
  */
 import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import { DataType, IMemoryDb, newDb } from 'pg-mem';
@@ -133,32 +136,6 @@ describe('BudgetSaisieService — helpers de validation', () => {
 
   afterAll(async () => {
     await ds.destroy();
-  });
-
-  // ─── assertCompteFeuille
-
-  it('assertCompteFeuille : compte feuille (611100) → OK retourne le compte', async () => {
-    const r = (await ds.query(
-      `SELECT id FROM dim_compte WHERE code_compte='611100'`,
-    )) as Array<{ id: string }>;
-    const compte = await service.assertCompteFeuille(String(r[0]!.id));
-    expect(compte.codeCompte).toBe('611100');
-    expect(compte.estCompteCollectif).toBe(false);
-  });
-
-  it('assertCompteFeuille : compte agrégé (6) → BadRequestException', async () => {
-    const r = (await ds.query(
-      `SELECT id FROM dim_compte WHERE code_compte='6'`,
-    )) as Array<{ id: string }>;
-    await expect(service.assertCompteFeuille(String(r[0]!.id))).rejects.toThrow(
-      /Saisie sur compte agrégé interdite/,
-    );
-  });
-
-  it('assertCompteFeuille : compte inexistant → NotFoundException', async () => {
-    await expect(service.assertCompteFeuille('999999')).rejects.toThrow(
-      NotFoundException,
-    );
   });
 
   // ─── assertTempsPremierDuMois
