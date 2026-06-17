@@ -108,7 +108,9 @@ export class CompteService extends Scd2Service<DimCompte> {
       });
     }
     if (query.search) {
-      qb.andWhere('c.libelle ILIKE :search', {
+      // Recherche par CODE ou LIBELLÉ (autocomplétion compte de la saisie
+      // budgétaire hybride). Auparavant : libellé seul.
+      qb.andWhere('(c.libelle ILIKE :search OR c.codeCompte ILIKE :search)', {
         search: `%${query.search}%`,
       });
     }

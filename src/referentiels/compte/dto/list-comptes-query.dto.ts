@@ -74,7 +74,8 @@ export class ListComptesQueryDto {
   classes?: string[];
 
   @ApiPropertyOptional({
-    description: 'Filtre LIKE %libelle% case-insensitive.',
+    description:
+      'Filtre ILIKE %terme% case-insensitive sur le CODE ou le LIBELLÉ du compte.',
   })
   @IsOptional()
   @IsString()

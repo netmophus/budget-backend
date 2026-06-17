@@ -203,6 +203,43 @@ describe('CompteService', () => {
     });
   });
 
+  // ─── findAllPaginated — recherche code/libellé (saisie hybride)
+
+  describe('findAllPaginated (search)', () => {
+    beforeEach(async () => {
+      await rawInsert(dataSource, {
+        codeCompte: '601100',
+        libelle: 'Achats matières',
+        classe: '6',
+        niveau: 1,
+      });
+      await rawInsert(dataSource, {
+        codeCompte: '611100',
+        libelle: 'Salaires bruts',
+        classe: '6',
+        niveau: 1,
+      });
+    });
+
+    it('recherche par CODE (ILIKE)', async () => {
+      const res = await service.findAllPaginated({
+        page: 1,
+        limit: 50,
+        search: '6011',
+      } as never);
+      expect(res.items.map((c) => c.codeCompte)).toEqual(['601100']);
+    });
+
+    it('recherche par LIBELLÉ (ILIKE, insensible casse)', async () => {
+      const res = await service.findAllPaginated({
+        page: 1,
+        limit: 50,
+        search: 'salaires',
+      } as never);
+      expect(res.items.map((c) => c.codeCompte)).toEqual(['611100']);
+    });
+  });
+
   // ─── validateNoCycle
 
   describe('validateNoCycle', () => {
