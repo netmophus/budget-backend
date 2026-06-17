@@ -377,10 +377,10 @@ describe('BudgetImportService', () => {
       'BR_CIV,760000,RETAIL_PARTICULIERS,2027-01,MONTANT,5000,,,',
       'BR_BFA,611100,RETAIL_PARTICULIERS,2027-01,MONTANT,800,,,',
       'BR_BFA,670000,RETAIL_PARTICULIERS,2027-01,MONTANT,300,,,',
-      // 3 KO :
+      // 2 KO + 1 ex-agrégé (600000) désormais valide (politique BSIC) :
       'BR_INCONNU,611100,RETAIL_PARTICULIERS,2027-01,MONTANT,500,,,', // CR_INTROUVABLE
       'BR_CIV,999999,RETAIL_PARTICULIERS,2027-01,MONTANT,500,,,', // COMPTE_INTROUVABLE
-      'BR_CIV,600000,RETAIL_PARTICULIERS,2027-01,MONTANT,500,,,', // COMPTE_AGREGE
+      'BR_CIV,600000,RETAIL_PARTICULIERS,2027-01,MONTANT,500,,,', // agrégé → importé
     ]);
     const r = await service.importFichier(
       file,
@@ -389,15 +389,16 @@ describe('BudgetImportService', () => {
       adminUser,
     );
     expect(r.lignesTotal).toBe(8);
-    expect(r.lignesValides).toBe(5);
-    expect(r.lignesRejetees).toBe(3);
-    // Le taux d'erreurs = 3/8 = 37.5 % > 10 % → rollback
+    // 600000 (agrégé) est désormais valide → 6 valides / 2 rejetées.
+    expect(r.lignesValides).toBe(6);
+    expect(r.lignesRejetees).toBe(2);
+    // Le taux d'erreurs = 2/8 = 25 % > 10 % → rollback
     expect(r.transactionRollback).toBe(true);
     expect(r.lignesInserees).toBe(0);
     const codes = r.erreurs.map((e) => e.code);
     expect(codes).toContain('CR_INTROUVABLE');
     expect(codes).toContain('COMPTE_INTROUVABLE');
-    expect(codes).toContain('COMPTE_AGREGE');
+    expect(codes).not.toContain('COMPTE_AGREGE');
   });
 
   it('CR hors périmètre → rejet ligne par ligne (CR_PERIMETRE_REFUSE)', async () => {
@@ -555,7 +556,7 @@ describe('BudgetImportService', () => {
     expect(Number(inserted[0]!.montant_devise)).toBe(6000);
   });
 
-  it('compte agrégé → COMPTE_AGREGE error', async () => {
+  it('compte agrégé → importé (parents saisissables, politique BSIC)', async () => {
     const file = csv([
       HEADER,
       'BR_CIV,600000,RETAIL_PARTICULIERS,2027-01,MONTANT,1000,,,',
@@ -566,8 +567,9 @@ describe('BudgetImportService', () => {
       ids.scenarioId,
       adminUser,
     );
-    expect(r.lignesRejetees).toBe(1);
-    expect(r.erreurs[0]!.code).toBe('COMPTE_AGREGE');
+    expect(r.lignesValides).toBe(1);
+    expect(r.lignesRejetees).toBe(0);
+    expect(r.erreurs.map((e) => e.code)).not.toContain('COMPTE_AGREGE');
   });
 
   it('mois inconnu (dim_temps absent) → TEMPS_INTROUVABLE', async () => {

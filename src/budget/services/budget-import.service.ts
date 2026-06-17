@@ -449,17 +449,8 @@ export class BudgetImportService {
       });
       return;
     }
-    if (compte[0].est_compte_collectif) {
-      erreurs.push({
-        ligneNumero,
-        code: 'COMPTE_AGREGE',
-        message:
-          `Saisie sur compte agrégé interdite : '${data.code_compte}' ` +
-          `est est_compte_collectif=true.`,
-        valeurFournie: data.code_compte,
-      });
-      return;
-    }
+    // Politique BSIC NIGER : plus de restriction parents/feuilles —
+    // les comptes agrégés sont importables comme les feuilles.
     const fkCompte = String(compte[0].id);
 
     // Résolution FK Ligne métier

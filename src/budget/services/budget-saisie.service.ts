@@ -70,23 +70,9 @@ export class BudgetSaisieService {
 
   // ─── Helpers de validation métier (Lot 3.3) ───────────────────────
 
-  /**
-   * Garantit que le compte cible est une feuille saisissable
-   * (`est_compte_collectif=false`). Lance BadRequest sinon.
-   */
-  async assertCompteFeuille(fkCompte: string): Promise<DimCompte> {
-    const compte = await this.compteRepo.findOne({ where: { id: fkCompte } });
-    if (!compte) {
-      throw new NotFoundException(`Compte ${fkCompte} introuvable.`);
-    }
-    if (compte.estCompteCollectif) {
-      throw new BadRequestException(
-        `Saisie sur compte agrégé interdite. Le compte ${compte.codeCompte} ` +
-          `est marqué est_compte_collectif=true. Choisir un compte feuille.`,
-      );
-    }
-    return compte;
-  }
+  // NB : la restriction « saisie sur compte agrégé interdite » a été
+  // levée (politique BSIC NIGER : parents ET feuilles saisissables).
+  // L'ancien helper assertCompteFeuille a été supprimé avec ce contrôle.
 
   /**
    * Garantit que la maille budgétaire est mensuelle (jour=1 dans
@@ -207,11 +193,11 @@ export class BudgetSaisieService {
       );
     }
 
-    // 4. Charger les comptes feuilles (option : filtre par classe)
+    // 4. Charger les comptes saisissables (politique BSIC : parents +
+    //    feuilles, plus de filtre est_compte_collectif). Option : classe.
     const compteQb = this.compteRepo
       .createQueryBuilder('c')
-      .where('c.estCompteCollectif = :collectif', { collectif: false })
-      .andWhere('c.versionCourante = :vc', { vc: true })
+      .where('c.versionCourante = :vc', { vc: true })
       .andWhere('c.estActif = :ea', { ea: true });
     if (query.classeCompte) {
       compteQb.andWhere('c.classe = :cl', { cl: query.classeCompte });
@@ -491,18 +477,6 @@ export class BudgetSaisieService {
               mois: c.mois,
               message: `Compte ${ligne.compteId} introuvable.`,
               code: 'COMPTE_INCONNU',
-            });
-            totalCellules++;
-          }
-          continue;
-        }
-        if (compte.estCompteCollectif) {
-          for (const c of ligne.cellules) {
-            erreurs.push({
-              ligneIndex: i,
-              mois: c.mois,
-              message: `Compte ${compte.codeCompte} agrégé : saisie interdite.`,
-              code: 'COMPTE_AGREGE',
             });
             totalCellules++;
           }
