@@ -8,7 +8,13 @@ export type TypeVersion =
   // Lot 5.3 — reforecast trimestriel publication-écrasement.
   | 'reforecast';
 
-export type StatutVersion = 'ouvert' | 'soumis' | 'valide' | 'gele';
+export type StatutVersion =
+  | 'ouvert'
+  | 'soumis' // legacy (workflow version-globale, conservé en coexistence)
+  | 'pre_valide' // Lot workflow CR : tous les CR attendus validés
+  | 'soumis_comite' // Lot workflow CR : soumis au Comité par le Coordinateur
+  | 'valide'
+  | 'gele';
 
 /**
  * Statut de cycle de vie de publication (Lot 5.3). Distinct du

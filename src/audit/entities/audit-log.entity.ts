@@ -118,7 +118,20 @@ export type TypeAction =
   // ETENDRE_CALENDRIER = POST d'extension d'annees (id_cible = null)
   // Pas de point-virgule dans ce commentaire (regex CI fragile)
   | 'MODIFIER_JOUR_CALENDRIER'
-  | 'ETENDRE_CALENDRIER';
+  | 'ETENDRE_CALENDRIER'
+  // Lot workflow par CR — transitions CR + soumission au Comite
+  // Codes seedes en base via migration 1779200000500
+  | 'SOUMETTRE_CR'
+  | 'VALIDER_CR'
+  | 'REJETER_CR'
+  | 'ROUVRIR_CR'
+  | 'SOUMETTRE_COMITE'
+  // Lot workflow par CR palier 3 — automation version + snapshot
+  // Codes seedes en base via migration 1779200000510
+  | 'PRE_VALIDER_VERSION'
+  | 'REOUVRIR_VERSION'
+  | 'INIT_SNAPSHOT_CR'
+  | 'RETIRER_CR_SNAPSHOT';
 
 export type AuditStatut = 'success' | 'failure';
 

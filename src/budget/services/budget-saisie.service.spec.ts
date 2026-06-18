@@ -12,6 +12,7 @@
  * parents ET feuilles saisissables.
  */
 import { ForbiddenException, NotFoundException } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { DataType, IMemoryDb, newDb } from 'pg-mem';
 import { DataSource } from 'typeorm';
 
@@ -35,8 +36,29 @@ import { RolePermission } from '../../roles/entities/role-permission.entity';
 import { User } from '../../users/entities/user.entity';
 import { UserPerimetre } from '../../users/entities/user-perimetre.entity';
 import { UserRole } from '../../users/entities/user-role.entity';
+import { CrWorkflowService } from '../cr-workflow/cr-workflow.service';
+import { DimVersionCrAttendu } from '../cr-workflow/entities/dim-version-cr-attendu.entity';
+import { FaitBudgetCrStatut } from '../cr-workflow/entities/fait-budget-cr-statut.entity';
 import { BudgetSaisieService } from './budget-saisie.service';
 import { PerimetreService } from './perimetre.service';
+
+/** Construit un CrWorkflowService minimal pour injecter le verrou. */
+function buildCrWorkflow(
+  ds: DataSource,
+  perim: PerimetreService,
+  audit: AuditService,
+): CrWorkflowService {
+  return new CrWorkflowService(
+    ds.getRepository(FaitBudgetCrStatut),
+    ds.getRepository(DimVersion),
+    ds.getRepository(DimCentreResponsabilite),
+    ds.getRepository(DimVersionCrAttendu),
+    ds,
+    perim,
+    audit,
+    { emit: jest.fn() } as unknown as EventEmitter2,
+  );
+}
 
 function buildMemDb(): IMemoryDb {
   const db = newDb({ autoCreateForeignKeyIndices: true });
@@ -78,6 +100,8 @@ async function createDataSource(): Promise<DataSource> {
       DimScenario,
       FaitBudget,
       AuditLog,
+      FaitBudgetCrStatut,
+      DimVersionCrAttendu,
     ],
     synchronize: true,
   });
@@ -112,6 +136,7 @@ describe('BudgetSaisieService — helpers de validation', () => {
       auditService,
       ds,
       permissionsServiceMock,
+      buildCrWorkflow(ds, perimetreService, auditService),
     );
 
     // Seed minimal : 1 compte feuille, 1 compte agrégé, 1 temps 1er, 1 temps mid
@@ -194,7 +219,7 @@ describe('BudgetSaisieService — helpers de validation', () => {
 });
 
 describe('BudgetSaisieService — wiring', () => {
-  it('le service est instanciable avec ses 9 dépendances', () => {
+  it('le service est instanciable avec ses dépendances (verrou CR inclus)', () => {
     // Smoke instantiation : on ne ré-instancie pas le DataSource ici,
     // ce test garantit juste que le constructeur compile.
     expect(BudgetSaisieService).toBeDefined();
@@ -235,6 +260,7 @@ describe('BudgetSaisieService — grille from-scratch (Lot 3.4-bis)', () => {
       audit,
       ds,
       permissionsServiceMock,
+      buildCrWorkflow(ds, perim, audit),
     );
 
     // 1 user admin global (rôle 'global' → null filter)

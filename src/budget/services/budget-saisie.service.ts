@@ -38,6 +38,7 @@ import { DimScenario } from '../../referentiels/scenario/entities/dim-scenario.e
 import { DimVersion } from '../../referentiels/version/entities/dim-version.entity';
 import { FaitBudget } from '../../faits/budget/entities/fait-budget.entity';
 import type { ModeSaisieFaitBudget } from '../../faits/budget/entities/fait-budget.entity';
+import { CrWorkflowService } from '../cr-workflow/cr-workflow.service';
 import { PerimetreService } from './perimetre.service';
 import {
   CelluleGrilleDto,
@@ -66,6 +67,7 @@ export class BudgetSaisieService {
     private readonly auditService: AuditService,
     private readonly dataSource: DataSource,
     private readonly permissionsService: PermissionsService,
+    private readonly crWorkflowService: CrWorkflowService,
   ) {}
 
   // ─── Helpers de validation métier (Lot 3.3) ───────────────────────
@@ -460,6 +462,14 @@ export class BudgetSaisieService {
 
     // 5. Tout en transaction
     await this.dataSource.transaction(async (manager) => {
+      // Verrou workflow par CR : refuse si le CR est SOUMIS/VALIDE,
+      // et auto-crée la ligne statut EN_SAISIE à la 1ʳᵉ saisie.
+      await this.crWorkflowService.assertCrModifiable(
+        manager,
+        dto.versionId,
+        dto.crId,
+      );
+
       const faitRepoTx = manager.getRepository(FaitBudget);
       const compteRepoTx = manager.getRepository(DimCompte);
       const tempsRepoTx = manager.getRepository(DimTemps);
