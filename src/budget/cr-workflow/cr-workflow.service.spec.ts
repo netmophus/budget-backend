@@ -11,6 +11,7 @@
  * (périmètre [CR_A, CR_B]).
  */
 import { ConflictException, ForbiddenException } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { DataType, IMemoryDb, newDb } from 'pg-mem';
 import { DataSource } from 'typeorm';
 
@@ -111,9 +112,11 @@ describe('CrWorkflowService', () => {
       ds.getRepository(FaitBudgetCrStatut),
       ds.getRepository(DimVersion),
       ds.getRepository(DimCentreResponsabilite),
+      ds.getRepository(DimVersionCrAttendu),
       ds,
       perimetreService,
       auditService,
+      { emit: jest.fn() } as unknown as EventEmitter2,
     );
 
     // Structure + 2 CR
@@ -190,6 +193,22 @@ describe('CrWorkflowService', () => {
         [uid, ids.role],
       );
     }
+    // Rôle SAISISSEUR pour le saisisseur (initialiserSnapshot filtre dessus).
+    await ds.query(
+      `INSERT INTO ref_role
+        ("code_role","libelle","description","est_actif","utilisateur_creation")
+       VALUES ('SAISISSEUR','Saisisseur',NULL,true,'system')`,
+    );
+    const roleSais = await scalar(
+      `SELECT id FROM ref_role WHERE code_role='SAISISSEUR'`,
+    );
+    await ds.query(
+      `INSERT INTO bridge_user_role
+        ("fk_user","fk_role","perimetre_type","est_actif","utilisateur_creation")
+       VALUES ($1,$2,'global',true,'system')`,
+      [ids.uSaisisseur, roleSais],
+    );
+
     // Saisisseur → [CR_A] ; Validateur → [CR_A, CR_B]
     await ds.query(
       `INSERT INTO user_perimetres
@@ -403,5 +422,76 @@ describe('CrWorkflowService', () => {
     );
     expect(v.statut).toBe('soumis_comite');
     expect(await auditCount('SOUMETTRE_COMITE')).toBe(1);
+  });
+
+  // ─── Palier 3 : verrou + automation + snapshot ──────────────────
+
+  it('verrou : CR VALIDE → CR_VERROUILLE ; CR sans statut → auto-crée EN_SAISIE', async () => {
+    await ds.query(`DELETE FROM fait_budget_cr_statut`);
+    await ds.query(`UPDATE dim_version SET statut='ouvert' WHERE id=$1`, [
+      ids.version,
+    ]);
+    await ds.query(
+      `INSERT INTO fait_budget_cr_statut (fk_version,fk_cr,statut) VALUES ($1,$2,'VALIDE')`,
+      [ids.version, ids.crA],
+    );
+    await expect(
+      ds.transaction((m) =>
+        service.assertCrModifiable(m, ids.version, ids.crA),
+      ),
+    ).rejects.toThrow(ForbiddenException);
+    // CR_B sans ligne statut → création paresseuse EN_SAISIE.
+    await ds.transaction((m) =>
+      service.assertCrModifiable(m, ids.version, ids.crB),
+    );
+    const r = (await ds.query(
+      `SELECT statut FROM fait_budget_cr_statut WHERE fk_version=$1 AND fk_cr=$2`,
+      [ids.version, ids.crB],
+    )) as Array<{ statut: string }>;
+    expect(r[0]!.statut).toBe('EN_SAISIE');
+  });
+
+  it('automation : dernière validation → version PRE_VALIDE + audit', async () => {
+    await ds.query(`DELETE FROM fait_budget_cr_statut`);
+    await ds.query(`UPDATE dim_version SET statut='ouvert' WHERE id=$1`, [
+      ids.version,
+    ]);
+    await ds.query(
+      `INSERT INTO fait_budget_cr_statut (fk_version,fk_cr,statut) VALUES ($1,$2,'VALIDE')`,
+      [ids.version, ids.crA],
+    );
+    await ds.query(
+      `INSERT INTO fait_budget_cr_statut (fk_version,fk_cr,statut) VALUES ($1,$2,'SOUMIS')`,
+      [ids.version, ids.crB],
+    );
+    await service.valider(ids.version, 'CR_B', undefined, validateur);
+    const v = (await ds.query(`SELECT statut FROM dim_version WHERE id=$1`, [
+      ids.version,
+    ])) as Array<{ statut: string }>;
+    expect(v[0]!.statut).toBe('pre_valide');
+    expect(await auditCount('PRE_VALIDER_VERSION')).toBe(1);
+  });
+
+  it('automation : réouverture d’un CR → version repasse OUVERT + audit', async () => {
+    // Version PRE_VALIDE + CR_B VALIDE par `validateur` (test précédent).
+    const res = await service.rouvrir(
+      ids.version,
+      'CR_B',
+      'correction',
+      validateur,
+    );
+    expect(res.statut).toBe('EN_SAISIE');
+    const v = (await ds.query(`SELECT statut FROM dim_version WHERE id=$1`, [
+      ids.version,
+    ])) as Array<{ statut: string }>;
+    expect(v[0]!.statut).toBe('ouvert');
+    expect(await auditCount('REOUVRIR_VERSION')).toBe(1);
+  });
+
+  it('initialiserSnapshot : peuple depuis les périmètres SAISISSEUR + idempotent', async () => {
+    const r1 = await service.initialiserSnapshot(ids.version, validateur);
+    expect(r1.total).toBeGreaterThanOrEqual(1); // CR_A (périmètre saisisseur)
+    const r2 = await service.initialiserSnapshot(ids.version, validateur);
+    expect(r2.ajoutes).toBe(0); // idempotent
   });
 });

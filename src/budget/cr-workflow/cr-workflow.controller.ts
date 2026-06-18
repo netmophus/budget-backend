@@ -36,6 +36,7 @@ import {
 import {
   CrContexteQueryDto,
   RejeterCrDto,
+  RetirerCrSnapshotDto,
   RouvrirCrDto,
   SoumettreComiteDto,
   SoumettreCrDto,
@@ -151,6 +152,38 @@ export class CrWorkflowController {
     @Param('versionId') versionId: string,
   ): Promise<StatutsCrsResponseDto> {
     return this.service.getStatutsCrs(versionId);
+  }
+
+  @Post('version/:versionId/initialiser-snapshot')
+  @HttpCode(HttpStatus.OK)
+  @RequirePermissions('BUDGET.COORDONNER')
+  @ApiOperation({
+    summary:
+      'Initialise le snapshot des CR attendus (union des périmètres ' +
+      'SAISISSEUR actifs). Idempotent. Réservé au Coordinateur.',
+  })
+  initialiserSnapshot(
+    @Param('versionId') versionId: string,
+    @CurrentUser() user: AuthUser,
+  ): Promise<{ ajoutes: number; total: number }> {
+    return this.service.initialiserSnapshot(versionId, user);
+  }
+
+  @Post('version/:versionId/cr/:crCode/retirer-snapshot')
+  @HttpCode(HttpStatus.OK)
+  @RequirePermissions('BUDGET.COORDONNER')
+  @ApiOperation({
+    summary:
+      'Retire un CR du snapshot des CR attendus (actif=false, tracé). ' +
+      'Cas exceptionnel. Réservé au Coordinateur.',
+  })
+  retirerCrSnapshot(
+    @Param('versionId') versionId: string,
+    @Param('crCode') crCode: string,
+    @Body() dto: RetirerCrSnapshotDto,
+    @CurrentUser() user: AuthUser,
+  ): Promise<{ crCode: string; retire: boolean }> {
+    return this.service.retirerCrSnapshot(versionId, crCode, dto.motif, user);
   }
 }
 

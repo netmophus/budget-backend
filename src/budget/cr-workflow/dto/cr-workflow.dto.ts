@@ -76,6 +76,18 @@ export class RouvrirCrDto {
   motif!: string;
 }
 
+export class RetirerCrSnapshotDto {
+  @ApiProperty({
+    example: 'CR sans activité budgétaire cette année (décision Comité).',
+    description: 'Motif du retrait du CR du snapshot (obligatoire, tracé).',
+    maxLength: 2000,
+  })
+  @IsString()
+  @IsNotEmpty({ message: 'Le motif de retrait est obligatoire.' })
+  @MaxLength(2000)
+  motif!: string;
+}
+
 export class SoumettreComiteDto {
   @ApiPropertyOptional({
     example: 'Tous les CR validés — transmission au Comité budgétaire.',

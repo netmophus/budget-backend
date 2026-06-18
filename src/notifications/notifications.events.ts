@@ -24,6 +24,28 @@ export const EVENT_AFFECTATION_CREATED = 'affectation.created';
 // A6 Email N°1). Déclenchée par POST /admin/campagnes/:versionId/ouvrir.
 export const EVENT_CAMPAGNE_OUVERTE = 'campagne.ouverte';
 
+// Lot workflow par CR — 6 événements du cycle de validation par CR.
+// Émis par CrWorkflowService ; les listeners email sont câblés dans un
+// sous-lot dédié (templates + résolution destinataires).
+export const EVENT_CR_SUBMITTED = 'cr.submitted'; // → validateur
+export const EVENT_CR_VALIDATED = 'cr.validated'; // → saisisseur
+export const EVENT_CR_REJECTED = 'cr.rejected'; // → saisisseur (motif)
+export const EVENT_CR_REOPENED = 'cr.reopened'; // → saisisseur (motif)
+export const EVENT_VERSION_PRE_VALIDATED = 'version.prevalidated'; // → coordinateur
+export const EVENT_VERSION_SUBMITTED_COMITE = 'version.submitted_comite'; // → comité
+
+/** Payload des événements de transition par CR. */
+export interface CrWorkflowEventPayload {
+  versionId: string;
+  codeVersion: string;
+  crCode: string;
+  crId: string;
+  auteurEmail: string;
+  auteurId: string;
+  motif?: string | null;
+  commentaire?: string | null;
+}
+
 export interface BudgetEventPayload {
   versionId: string;
   codeVersion: string;

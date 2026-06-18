@@ -125,7 +125,13 @@ export type TypeAction =
   | 'VALIDER_CR'
   | 'REJETER_CR'
   | 'ROUVRIR_CR'
-  | 'SOUMETTRE_COMITE';
+  | 'SOUMETTRE_COMITE'
+  // Lot workflow par CR palier 3 — automation version + snapshot
+  // Codes seedes en base via migration 1779200000510
+  | 'PRE_VALIDER_VERSION'
+  | 'REOUVRIR_VERSION'
+  | 'INIT_SNAPSHOT_CR'
+  | 'RETIRER_CR_SNAPSHOT';
 
 export type AuditStatut = 'success' | 'failure';
 

@@ -9,9 +9,9 @@
  * appartenance du CR au périmètre de l'utilisateur (PerimetreService,
  * role-agnostic : 1 CR pour un saisisseur, 5-6 pour un validateur).
  *
- * NB palier 2 : PAS d'automation (bascule auto OUVERT→PRE_VALIDE à la
- * dernière validation) ni de verrou de saisie — ce sont des hooks
- * laissés explicites pour le palier 3.
+ * Palier 3 : automation (bascule auto OUVERT↔PRE_VALIDE selon le
+ * snapshot), verrou de saisie (assertCrModifiable), gestion du snapshot
+ * des CR attendus, et émission des 6 événements (emails câblés à part).
  */
 import {
   ConflictException,
@@ -20,12 +20,22 @@ import {
   NotFoundException,
   UnprocessableEntityException,
 } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, EntityManager, Repository } from 'typeorm';
 
 import { AuditService } from '../../audit/audit.service';
 import type { TypeAction } from '../../audit/entities/audit-log.entity';
 import type { AuthUser } from '../../auth/decorators/current-user.decorator';
+import {
+  type CrWorkflowEventPayload,
+  EVENT_CR_REJECTED,
+  EVENT_CR_REOPENED,
+  EVENT_CR_SUBMITTED,
+  EVENT_CR_VALIDATED,
+  EVENT_VERSION_PRE_VALIDATED,
+  EVENT_VERSION_SUBMITTED_COMITE,
+} from '../../notifications/notifications.events';
 import { DimCentreResponsabilite } from '../../referentiels/centre-responsabilite/entities/dim-centre-responsabilite.entity';
 import { DimVersion } from '../../referentiels/version/entities/dim-version.entity';
 import { PerimetreService } from '../services/perimetre.service';
@@ -33,6 +43,7 @@ import {
   CrStatutResponseDto,
   StatutsCrsResponseDto,
 } from './dto/cr-statut-response.dto';
+import { DimVersionCrAttendu } from './entities/dim-version-cr-attendu.entity';
 import {
   FaitBudgetCrStatut,
   type StatutCrSaisie,
@@ -47,10 +58,33 @@ export class CrWorkflowService {
     private readonly versionRepo: Repository<DimVersion>,
     @InjectRepository(DimCentreResponsabilite)
     private readonly crRepo: Repository<DimCentreResponsabilite>,
+    @InjectRepository(DimVersionCrAttendu)
+    private readonly attenduRepo: Repository<DimVersionCrAttendu>,
     private readonly dataSource: DataSource,
     private readonly perimetreService: PerimetreService,
     private readonly auditService: AuditService,
+    private readonly events: EventEmitter2,
   ) {}
+
+  private emit(
+    event: string,
+    versionId: string,
+    codeVersion: string,
+    cr: { id: string; codeCr: string },
+    user: AuthUser,
+    extra: { motif?: string | null; commentaire?: string | null } = {},
+  ): void {
+    this.events.emit(event, {
+      versionId: String(versionId),
+      codeVersion,
+      crCode: cr.codeCr,
+      crId: String(cr.id),
+      auteurEmail: user.email,
+      auteurId: String(user.userId),
+      motif: extra.motif ?? null,
+      commentaire: extra.commentaire ?? null,
+    } satisfies CrWorkflowEventPayload);
+  }
 
   // ─── Helpers de résolution + garde-fous ───────────────────────────
 
@@ -200,6 +234,9 @@ export class CrWorkflowService {
         },
         `Soumission du CR ${cr.codeCr} (version ${version.codeVersion}).`,
       );
+      this.emit(EVENT_CR_SUBMITTED, versionId, version.codeVersion, cr, user, {
+        commentaire,
+      });
       return this.toResponse(saved, cr);
     });
   }
@@ -246,9 +283,13 @@ export class CrWorkflowService {
         },
         `Validation du CR ${cr.codeCr} (version ${version.codeVersion}).`,
       );
+      this.emit(EVENT_CR_VALIDATED, versionId, version.codeVersion, cr, user, {
+        commentaire,
+      });
 
-      // PALIER 3 (automation) : si tous les CR attendus du snapshot sont
-      // VALIDE → bascule auto de la version OUVERT → PRE_VALIDE.
+      // Automation : si tous les CR attendus (snapshot actif) sont
+      // VALIDE → bascule OUVERT → PRE_VALIDE.
+      await this.basculerVersionSiTousValides(m, version, user);
       return this.toResponse(saved, cr);
     });
   }
@@ -294,6 +335,9 @@ export class CrWorkflowService {
         },
         `Rejet du CR ${cr.codeCr} (version ${version.codeVersion}) : ${motif.slice(0, 200)}`,
       );
+      this.emit(EVENT_CR_REJECTED, versionId, version.codeVersion, cr, user, {
+        motif,
+      });
       return this.toResponse(saved, cr);
     });
   }
@@ -357,8 +401,36 @@ export class CrWorkflowService {
         },
         `Réouverture du CR ${cr.codeCr} (version ${version.codeVersion}) : ${motif.slice(0, 200)}`,
       );
+      this.emit(EVENT_CR_REOPENED, versionId, version.codeVersion, cr, user, {
+        motif,
+      });
 
-      // PALIER 3 (automation) : si la version était PRE_VALIDE → OUVERT.
+      // Automation : un CR validé redevient EN_SAISIE → si la version
+      // était PRE_VALIDE, elle repasse OUVERT.
+      if (version.statut === 'pre_valide') {
+        await m.getRepository(DimVersion).update(
+          { id: String(versionId) },
+          {
+            statut: 'ouvert',
+            dateModification: new Date(),
+            utilisateurModification: user.email,
+          },
+        );
+        await this.audit(
+          m,
+          user,
+          'REOUVRIR_VERSION',
+          'dim_version',
+          String(versionId),
+          {
+            codeVersion: version.codeVersion,
+            statutAvant: 'pre_valide',
+            statutApres: 'ouvert',
+            declencheur: cr.codeCr,
+          },
+          `Réouverture auto de ${version.codeVersion} (CR ${cr.codeCr} rouvert).`,
+        );
+      }
       return this.toResponse(saved, cr);
     });
   }
@@ -489,7 +561,218 @@ export class CrWorkflowService {
         },
         `Soumission au Comité de ${v.codeVersion}.`,
       );
+      this.events.emit(EVENT_VERSION_SUBMITTED_COMITE, {
+        versionId: String(versionId),
+        codeVersion: v.codeVersion,
+        auteurEmail: user.email,
+        auteurId: String(user.userId),
+        commentaire: commentaire ?? null,
+      });
       return saved;
+    });
+  }
+
+  // ─── Automation : bascule version selon l'état du snapshot ─────────
+
+  /**
+   * Compte les CR attendus (snapshot actif) et combien sont VALIDE,
+   * via LEFT JOIN sur le statut courant (défaut EN_SAISIE).
+   */
+  private async compterSnapshot(
+    m: EntityManager,
+    versionId: string,
+  ): Promise<{ total: number; valides: number }> {
+    const rows = await m.query<Array<{ statut: StatutCrSaisie }>>(
+      `SELECT COALESCE(s.statut, 'EN_SAISIE') AS statut
+         FROM dim_version_cr_attendu a
+         LEFT JOIN fait_budget_cr_statut s
+                ON s.fk_version = a.fk_version AND s.fk_cr = a.fk_cr
+        WHERE a.fk_version = $1 AND a.actif = true`,
+      [versionId],
+    );
+    return {
+      total: rows.length,
+      valides: rows.filter((r) => r.statut === 'VALIDE').length,
+    };
+  }
+
+  /** OUVERT → PRE_VALIDE si tous les CR attendus du snapshot sont VALIDE. */
+  private async basculerVersionSiTousValides(
+    m: EntityManager,
+    version: DimVersion,
+    user: AuthUser,
+  ): Promise<void> {
+    if (version.statut !== 'ouvert') return;
+    const { total, valides } = await this.compterSnapshot(m, version.id);
+    if (total === 0 || valides !== total) return;
+    await m.getRepository(DimVersion).update(
+      { id: String(version.id) },
+      {
+        statut: 'pre_valide',
+        dateModification: new Date(),
+        utilisateurModification: user.email,
+      },
+    );
+    await this.audit(
+      m,
+      user,
+      'PRE_VALIDER_VERSION',
+      'dim_version',
+      String(version.id),
+      {
+        codeVersion: version.codeVersion,
+        statutAvant: 'ouvert',
+        statutApres: 'pre_valide',
+        crValides: valides,
+        crAttendus: total,
+      },
+      `Pré-validation auto de ${version.codeVersion} (${valides}/${total} CR validés).`,
+    );
+    this.events.emit(EVENT_VERSION_PRE_VALIDATED, {
+      versionId: String(version.id),
+      codeVersion: version.codeVersion,
+      auteurEmail: user.email,
+      auteurId: String(user.userId),
+    });
+  }
+
+  // ─── Verrou de saisie ─────────────────────────────────────────────
+
+  /**
+   * Garde-fou appelé par la saisie/l'import AVANT toute écriture de
+   * ligne budgétaire. Refuse (403 CR_VERROUILLE) si le CR est SOUMIS
+   * ou VALIDE. Sinon garantit l'existence d'une ligne statut EN_SAISIE
+   * (auto-création paresseuse à la 1ʳᵉ saisie — gère les saisies
+   * préexistantes sans migration de données).
+   */
+  async assertCrModifiable(
+    m: EntityManager,
+    versionId: string,
+    crId: string,
+  ): Promise<void> {
+    const repo = m.getRepository(FaitBudgetCrStatut);
+    const statut = await repo.findOne({
+      where: { fkVersion: String(versionId), fkCr: String(crId) },
+    });
+    if (statut && (statut.statut === 'SOUMIS' || statut.statut === 'VALIDE')) {
+      throw new ForbiddenException({
+        message: `Saisie verrouillée : ce CR est au statut '${statut.statut}'. Demandez une réouverture au validateur.`,
+        code: 'CR_VERROUILLE',
+      });
+    }
+    if (!statut) {
+      await repo.insert({
+        fkVersion: String(versionId),
+        fkCr: String(crId),
+        statut: 'EN_SAISIE',
+      });
+    }
+  }
+
+  // ─── Snapshot des CR attendus (Coordinateur) ──────────────────────
+
+  /**
+   * (Ré)initialise le snapshot des CR attendus = union des périmètres
+   * effectifs des utilisateurs actifs portant le rôle SAISISSEUR.
+   * Idempotent : n'insère que les CR manquants (figés une fois posés).
+   */
+  async initialiserSnapshot(
+    versionId: string,
+    user: AuthUser,
+  ): Promise<{ ajoutes: number; total: number }> {
+    const version = await this.resolveVersion(versionId);
+    const users = await this.dataSource.query<Array<{ fk_user: string }>>(
+      `SELECT DISTINCT bur.fk_user
+         FROM bridge_user_role bur
+         JOIN ref_role r ON r.id = bur.fk_role
+         JOIN "user" u ON u.id = bur.fk_user
+        WHERE r.code_role = 'SAISISSEUR'
+          AND bur.est_actif = true
+          AND u.est_actif = true`,
+    );
+    const crSet = new Set<string>();
+    for (const u of users) {
+      const crs = await this.perimetreService.getPerimetreEffectif(
+        String(u.fk_user),
+      );
+      crs.forEach((c) => crSet.add(String(c)));
+    }
+    return this.dataSource.transaction(async (m) => {
+      const repo = m.getRepository(DimVersionCrAttendu);
+      let ajoutes = 0;
+      for (const crId of crSet) {
+        const exists = await repo.findOne({
+          where: { fkVersion: String(versionId), fkCr: crId },
+        });
+        if (!exists) {
+          await repo.insert({
+            fkVersion: String(versionId),
+            fkCr: crId,
+            source: 'AUTO',
+            actif: true,
+          });
+          ajoutes++;
+        }
+      }
+      await this.audit(
+        m,
+        user,
+        'INIT_SNAPSHOT_CR',
+        'dim_version',
+        String(versionId),
+        {
+          codeVersion: version.codeVersion,
+          crAttendus: crSet.size,
+          ajoutes,
+        },
+        `Initialisation snapshot ${version.codeVersion} : ${crSet.size} CR attendus (${ajoutes} ajoutés).`,
+      );
+      return { ajoutes, total: crSet.size };
+    });
+  }
+
+  /** Retrait manuel d'un CR du snapshot (actif=false, tracé). */
+  async retirerCrSnapshot(
+    versionId: string,
+    crCode: string,
+    motif: string,
+    user: AuthUser,
+  ): Promise<{ crCode: string; retire: boolean }> {
+    const version = await this.resolveVersion(versionId);
+    const cr = await this.resolveCr(crCode);
+    return this.dataSource.transaction(async (m) => {
+      const repo = m.getRepository(DimVersionCrAttendu);
+      const row = await repo.findOne({
+        where: {
+          fkVersion: String(versionId),
+          fkCr: String(cr.id),
+          actif: true,
+        },
+      });
+      if (!row) {
+        throw new NotFoundException(
+          `CR ${crCode} absent du snapshot actif de la version.`,
+        );
+      }
+      row.actif = false;
+      row.motifRetrait = motif;
+      row.dateModification = new Date();
+      row.utilisateurModification = user.email;
+      await repo.save(row);
+      await this.audit(
+        m,
+        user,
+        'RETIRER_CR_SNAPSHOT',
+        'dim_version_cr_attendu',
+        String(row.id),
+        {
+          codeVersion: version.codeVersion,
+          codeCr: cr.codeCr,
+          motif,
+        },
+        `Retrait du CR ${cr.codeCr} du snapshot ${version.codeVersion} : ${motif.slice(0, 200)}`,
+      );
+      return { crCode: cr.codeCr, retire: true };
     });
   }
 }
