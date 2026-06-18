@@ -467,8 +467,24 @@ export class CrWorkflowService {
 
   // ─── Lecture : vue d'ensemble des CR d'une version ────────────────
 
-  async getStatutsCrs(versionId: string): Promise<StatutsCrsResponseDto> {
+  /**
+   * @param monPerimetrePourUserId si fourni, restreint la liste aux CR
+   *   du périmètre de cet utilisateur (via PerimetreService — gère CR /
+   *   CR_SET / STRUCTURE). `null` retourné par le périmètre = admin =
+   *   pas de restriction. Sans ce paramètre : tous les CR du snapshot
+   *   (cas Coordinateur / vue globale).
+   */
+  async getStatutsCrs(
+    versionId: string,
+    monPerimetrePourUserId?: string,
+  ): Promise<StatutsCrsResponseDto> {
     const version = await this.resolveVersion(versionId);
+
+    const crsAutorises = monPerimetrePourUserId
+      ? await this.perimetreService.getCrAutorisesPourUser(
+          monPerimetrePourUserId,
+        )
+      : null;
 
     // Snapshot des CR attendus (actif) joint au statut courant + emails.
     const rows = await this.dataSource.query<
@@ -503,7 +519,24 @@ export class CrWorkflowService {
       [versionId],
     );
 
-    const crs = rows.map((r) => ({
+    // PNB par CR (Produits cl.7 − Charges cl.6) sur fait_budget × version.
+    const pnbRows = await this.dataSource.query<
+      Array<{ cr_id: string; pnb: string }>
+    >(
+      `SELECT fb.fk_centre AS cr_id,
+              COALESCE(SUM(CASE WHEN c.classe = '7' THEN fb.montant_devise ELSE 0 END), 0)
+            - COALESCE(SUM(CASE WHEN c.classe = '6' THEN fb.montant_devise ELSE 0 END), 0) AS pnb
+         FROM fait_budget fb
+         JOIN dim_compte c ON c.id = fb.fk_compte
+        WHERE fb.fk_version = $1
+        GROUP BY fb.fk_centre`,
+      [versionId],
+    );
+    const pnbParCr = new Map(
+      pnbRows.map((r) => [String(r.cr_id), Number(r.pnb)]),
+    );
+
+    const tous = rows.map((r) => ({
       crId: String(r.cr_id),
       crCode: r.cr_code,
       libelle: r.libelle,
@@ -512,7 +545,13 @@ export class CrWorkflowService {
       validateurEmail: r.validateur_email,
       dateSoumission: r.date_soumission,
       dateValidation: r.date_validation,
+      pnb: pnbParCr.get(String(r.cr_id)) ?? 0,
     }));
+
+    // Restriction périmètre si demandée (crsAutorises null = pas de filtre).
+    const crs = crsAutorises
+      ? tous.filter((c) => crsAutorises.includes(c.crId))
+      : tous;
 
     return {
       versionId: String(versionId),
