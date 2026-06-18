@@ -467,8 +467,24 @@ export class CrWorkflowService {
 
   // ─── Lecture : vue d'ensemble des CR d'une version ────────────────
 
-  async getStatutsCrs(versionId: string): Promise<StatutsCrsResponseDto> {
+  /**
+   * @param monPerimetrePourUserId si fourni, restreint la liste aux CR
+   *   du périmètre de cet utilisateur (via PerimetreService — gère CR /
+   *   CR_SET / STRUCTURE). `null` retourné par le périmètre = admin =
+   *   pas de restriction. Sans ce paramètre : tous les CR du snapshot
+   *   (cas Coordinateur / vue globale).
+   */
+  async getStatutsCrs(
+    versionId: string,
+    monPerimetrePourUserId?: string,
+  ): Promise<StatutsCrsResponseDto> {
     const version = await this.resolveVersion(versionId);
+
+    const crsAutorises = monPerimetrePourUserId
+      ? await this.perimetreService.getCrAutorisesPourUser(
+          monPerimetrePourUserId,
+        )
+      : null;
 
     // Snapshot des CR attendus (actif) joint au statut courant + emails.
     const rows = await this.dataSource.query<
@@ -503,7 +519,7 @@ export class CrWorkflowService {
       [versionId],
     );
 
-    const crs = rows.map((r) => ({
+    const tous = rows.map((r) => ({
       crId: String(r.cr_id),
       crCode: r.cr_code,
       libelle: r.libelle,
@@ -513,6 +529,11 @@ export class CrWorkflowService {
       dateSoumission: r.date_soumission,
       dateValidation: r.date_validation,
     }));
+
+    // Restriction périmètre si demandée (crsAutorises null = pas de filtre).
+    const crs = crsAutorises
+      ? tous.filter((c) => crsAutorises.includes(c.crId))
+      : tous;
 
     return {
       versionId: String(versionId),

@@ -145,13 +145,20 @@ export class CrWorkflowController {
   @ApiOperation({
     summary:
       'Vue d’ensemble des CR attendus d’une version (snapshot) + ' +
-      'compteur « X/Y validés ».',
+      'compteur « X/Y validés ». `?monPerimetre=true` restreint aux CR ' +
+      'du périmètre de l’appelant (écran Validations).',
   })
+  @ApiQuery({ name: 'monPerimetre', required: false })
   @ApiOkResponse({ type: StatutsCrsResponseDto })
   getStatutsCrs(
     @Param('versionId') versionId: string,
+    @CurrentUser() user: AuthUser,
+    @Query('monPerimetre') monPerimetre?: string,
   ): Promise<StatutsCrsResponseDto> {
-    return this.service.getStatutsCrs(versionId);
+    return this.service.getStatutsCrs(
+      versionId,
+      monPerimetre === 'true' ? user.userId : undefined,
+    );
   }
 
   @Post('version/:versionId/initialiser-snapshot')

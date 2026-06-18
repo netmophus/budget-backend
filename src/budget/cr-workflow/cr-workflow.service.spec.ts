@@ -405,6 +405,15 @@ describe('CrWorkflowService', () => {
     expect(vue.crs.map((c) => c.crCode).sort()).toEqual(['CR_A', 'CR_B']);
   });
 
+  it('getStatutsCrs : monPerimetre restreint aux CR de l’utilisateur', async () => {
+    // Saisisseur : périmètre [CR_A] → ne voit que CR_A.
+    const vueSais = await service.getStatutsCrs(ids.version, ids.uSaisisseur);
+    expect(vueSais.crs.map((c) => c.crCode)).toEqual(['CR_A']);
+    // Validateur : périmètre [CR_A, CR_B] → voit les deux.
+    const vueValid = await service.getStatutsCrs(ids.version, ids.uValidateur);
+    expect(vueValid.crs.map((c) => c.crCode).sort()).toEqual(['CR_A', 'CR_B']);
+  });
+
   it('soumettreComite : refusé si version pas PRE_VALIDE', async () => {
     await expect(
       service.soumettreComite(ids.version, undefined, validateur),
