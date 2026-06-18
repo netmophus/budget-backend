@@ -519,6 +519,23 @@ export class CrWorkflowService {
       [versionId],
     );
 
+    // PNB par CR (Produits cl.7 − Charges cl.6) sur fait_budget × version.
+    const pnbRows = await this.dataSource.query<
+      Array<{ cr_id: string; pnb: string }>
+    >(
+      `SELECT fb.fk_centre AS cr_id,
+              COALESCE(SUM(CASE WHEN c.classe = '7' THEN fb.montant_devise ELSE 0 END), 0)
+            - COALESCE(SUM(CASE WHEN c.classe = '6' THEN fb.montant_devise ELSE 0 END), 0) AS pnb
+         FROM fait_budget fb
+         JOIN dim_compte c ON c.id = fb.fk_compte
+        WHERE fb.fk_version = $1
+        GROUP BY fb.fk_centre`,
+      [versionId],
+    );
+    const pnbParCr = new Map(
+      pnbRows.map((r) => [String(r.cr_id), Number(r.pnb)]),
+    );
+
     const tous = rows.map((r) => ({
       crId: String(r.cr_id),
       crCode: r.cr_code,
@@ -528,6 +545,7 @@ export class CrWorkflowService {
       validateurEmail: r.validateur_email,
       dateSoumission: r.date_soumission,
       dateValidation: r.date_validation,
+      pnb: pnbParCr.get(String(r.cr_id)) ?? 0,
     }));
 
     // Restriction périmètre si demandée (crsAutorises null = pas de filtre).

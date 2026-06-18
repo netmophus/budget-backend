@@ -403,6 +403,8 @@ describe('CrWorkflowService', () => {
     expect(vue.totalAttendus).toBe(2);
     expect(vue.statutVersion).toBe('ouvert');
     expect(vue.crs.map((c) => c.crCode).sort()).toEqual(['CR_A', 'CR_B']);
+    // CR_A : 1 ligne fait_budget classe 6 (1000) → PNB = -1000.
+    expect(vue.crs.find((c) => c.crCode === 'CR_A')?.pnb).toBe(-1000);
   });
 
   it('getStatutsCrs : monPerimetre restreint aux CR de l’utilisateur', async () => {

@@ -30,6 +30,8 @@ export class CrStatutLigneDto {
   @ApiProperty({ nullable: true }) validateurEmail!: string | null;
   @ApiProperty({ nullable: true }) dateSoumission!: Date | null;
   @ApiProperty({ nullable: true }) dateValidation!: Date | null;
+  @ApiProperty({ description: 'PNB du CR (Produits cl.7 − Charges cl.6).' })
+  pnb!: number;
 }
 
 /**
