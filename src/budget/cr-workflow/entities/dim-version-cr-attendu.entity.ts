@@ -19,7 +19,7 @@ export type SourceCrAttendu = 'AUTO' | 'MANUEL';
 @Index('uq_dvca_version_cr', ['fkVersion', 'fkCr'], { unique: true })
 @Index('ix_dvca_version_actif', ['fkVersion', 'actif'])
 export class DimVersionCrAttendu {
-  @PrimaryGeneratedColumn('uuid')
+  @PrimaryGeneratedColumn('identity', { type: 'bigint' })
   id!: string;
 
   @Column({ name: 'fk_version', type: 'bigint' })

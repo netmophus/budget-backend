@@ -14,7 +14,7 @@ export class CreerDimVersionCrAttendu1779200000475 implements MigrationInterface
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(`
       CREATE TABLE dim_version_cr_attendu (
-        id                        UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        id                        BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
         fk_version                BIGINT NOT NULL REFERENCES dim_version(id),
         fk_cr                     BIGINT NOT NULL REFERENCES dim_centre_responsabilite(id),
         source                    VARCHAR(10) NOT NULL DEFAULT 'AUTO',

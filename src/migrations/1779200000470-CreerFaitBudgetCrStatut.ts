@@ -16,7 +16,7 @@ export class CreerFaitBudgetCrStatut1779200000470 implements MigrationInterface 
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(`
       CREATE TABLE fait_budget_cr_statut (
-        id                  UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        id                  BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
         fk_version          BIGINT NOT NULL REFERENCES dim_version(id),
         fk_cr               BIGINT NOT NULL REFERENCES dim_centre_responsabilite(id),
         statut              VARCHAR(20) NOT NULL DEFAULT 'EN_SAISIE',

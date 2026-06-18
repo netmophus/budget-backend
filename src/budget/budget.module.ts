@@ -16,6 +16,13 @@ import { BudgetImportController } from './controllers/budget-import.controller';
 import { IndicateursController } from './controllers/indicateurs.controller';
 import { MePerimetreController } from './controllers/me-perimetre.controller';
 import { VersionsResumeController } from './controllers/versions-resume.controller';
+import {
+  CrWorkflowController,
+  VersionComiteController,
+} from './cr-workflow/cr-workflow.controller';
+import { CrWorkflowService } from './cr-workflow/cr-workflow.service';
+import { DimVersionCrAttendu } from './cr-workflow/entities/dim-version-cr-attendu.entity';
+import { FaitBudgetCrStatut } from './cr-workflow/entities/fait-budget-cr-statut.entity';
 import { BudgetImportService } from './services/budget-import.service';
 import { BudgetSaisieService } from './services/budget-saisie.service';
 import { IndicateursHomeService } from './services/indicateurs-home.service';
@@ -46,6 +53,8 @@ import { VersionsResumeService } from './services/versions-resume.service';
       DimCentreResponsabilite,
       DimVersion,
       DimScenario,
+      FaitBudgetCrStatut,
+      DimVersionCrAttendu,
     ]),
     AuditModule,
     AuthModule,
@@ -56,6 +65,8 @@ import { VersionsResumeService } from './services/versions-resume.service';
     BudgetImportController,
     VersionsResumeController,
     MePerimetreController,
+    CrWorkflowController,
+    VersionComiteController,
   ],
   providers: [
     PerimetreService,
@@ -64,6 +75,7 @@ import { VersionsResumeService } from './services/versions-resume.service';
     IndicateursHomeService,
     BudgetImportService,
     VersionsResumeService,
+    CrWorkflowService,
   ],
   exports: [
     PerimetreService,

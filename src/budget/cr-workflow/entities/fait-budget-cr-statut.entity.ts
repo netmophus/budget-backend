@@ -19,7 +19,7 @@ export type StatutCrSaisie = 'EN_SAISIE' | 'SOUMIS' | 'VALIDE';
 @Index('uq_fbcs_version_cr', ['fkVersion', 'fkCr'], { unique: true })
 @Index('ix_fbcs_version_statut', ['fkVersion', 'statut'])
 export class FaitBudgetCrStatut {
-  @PrimaryGeneratedColumn('uuid')
+  @PrimaryGeneratedColumn('identity', { type: 'bigint' })
   id!: string;
 
   @Column({ name: 'fk_version', type: 'bigint' })
