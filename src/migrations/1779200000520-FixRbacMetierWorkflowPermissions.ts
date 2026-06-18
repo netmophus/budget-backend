@@ -56,11 +56,15 @@ export class FixRbacMetierWorkflowPermissions1779200000520 implements MigrationI
     // 1. Garantir les permissions (filet : normalement déjà seedées).
     for (const p of PERMISSIONS) {
       await q.query(
+        // $1 est utilisé en valeur d'INSERT ET en comparaison WHERE :
+        // Postgres réel n'infère pas un type unique (text vs varchar,
+        // erreur 42P08). On caste explicitement aux deux endroits.
+        // pg-mem est plus tolérant et ne détectait pas le souci.
         `INSERT INTO "ref_permission"
            ("code_permission","libelle","description","module","utilisateur_creation")
-         SELECT $1, $2, $3, 'BUDGET', 'system (fix RBAC workflow)'
+         SELECT $1::varchar, $2, $3, 'BUDGET', 'system (fix RBAC workflow)'
          WHERE NOT EXISTS (
-           SELECT 1 FROM "ref_permission" WHERE "code_permission" = $1
+           SELECT 1 FROM "ref_permission" WHERE "code_permission" = $1::varchar
          )`,
         [p.code, p.libelle, p.description],
       );
