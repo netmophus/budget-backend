@@ -98,6 +98,22 @@ jobs:
     needs: setup
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    # Lot fix CI — Redis pour BullMQ. Le job `test` (unitaires) ne
+    # bootstrappe en principe pas la queue (les `*.e2e.spec.ts` sont
+    # exclus via testPathIgnorePatterns), mais on provisionne Redis par
+    # sécurité : tout spec qui chargerait `NotificationsModule` (BullMQ)
+    # se connecte au lieu d'émettre un `'error'` non géré qui crashait
+    # le process en `--runInBand`.
+    services:
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -109,6 +125,8 @@ jobs:
         env:
           # NestJS Logger en silent pour réduire le bruit CI.
           NODE_ENV: test
+          REDIS_HOST: localhost
+          REDIS_PORT: '6379'
 
   audit-codes-coherence:
     # Vérifie que tous les codes ref_type_action_audit insérés dans
