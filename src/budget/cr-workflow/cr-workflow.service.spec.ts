@@ -586,4 +586,14 @@ describe('CrWorkflowService', () => {
     expect(cr[0]!.motif_reouverture).toBe('revoir hypothèse PNB');
     expect(await auditCount('DEMANDER_REVISION_COMITE')).toBe(1);
   });
+
+  it('getLignesCr : lignes agrégées compte × LM (vue Comité, perimeter-free)', async () => {
+    const r = await service.getLignesCr(ids.version, 'CR_A');
+    expect(r.crCode).toBe('CR_A');
+    // 1 ligne fait_budget seedée pour CR_A (compte 611100, LM RETAIL, 1000).
+    const ligne = r.items.find((i) => i.compte.code === '611100');
+    expect(ligne).toBeDefined();
+    expect(ligne!.ligneMetier.code).toBe('RETAIL');
+    expect(ligne!.montantDevise).toBe(1000);
+  });
 });

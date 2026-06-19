@@ -195,6 +195,28 @@ export class CrWorkflowController {
     return this.service.retirerCrSnapshot(versionId, crCode, dto.motif, user);
   }
 
+  @Get('version/:versionId/cr/:crCode/lignes')
+  @RequirePermissions('BUDGET.VALIDER')
+  @ApiOperation({
+    summary:
+      'Lignes budgétaires agrégées (compte × ligne métier) d’un CR pour ' +
+      'une version — vue Comité. SANS filtre périmètre (le Comité examine ' +
+      'l’ensemble de la version).',
+  })
+  getLignesCr(
+    @Param('versionId') versionId: string,
+    @Param('crCode') crCode: string,
+  ): Promise<{
+    crCode: string;
+    items: Array<{
+      montantDevise: number;
+      compte: { code: string; libelle: string };
+      ligneMetier: { code: string; libelle: string };
+    }>;
+  }> {
+    return this.service.getLignesCr(versionId, crCode);
+  }
+
   @Post('version/:versionId/demander-revision')
   @HttpCode(HttpStatus.OK)
   @RequirePermissions('BUDGET.VALIDER')
