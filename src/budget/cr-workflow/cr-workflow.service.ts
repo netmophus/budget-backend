@@ -31,6 +31,7 @@ import {
   type CrWorkflowEventPayload,
   EVENT_CR_REJECTED,
   EVENT_CR_REOPENED,
+  EVENT_CR_REVISION_DEMANDEE,
   EVENT_CR_SUBMITTED,
   EVENT_CR_VALIDATED,
   EVENT_VERSION_PRE_VALIDATED,
@@ -608,6 +609,151 @@ export class CrWorkflowService {
         commentaire: commentaire ?? null,
       });
       return saved;
+    });
+  }
+
+  // ─── Approuver (Comité) : SOUMIS_COMITE → VALIDE (membre Comité) ───
+  //
+  // Mini-PR additive (transitions Comité) : le workflow version-globale
+  // legacy (POST /referentiels/versions/:id/valider, garde-fou statut
+  // 'soumis') reste inchangé — coexistence Option A. Ici on couvre la
+  // sortie du statut 'soumis_comite' propre au workflow par CR.
+
+  async approuverComite(
+    versionId: string,
+    commentaire: string | undefined,
+    user: AuthUser,
+  ): Promise<DimVersion> {
+    return this.dataSource.transaction(async (m) => {
+      const repo = m.getRepository(DimVersion);
+      const v = await repo.findOne({ where: { id: versionId } });
+      if (!v) throw new NotFoundException(`Version ${versionId} introuvable.`);
+      if (v.statut !== 'soumis_comite') {
+        throw new ConflictException(
+          `Seule une version SOUMIS_COMITE peut être approuvée par le Comité. ` +
+            `Statut actuel : '${v.statut}'.`,
+        );
+      }
+      v.statut = 'valide';
+      v.dateModification = new Date();
+      v.utilisateurModification = user.email;
+      const saved = await repo.save(v);
+
+      await this.audit(
+        m,
+        user,
+        'APPROUVER_COMITE',
+        'dim_version',
+        String(versionId),
+        {
+          codeVersion: v.codeVersion,
+          statutAvant: 'soumis_comite',
+          statutApres: 'valide',
+          commentaire: commentaire ?? null,
+        },
+        `Approbation par le Comité de ${v.codeVersion}.`,
+      );
+      return saved;
+    });
+  }
+
+  // ─── Demander révision (Comité) : SOUMIS_COMITE → OUVERT ───────────
+  //   + CR ciblé VALIDE → EN_SAISIE (transaction unique).
+  //
+  // À la différence de rouvrir() (réservé au validateur ayant validé),
+  // l'action est portée par le Comité : pas de contrôle de périmètre sur
+  // le CR (les membres du Comité statuent sur l'ensemble de la version).
+  // Le garde-fou réel est le statut 'soumis_comite' (phase Comité) +
+  // la permission BUDGET.VALIDER.
+
+  async demanderRevision(
+    versionId: string,
+    crCode: string,
+    motif: string,
+    user: AuthUser,
+  ): Promise<{
+    versionId: string;
+    crCode: string;
+    statutVersion: string;
+    statutCr: StatutCrSaisie;
+  }> {
+    const version = await this.resolveVersion(versionId);
+    const cr = await this.resolveCr(crCode);
+
+    if (version.statut !== 'soumis_comite') {
+      throw new ConflictException(
+        `Demande de révision impossible : la version doit être ` +
+          `SOUMIS_COMITE. Statut actuel : '${version.statut}'.`,
+      );
+    }
+
+    return this.dataSource.transaction(async (m) => {
+      const statut = await this.findStatut(m, versionId, cr.id);
+      if (!statut || statut.statut !== 'VALIDE') {
+        throw new ConflictException(
+          `Seul un CR VALIDE peut être renvoyé en révision. Statut ` +
+            `actuel : '${statut?.statut ?? 'aucun'}'.`,
+        );
+      }
+
+      // a) CR ciblé : VALIDE → EN_SAISIE (logique rouvrir, sans le
+      //    garde-fou « version OUVERT » ni la restriction validateur).
+      statut.statut = 'EN_SAISIE';
+      statut.dateReouverture = new Date();
+      statut.motifReouverture = motif;
+      statut.fkUserModif = String(user.userId);
+      statut.dateModification = new Date();
+      const savedCr = await m.getRepository(FaitBudgetCrStatut).save(statut);
+
+      // b) Version : SOUMIS_COMITE → OUVERT.
+      await m.getRepository(DimVersion).update(
+        { id: String(versionId) },
+        {
+          statut: 'ouvert',
+          dateModification: new Date(),
+          utilisateurModification: user.email,
+        },
+      );
+
+      await this.audit(
+        m,
+        user,
+        'DEMANDER_REVISION_COMITE',
+        'dim_version',
+        String(versionId),
+        {
+          codeVersion: version.codeVersion,
+          crCible: cr.codeCr,
+          statutVersionAvant: 'soumis_comite',
+          statutVersionApres: 'ouvert',
+          statutCrAvant: 'VALIDE',
+          statutCrApres: 'EN_SAISIE',
+          motif,
+        },
+        `Demande de révision du Comité sur ${version.codeVersion} — ` +
+          `CR ${cr.codeCr} : ${motif.slice(0, 200)}`,
+      );
+
+      // Notifie le saisisseur ET le validateur du CR ciblé. Les listeners
+      // email sont câblés dans le sous-lot notifications dédié (comme les
+      // autres événements du cycle par CR).
+      this.emit(
+        EVENT_CR_REVISION_DEMANDEE,
+        versionId,
+        version.codeVersion,
+        cr,
+        user,
+        {
+          motif,
+        },
+      );
+
+      return {
+        versionId: String(versionId),
+        crCode: cr.codeCr,
+        statutVersion: 'ouvert',
+        statutCr: savedCr.statut,
+      };
     });
   }
 

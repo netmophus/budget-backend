@@ -33,6 +33,8 @@ export const EVENT_CR_REJECTED = 'cr.rejected'; // → saisisseur (motif)
 export const EVENT_CR_REOPENED = 'cr.reopened'; // → saisisseur (motif)
 export const EVENT_VERSION_PRE_VALIDATED = 'version.prevalidated'; // → coordinateur
 export const EVENT_VERSION_SUBMITTED_COMITE = 'version.submitted_comite'; // → comité
+// Mini-PR transitions Comité — demande de révision sur un CR validé.
+export const EVENT_CR_REVISION_DEMANDEE = 'cr.revision_demandee'; // → saisisseur + validateur du CR ciblé
 
 /** Payload des événements de transition par CR. */
 export interface CrWorkflowEventPayload {

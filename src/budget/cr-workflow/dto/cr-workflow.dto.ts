@@ -98,3 +98,38 @@ export class SoumettreComiteDto {
   @MaxLength(2000)
   commentaire?: string;
 }
+
+export class ApprouverComiteDto {
+  @ApiPropertyOptional({
+    example: 'Budget approuvé par le Comité — séance du 19/06/2026.',
+    maxLength: 2000,
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(2000)
+  commentaire?: string;
+}
+
+export class DemanderRevisionComiteDto {
+  @ApiProperty({
+    example: 'CR_AG_SIEGE',
+    description: 'Code du CR validé que le Comité renvoie en révision.',
+  })
+  @IsString()
+  @IsNotEmpty({ message: 'Le code du CR à réviser est obligatoire.' })
+  crCode!: string;
+
+  @ApiProperty({
+    example: 'Revoir l’hypothèse PNB cl.7 à la baisse (cadrage Holding).',
+    description:
+      'Motif de la demande de révision (obligatoire), communiqué au ' +
+      'saisisseur et au validateur du CR ciblé.',
+    maxLength: 2000,
+  })
+  @IsString()
+  @IsNotEmpty({
+    message: 'Le motif de la demande de révision est obligatoire.',
+  })
+  @MaxLength(2000)
+  motif!: string;
+}

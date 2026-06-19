@@ -131,7 +131,14 @@ export type TypeAction =
   | 'PRE_VALIDER_VERSION'
   | 'REOUVRIR_VERSION'
   | 'INIT_SNAPSHOT_CR'
-  | 'RETIRER_CR_SNAPSHOT';
+  | 'RETIRER_CR_SNAPSHOT'
+  // Mini-PR transitions Comite — sortie du statut soumis_comite
+  // Codes seedes en base via migration 1779200000530
+  // APPROUVER_COMITE = soumis_comite -> valide (approbation Comite)
+  // DEMANDER_REVISION_COMITE = soumis_comite -> ouvert + CR cible rouvert
+  // Pas de point-virgule dans ce commentaire (regex CI fragile)
+  | 'APPROUVER_COMITE'
+  | 'DEMANDER_REVISION_COMITE';
 
 export type AuditStatut = 'success' | 'failure';
 
