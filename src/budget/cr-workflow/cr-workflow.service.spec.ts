@@ -505,4 +505,85 @@ describe('CrWorkflowService', () => {
     const r2 = await service.initialiserSnapshot(ids.version, validateur);
     expect(r2.ajoutes).toBe(0); // idempotent
   });
+
+  // ─── Mini-PR transitions Comité ─────────────────────────────────
+
+  it('approuverComite : refusé si version pas SOUMIS_COMITE', async () => {
+    await ds.query(`UPDATE dim_version SET statut='ouvert' WHERE id=$1`, [
+      ids.version,
+    ]);
+    await expect(
+      service.approuverComite(ids.version, undefined, validateur),
+    ).rejects.toThrow(/SOUMIS_COMITE/);
+  });
+
+  it('approuverComite : SOUMIS_COMITE → VALIDE + audit', async () => {
+    await ds.query(
+      `UPDATE dim_version SET statut='soumis_comite' WHERE id=$1`,
+      [ids.version],
+    );
+    const v = await service.approuverComite(
+      ids.version,
+      'approuvé séance Comité',
+      validateur,
+    );
+    expect(v.statut).toBe('valide');
+    expect(await auditCount('APPROUVER_COMITE')).toBe(1);
+  });
+
+  it('demanderRevision : refusé si version pas SOUMIS_COMITE', async () => {
+    await ds.query(`UPDATE dim_version SET statut='valide' WHERE id=$1`, [
+      ids.version,
+    ]);
+    await expect(
+      service.demanderRevision(ids.version, 'CR_A', 'motif', validateur),
+    ).rejects.toThrow(/SOUMIS_COMITE/);
+  });
+
+  it('demanderRevision : refusé si le CR ciblé n’est pas VALIDE', async () => {
+    await ds.query(
+      `UPDATE dim_version SET statut='soumis_comite' WHERE id=$1`,
+      [ids.version],
+    );
+    await ds.query(`DELETE FROM fait_budget_cr_statut`);
+    await ds.query(
+      `INSERT INTO fait_budget_cr_statut (fk_version,fk_cr,statut) VALUES ($1,$2,'EN_SAISIE')`,
+      [ids.version, ids.crA],
+    );
+    await expect(
+      service.demanderRevision(ids.version, 'CR_A', 'motif', validateur),
+    ).rejects.toThrow(/VALIDE/);
+  });
+
+  it('demanderRevision : SOUMIS_COMITE + CR VALIDE → version OUVERT + CR EN_SAISIE + audit', async () => {
+    await ds.query(
+      `UPDATE dim_version SET statut='soumis_comite' WHERE id=$1`,
+      [ids.version],
+    );
+    await ds.query(`DELETE FROM fait_budget_cr_statut`);
+    await ds.query(
+      `INSERT INTO fait_budget_cr_statut (fk_version,fk_cr,statut) VALUES ($1,$2,'VALIDE')`,
+      [ids.version, ids.crA],
+    );
+    const res = await service.demanderRevision(
+      ids.version,
+      'CR_A',
+      'revoir hypothèse PNB',
+      validateur,
+    );
+    expect(res.statutVersion).toBe('ouvert');
+    expect(res.statutCr).toBe('EN_SAISIE');
+    // Effets persistés.
+    const v = (await ds.query(`SELECT statut FROM dim_version WHERE id=$1`, [
+      ids.version,
+    ])) as Array<{ statut: string }>;
+    expect(v[0]!.statut).toBe('ouvert');
+    const cr = (await ds.query(
+      `SELECT statut, motif_reouverture FROM fait_budget_cr_statut WHERE fk_version=$1 AND fk_cr=$2`,
+      [ids.version, ids.crA],
+    )) as Array<{ statut: string; motif_reouverture: string }>;
+    expect(cr[0]!.statut).toBe('EN_SAISIE');
+    expect(cr[0]!.motif_reouverture).toBe('revoir hypothèse PNB');
+    expect(await auditCount('DEMANDER_REVISION_COMITE')).toBe(1);
+  });
 });

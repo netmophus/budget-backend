@@ -34,7 +34,9 @@ import {
   StatutsCrsResponseDto,
 } from './dto/cr-statut-response.dto';
 import {
+  ApprouverComiteDto,
   CrContexteQueryDto,
+  DemanderRevisionComiteDto,
   RejeterCrDto,
   RetirerCrSnapshotDto,
   RouvrirCrDto,
@@ -192,6 +194,33 @@ export class CrWorkflowController {
   ): Promise<{ crCode: string; retire: boolean }> {
     return this.service.retirerCrSnapshot(versionId, crCode, dto.motif, user);
   }
+
+  @Post('version/:versionId/demander-revision')
+  @HttpCode(HttpStatus.OK)
+  @RequirePermissions('BUDGET.VALIDER')
+  @ApiOperation({
+    summary:
+      'Demande de révision du Comité sur un CR validé (version ' +
+      'SOUMIS_COMITE → OUVERT + CR ciblé VALIDE → EN_SAISIE). Motif ' +
+      'obligatoire. Réservé au Comité (BUDGET.VALIDER).',
+  })
+  demanderRevision(
+    @Param('versionId') versionId: string,
+    @Body() dto: DemanderRevisionComiteDto,
+    @CurrentUser() user: AuthUser,
+  ): Promise<{
+    versionId: string;
+    crCode: string;
+    statutVersion: string;
+    statutCr: string;
+  }> {
+    return this.service.demanderRevision(
+      versionId,
+      dto.crCode,
+      dto.motif,
+      user,
+    );
+  }
 }
 
 /**
@@ -218,6 +247,24 @@ export class VersionComiteController {
     @CurrentUser() user: AuthUser,
   ): Promise<{ id: string; codeVersion: string; statut: string }> {
     const v = await this.service.soumettreComite(id, dto.commentaire, user);
+    return { id: String(v.id), codeVersion: v.codeVersion, statut: v.statut };
+  }
+
+  @Post(':id/approuver-comite')
+  @HttpCode(HttpStatus.OK)
+  @RequirePermissions('BUDGET.VALIDER')
+  @ApiOperation({
+    summary:
+      'Approbation par le Comité d’une version soumise (SOUMIS_COMITE → ' +
+      'VALIDE). Réservé au Comité (BUDGET.VALIDER). N’altère PAS le ' +
+      'workflow version-globale legacy (garde-fou statut « soumis »).',
+  })
+  async approuverComite(
+    @Param('id') id: string,
+    @Body() dto: ApprouverComiteDto,
+    @CurrentUser() user: AuthUser,
+  ): Promise<{ id: string; codeVersion: string; statut: string }> {
+    const v = await this.service.approuverComite(id, dto.commentaire, user);
     return { id: String(v.id), codeVersion: v.codeVersion, statut: v.statut };
   }
 }
