@@ -565,6 +565,59 @@ export class CrWorkflowService {
     };
   }
 
+  // ─── Lecture : lignes agrégées (compte × LM) d'un CR ──────────────
+  //
+  // Vue Comité / impression : SANS filtre périmètre (le Comité examine
+  // l'ensemble de la version). Gardée par BUDGET.VALIDER au controller.
+  // Cohérent avec getStatutsCrs (vue globale du snapshot, perimeter-free).
+
+  async getLignesCr(
+    versionId: string,
+    crCode: string,
+  ): Promise<{
+    crCode: string;
+    items: Array<{
+      montantDevise: number;
+      compte: { code: string; libelle: string };
+      ligneMetier: { code: string; libelle: string };
+    }>;
+  }> {
+    await this.resolveVersion(versionId);
+    const cr = await this.resolveCr(crCode);
+
+    const rows = await this.dataSource.query<
+      Array<{
+        compte_code: string;
+        compte_libelle: string;
+        lm_code: string;
+        lm_libelle: string;
+        montant: string;
+      }>
+    >(
+      `SELECT c.code_compte        AS compte_code,
+              c.libelle            AS compte_libelle,
+              lm.code_ligne_metier AS lm_code,
+              lm.libelle           AS lm_libelle,
+              COALESCE(SUM(fb.montant_devise), 0) AS montant
+         FROM fait_budget fb
+         JOIN dim_compte c        ON c.id = fb.fk_compte
+         JOIN dim_ligne_metier lm ON lm.id = fb.fk_ligne_metier
+        WHERE fb.fk_version = $1 AND fb.fk_centre = $2
+        GROUP BY c.code_compte, c.libelle, lm.code_ligne_metier, lm.libelle
+        ORDER BY c.code_compte, lm.code_ligne_metier`,
+      [versionId, cr.id],
+    );
+
+    return {
+      crCode: cr.codeCr,
+      items: rows.map((r) => ({
+        montantDevise: Number(r.montant),
+        compte: { code: r.compte_code, libelle: r.compte_libelle },
+        ligneMetier: { code: r.lm_code, libelle: r.lm_libelle },
+      })),
+    };
+  }
+
   // ─── Soumettre au Comité : PRE_VALIDE → SOUMIS_COMITE (Coordinateur)
 
   async soumettreComite(
