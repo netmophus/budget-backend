@@ -201,6 +201,13 @@ export class BudgetImportService {
     const lignesRejetees = erreurs.length;
     const tauxErreurs = lignesTotal === 0 ? 0 : lignesRejetees / lignesTotal;
 
+    // 6.bis Verrou workflow par CR : un import ne doit pas écraser une
+    // saisie déjà SOUMISE ou VALIDÉE (sécurité métier — symétrie avec la
+    // saisie unitaire qui appelle CrWorkflowService.assertCrModifiable).
+    // On vérifie TOUS les CR distincts des lignes valides ; si UN seul est
+    // verrouillé → refus de l'import COMPLET (rollback global).
+    await this.assertCrsImportables(versionId, operations, user, start);
+
     // 7. Décision rollback / upsert
     let lignesInserees = 0;
     let lignesModifiees = 0;
@@ -612,6 +619,68 @@ export class BudgetImportService {
   }
 
   /**
+   * Verrou workflow par CR (symétrie avec la saisie unitaire). Refuse
+   * l'import COMPLET si au moins un CR concerné est SOUMIS ou VALIDE.
+   * Méthode équivalente à `CrWorkflowService.assertCrModifiable`, mais
+   * collective (collecte TOUS les CR bloquants pour le message + audit,
+   * là où assertCrModifiable lèverait au premier). Un CR EN_SAISIE ou
+   * sans ligne statut (auto-créé EN_SAISIE à l'upsert) est importable.
+   */
+  private async assertCrsImportables(
+    versionId: string,
+    operations: OperationUpsert[],
+    user: { userId: string; email: string },
+    start: number,
+  ): Promise<void> {
+    const crIdsDistinct = [...new Set(operations.map((o) => o.fkCentre))];
+    if (crIdsDistinct.length === 0) return;
+
+    const bloquants: Array<{ codeCr: string; statut: string }> = [];
+    for (const crId of crIdsDistinct) {
+      const rows = await this.dataSource.query<
+        Array<{ code_cr: string; statut: string }>
+      >(
+        `SELECT cr.code_cr AS code_cr, s.statut AS statut
+           FROM fait_budget_cr_statut s
+           JOIN dim_centre_responsabilite cr ON cr.id = s.fk_cr
+          WHERE s.fk_version = $1 AND s.fk_cr = $2
+            AND s.statut IN ('SOUMIS', 'VALIDE')
+          LIMIT 1`,
+        [versionId, crId],
+      );
+      if (rows.length > 0) {
+        bloquants.push({ codeCr: rows[0].code_cr, statut: rows[0].statut });
+      }
+    }
+
+    if (bloquants.length === 0) return;
+
+    // Audit de la tentative refusée (sécurité métier).
+    const liste = bloquants.map((b) => `${b.codeCr} (${b.statut})`).join(', ');
+    await this.auditService.log({
+      utilisateur: user.email,
+      typeAction: 'IMPORT_BUDGET_BLOQUE_CR',
+      entiteCible: 'fait_budget',
+      idCible: `version=${versionId}`,
+      statut: 'failure',
+      dureeMs: Date.now() - start,
+      payloadApres: {
+        versionId: String(versionId),
+        crBloquants: bloquants,
+      },
+      commentaire: `Import refusé : CR verrouillé(s) — ${liste}.`,
+    });
+
+    throw new ConflictException({
+      code: 'CR_VERROUILLE',
+      message:
+        `Import refusé : le(s) CR ${liste} ` +
+        `${bloquants.length > 1 ? 'sont' : 'est'} au statut SOUMIS/VALIDE et ` +
+        `ne peuvent être modifiés par import. Demandez la réouverture au validateur.`,
+    });
+  }
+
+  /**
    * Résolution des FK par défaut (mêmes règles que
    * BudgetSaisieService.resoudreFkDefaultsPourInsert pour le Lot 3.4) —
    * dupliquée ici pour ne pas casser l'API privée du service de
@@ -680,6 +749,23 @@ export class BudgetImportService {
     let inserees = 0;
     let modifiees = 0;
     let ignorees = 0;
+
+    // Auto-création paresseuse du statut CR (EN_SAISIE) pour les CR
+    // jamais saisis — symétrie avec CrWorkflowService.assertCrModifiable.
+    // Les CR SOUMIS/VALIDE ont déjà été refusés en amont (verrou). Casts
+    // explicites : params réutilisés en valeur INSERT et en WHERE (pg-mem).
+    const crIdsDistinct = [...new Set(operations.map((o) => o.fkCentre))];
+    for (const crId of crIdsDistinct) {
+      await manager.query(
+        `INSERT INTO fait_budget_cr_statut (fk_version, fk_cr, statut)
+         SELECT $1::bigint, $2::bigint, 'EN_SAISIE'
+          WHERE NOT EXISTS (
+            SELECT 1 FROM fait_budget_cr_statut
+             WHERE fk_version = $1::bigint AND fk_cr = $2::bigint
+          )`,
+        [versionId, crId],
+      );
+    }
 
     for (const op of operations) {
       // Recherche d'une ligne existante au grain (uq_fait_budget_grain).

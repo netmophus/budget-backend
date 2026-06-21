@@ -138,7 +138,12 @@ export type TypeAction =
   // DEMANDER_REVISION_COMITE = soumis_comite -> ouvert + CR cible rouvert
   // Pas de point-virgule dans ce commentaire (regex CI fragile)
   | 'APPROUVER_COMITE'
-  | 'DEMANDER_REVISION_COMITE';
+  | 'DEMANDER_REVISION_COMITE'
+  // Fix verrou import — tentative d import sur un CR SOUMIS/VALIDE refusee
+  // Code seede en base via migration 1779200000540
+  // Trace la liste des CR bloquants pour audit de securite metier
+  // Pas de point-virgule dans ce commentaire (regex CI fragile)
+  | 'IMPORT_BUDGET_BLOQUE_CR';
 
 export type AuditStatut = 'success' | 'failure';
 
