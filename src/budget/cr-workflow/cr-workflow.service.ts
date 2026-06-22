@@ -969,13 +969,25 @@ export class CrWorkflowService {
     });
   }
 
-  /** Retrait manuel d'un CR du snapshot (actif=false, tracé). */
+  /**
+   * Retrait manuel d'un CR du snapshot (actif=false, tracé).
+   *
+   * Garde-fous (Chantier 2) : refuse le retrait si le CR a déjà des
+   * lignes budgétaires ou un statut ≠ EN_SAISIE — pour éviter de sortir
+   * un CR « actif » et fausser le dénominateur de la bascule. `forcer`
+   * (Coordinateur) lève les garde-fous, avec une trace dédiée.
+   *
+   * Ré-évaluation (Chantier 3) : après retrait, on réévalue la bascule
+   * OUVERT → PRE_VALIDE (retirer le dernier CR EN_SAISIE peut compléter
+   * le snapshot si les autres sont VALIDE).
+   */
   async retirerCrSnapshot(
     versionId: string,
     crCode: string,
     motif: string,
     user: AuthUser,
-  ): Promise<{ crCode: string; retire: boolean }> {
+    forcer = false,
+  ): Promise<{ crCode: string; retire: boolean; force: boolean }> {
     const version = await this.resolveVersion(versionId);
     const cr = await this.resolveCr(crCode);
     return this.dataSource.transaction(async (m) => {
@@ -992,6 +1004,34 @@ export class CrWorkflowService {
           `CR ${crCode} absent du snapshot actif de la version.`,
         );
       }
+
+      // Garde-fous (sautés si forcer=true).
+      if (!forcer) {
+        const lignes = await m.query<Array<{ n: number }>>(
+          `SELECT COUNT(*)::int AS n FROM fait_budget
+            WHERE fk_version = $1 AND fk_centre = $2`,
+          [versionId, cr.id],
+        );
+        const nbLignes = lignes[0]?.n ?? 0;
+        if (nbLignes > 0) {
+          throw new ConflictException({
+            code: 'CR_NON_RETIRABLE',
+            message:
+              `Impossible de retirer ${cr.codeCr} : ${nbLignes} ligne(s) ` +
+              `déjà saisie(s). Forcez le retrait si c'est volontaire.`,
+          });
+        }
+        const statut = await this.findStatut(m, versionId, cr.id);
+        if (statut && statut.statut !== 'EN_SAISIE') {
+          throw new ConflictException({
+            code: 'CR_NON_RETIRABLE',
+            message:
+              `Impossible de retirer ${cr.codeCr} : statut '${statut.statut}'. ` +
+              `Seul un CR jamais saisi ou EN_SAISIE peut être retiré.`,
+          });
+        }
+      }
+
       row.actif = false;
       row.motifRetrait = motif;
       row.dateModification = new Date();
@@ -1007,10 +1047,72 @@ export class CrWorkflowService {
           codeVersion: version.codeVersion,
           codeCr: cr.codeCr,
           motif,
+          force: forcer,
         },
-        `Retrait du CR ${cr.codeCr} du snapshot ${version.codeVersion} : ${motif.slice(0, 200)}`,
+        `Retrait${forcer ? ' FORCÉ' : ''} du CR ${cr.codeCr} du snapshot ` +
+          `${version.codeVersion} : ${motif.slice(0, 200)}`,
       );
-      return { crCode: cr.codeCr, retire: true };
+
+      // Chantier 3 : retirer un CR peut compléter le snapshot.
+      await this.basculerVersionSiTousValides(m, version, user);
+
+      return { crCode: cr.codeCr, retire: true, force: forcer };
+    });
+  }
+
+  /**
+   * Réintégration d'un CR retiré du snapshot (actif=false → true).
+   * Inverse de `retirerCrSnapshot`. Option A : autorisé UNIQUEMENT si la
+   * version est OUVERTE (réintégrer un CR non validé sur une version
+   * pré-validée / soumise au Comité briserait la cohérence du cycle).
+   */
+  async reintegrerCrSnapshot(
+    versionId: string,
+    crCode: string,
+    user: AuthUser,
+  ): Promise<{ crCode: string; reintegre: boolean }> {
+    const version = await this.resolveVersion(versionId);
+    if (version.statut !== 'ouvert') {
+      throw new ConflictException({
+        code: 'VERSION_NON_OUVERTE',
+        message:
+          `Réintégration impossible : la version ${version.codeVersion} est ` +
+          `au statut '${version.statut}'. Seule une version OUVERTE le permet.`,
+      });
+    }
+    const cr = await this.resolveCr(crCode);
+    return this.dataSource.transaction(async (m) => {
+      const repo = m.getRepository(DimVersionCrAttendu);
+      const row = await repo.findOne({
+        where: {
+          fkVersion: String(versionId),
+          fkCr: String(cr.id),
+          actif: false,
+        },
+      });
+      if (!row) {
+        throw new NotFoundException(
+          `CR ${crCode} introuvable parmi les CR retirés du snapshot de la version.`,
+        );
+      }
+      row.actif = true;
+      row.motifRetrait = null;
+      row.dateModification = new Date();
+      row.utilisateurModification = user.email;
+      await repo.save(row);
+      await this.audit(
+        m,
+        user,
+        'CR_REINTEGRE_SNAPSHOT',
+        'dim_version_cr_attendu',
+        String(row.id),
+        {
+          codeVersion: version.codeVersion,
+          codeCr: cr.codeCr,
+        },
+        `Réintégration du CR ${cr.codeCr} au snapshot ${version.codeVersion}.`,
+      );
+      return { crCode: cr.codeCr, reintegre: true };
     });
   }
 }

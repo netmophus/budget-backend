@@ -143,7 +143,12 @@ export type TypeAction =
   // Code seede en base via migration 1779200000540
   // Trace la liste des CR bloquants pour audit de securite metier
   // Pas de point-virgule dans ce commentaire (regex CI fragile)
-  | 'IMPORT_BUDGET_BLOQUE_CR';
+  | 'IMPORT_BUDGET_BLOQUE_CR'
+  // Durcissement snapshot CR — reintegration d un CR retire du snapshot
+  // Code seede en base via migration 1779200000550
+  // Action Coordinateur inverse de RETIRER_CR_SNAPSHOT (actif false vers true)
+  // Pas de point-virgule dans ce commentaire (regex CI fragile)
+  | 'CR_REINTEGRE_SNAPSHOT';
 
 export type AuditStatut = 'success' | 'failure';
 
