@@ -108,7 +108,7 @@ export class CompteService extends Scd2Service<DimCompte> {
       });
     }
     if (query.search) {
-      qb.andWhere('c.libelle ILIKE :search', {
+      qb.andWhere('(c.codeCompte ILIKE :search OR c.libelle ILIKE :search)', {
         search: `%${query.search}%`,
       });
     }
@@ -121,6 +121,15 @@ export class CompteService extends Scd2Service<DimCompte> {
       qb.andWhere('c.estPorteurInterets = :epi', {
         epi: query.estPorteurInterets,
       });
+    }
+    if (query.niveau !== undefined) {
+      qb.andWhere('c.niveau = :niveau', { niveau: query.niveau });
+    }
+    if (query.racinesUniquement === true) {
+      qb.andWhere('c.fkCompteParent IS NULL');
+    }
+    if (query.actifsUniquement === true) {
+      qb.andWhere('c.estActif = :actif', { actif: true });
     }
 
     qb.orderBy('c.codeCompte', 'ASC')

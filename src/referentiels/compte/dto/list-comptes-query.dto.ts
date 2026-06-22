@@ -31,12 +31,12 @@ export class ListComptesQueryDto {
   @Min(1)
   page: number = 1;
 
-  @ApiPropertyOptional({ example: 50, default: 50, minimum: 1, maximum: 200 })
+  @ApiPropertyOptional({ example: 50, default: 50, minimum: 1, maximum: 500 })
   @IsOptional()
   @Type(() => Number)
   @IsInt()
   @Min(1)
-  @Max(200)
+  @Max(500)
   limit: number = 50;
 
   @ApiPropertyOptional({ example: '6', enum: CLASSES_PCB })
@@ -74,12 +74,51 @@ export class ListComptesQueryDto {
   classes?: string[];
 
   @ApiPropertyOptional({
-    description: 'Filtre LIKE %libelle% case-insensitive.',
+    description:
+      'Recherche LIKE %terme% case-insensitive sur le code OU le libellé.',
   })
   @IsOptional()
   @IsString()
   @MaxLength(200)
   search?: string;
+
+  @ApiPropertyOptional({ example: 4, minimum: 1, maximum: 6 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(6)
+  niveau?: number;
+
+  @ApiPropertyOptional({
+    example: false,
+    description: 'Ne retourne que les comptes racines (sans parent).',
+  })
+  @IsOptional()
+  @Transform(({ value }) => {
+    if (typeof value === 'boolean') return value;
+    if (value === 'true') return true;
+    if (value === 'false') return false;
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- @Transform({ value }) impose any (signature class-transformer)
+    return value;
+  })
+  @IsBoolean()
+  racinesUniquement?: boolean;
+
+  @ApiPropertyOptional({
+    example: false,
+    description: 'Ne retourne que les comptes actifs (est_actif=true).',
+  })
+  @IsOptional()
+  @Transform(({ value }) => {
+    if (typeof value === 'boolean') return value;
+    if (value === 'true') return true;
+    if (value === 'false') return false;
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- @Transform({ value }) impose any (signature class-transformer)
+    return value;
+  })
+  @IsBoolean()
+  actifsUniquement?: boolean;
 
   @ApiPropertyOptional({ example: 'MASSE_SALARIALE', maxLength: 50 })
   @IsOptional()
