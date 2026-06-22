@@ -146,6 +146,39 @@ export class CompteService extends Scd2Service<DimCompte> {
     };
   }
 
+  /**
+   * Comptes éligibles comme parent d'un compte (classe `classe`,
+   * niveau `niveau`) : niveau strictement inférieur, même classe,
+   * courants + actifs. En édition (`excludeId` fourni), le compte
+   * lui-même et toute sa descendance sont exclus (anti-cycle). Liste
+   * ciblée — pas de pagination.
+   */
+  async findParentsEligibles(
+    classe: string,
+    niveau: number,
+    excludeId?: string,
+  ): Promise<DimCompte[]> {
+    const exclus = new Set<string>();
+    if (excludeId) {
+      exclus.add(String(excludeId));
+      const descendants = await this.findDescendants(excludeId);
+      for (const d of descendants) exclus.add(String(d.id));
+    }
+
+    const rows = await this.repo
+      .createQueryBuilder('c')
+      .where('c.versionCourante = :vc', { vc: true })
+      .andWhere('c.estActif = :actif', { actif: true })
+      .andWhere('c.classe = :classe', { classe })
+      .andWhere('c.niveau < :niveau', { niveau })
+      .orderBy('c.codeCompte', 'ASC')
+      .getMany();
+
+    return exclus.size > 0
+      ? rows.filter((r) => !exclus.has(String(r.id)))
+      : rows;
+  }
+
   async findOneResponse(id: string): Promise<CompteResponseDto> {
     const row = await this.repo.findOne({
       where: { id },
