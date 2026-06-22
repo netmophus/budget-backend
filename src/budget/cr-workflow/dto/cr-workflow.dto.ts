@@ -1,5 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
+  IsBoolean,
   IsNotEmpty,
   IsOptional,
   IsString,
@@ -86,6 +87,16 @@ export class RetirerCrSnapshotDto {
   @IsNotEmpty({ message: 'Le motif de retrait est obligatoire.' })
   @MaxLength(2000)
   motif!: string;
+
+  @ApiPropertyOptional({
+    example: false,
+    description:
+      'Force le retrait malgré les garde-fous (CR déjà saisi ou statut ' +
+      '≠ EN_SAISIE). Réservé au Coordinateur, tracé avec un flag dédié.',
+  })
+  @IsOptional()
+  @IsBoolean()
+  forcer?: boolean;
 }
 
 export class SoumettreComiteDto {

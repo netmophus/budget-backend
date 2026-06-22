@@ -596,4 +596,118 @@ describe('CrWorkflowService', () => {
     expect(ligne!.ligneMetier.code).toBe('RETAIL');
     expect(ligne!.montantDevise).toBe(1000);
   });
+
+  // ─── Durcissement snapshot CR (retrait + réintégration) ───────────
+
+  /** Remet un état propre : version OUVERT, snapshot A+B actifs, sans statut. */
+  async function resetSnapshot(): Promise<void> {
+    await ds.query(`UPDATE dim_version SET statut='ouvert' WHERE id=$1`, [
+      ids.version,
+    ]);
+    await ds.query(
+      `UPDATE dim_version_cr_attendu SET actif=true WHERE fk_version=$1`,
+      [ids.version],
+    );
+    await ds.query(`DELETE FROM fait_budget_cr_statut WHERE fk_version=$1`, [
+      ids.version,
+    ]);
+  }
+
+  it('retrait refusé si le CR a des lignes saisies (CR_A en a 1)', async () => {
+    await resetSnapshot();
+    await expect(
+      service.retirerCrSnapshot(ids.version, 'CR_A', 'motif', validateur),
+    ).rejects.toThrow(/ligne\(s\) déjà saisie/);
+  });
+
+  it('retrait refusé si le CR est VALIDE', async () => {
+    await resetSnapshot();
+    // CR_B : aucune ligne fait_budget, mais statut VALIDE.
+    await ds.query(
+      `INSERT INTO fait_budget_cr_statut (fk_version,fk_cr,statut) VALUES ($1,$2,'VALIDE')`,
+      [ids.version, ids.crB],
+    );
+    await expect(
+      service.retirerCrSnapshot(ids.version, 'CR_B', 'motif', validateur),
+    ).rejects.toThrow(/statut 'VALIDE'/);
+  });
+
+  it('retrait forcé (forcer=true) lève les garde-fous + trace force', async () => {
+    await resetSnapshot();
+    const r = await service.retirerCrSnapshot(
+      ids.version,
+      'CR_A',
+      'décision exceptionnelle',
+      validateur,
+      true,
+    );
+    expect(r.retire).toBe(true);
+    expect(r.force).toBe(true);
+    const act = (await ds.query(
+      `SELECT actif FROM dim_version_cr_attendu WHERE fk_version=$1 AND fk_cr=$2`,
+      [ids.version, ids.crA],
+    )) as Array<{ actif: boolean }>;
+    expect(act[0]!.actif).toBe(false);
+  });
+
+  it('retrait CR_B EN_SAISIE sans saisie + CR_A VALIDE → bascule PRE_VALIDE', async () => {
+    await resetSnapshot();
+    await ds.query(
+      `INSERT INTO fait_budget_cr_statut (fk_version,fk_cr,statut) VALUES ($1,$2,'VALIDE')`,
+      [ids.version, ids.crA],
+    );
+    await ds.query(
+      `INSERT INTO fait_budget_cr_statut (fk_version,fk_cr,statut) VALUES ($1,$2,'EN_SAISIE')`,
+      [ids.version, ids.crB],
+    );
+    const r = await service.retirerCrSnapshot(
+      ids.version,
+      'CR_B',
+      'CR sans activité',
+      validateur,
+    );
+    expect(r.retire).toBe(true);
+    const v = (await ds.query(`SELECT statut FROM dim_version WHERE id=$1`, [
+      ids.version,
+    ])) as Array<{ statut: string }>;
+    expect(v[0]!.statut).toBe('pre_valide');
+  });
+
+  it('réintégration d’un CR retiré → actif=true + audit CR_REINTEGRE_SNAPSHOT', async () => {
+    await resetSnapshot();
+    // Retire CR_B (EN_SAISIE sans ligne) puis réintègre.
+    await ds.query(
+      `INSERT INTO fait_budget_cr_statut (fk_version,fk_cr,statut) VALUES ($1,$2,'EN_SAISIE')`,
+      [ids.version, ids.crB],
+    );
+    await service.retirerCrSnapshot(ids.version, 'CR_B', 'motif', validateur);
+    // Après retrait, la version peut avoir basculé : on la remet OUVERT.
+    await ds.query(`UPDATE dim_version SET statut='ouvert' WHERE id=$1`, [
+      ids.version,
+    ]);
+    const r = await service.reintegrerCrSnapshot(
+      ids.version,
+      'CR_B',
+      validateur,
+    );
+    expect(r.reintegre).toBe(true);
+    const act = (await ds.query(
+      `SELECT actif FROM dim_version_cr_attendu WHERE fk_version=$1 AND fk_cr=$2`,
+      [ids.version, ids.crB],
+    )) as Array<{ actif: boolean }>;
+    expect(act[0]!.actif).toBe(true);
+    expect(await auditCount('CR_REINTEGRE_SNAPSHOT')).toBeGreaterThanOrEqual(1);
+  });
+
+  it('réintégration refusée si la version n’est pas OUVERTE', async () => {
+    await resetSnapshot();
+    // Retire CR_B puis fige la version en pre_valide.
+    await service.retirerCrSnapshot(ids.version, 'CR_B', 'motif', validateur);
+    await ds.query(`UPDATE dim_version SET statut='pre_valide' WHERE id=$1`, [
+      ids.version,
+    ]);
+    await expect(
+      service.reintegrerCrSnapshot(ids.version, 'CR_B', validateur),
+    ).rejects.toThrow(/OUVERTE/);
+  });
 });

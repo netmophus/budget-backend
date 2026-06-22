@@ -191,8 +191,30 @@ export class CrWorkflowController {
     @Param('crCode') crCode: string,
     @Body() dto: RetirerCrSnapshotDto,
     @CurrentUser() user: AuthUser,
-  ): Promise<{ crCode: string; retire: boolean }> {
-    return this.service.retirerCrSnapshot(versionId, crCode, dto.motif, user);
+  ): Promise<{ crCode: string; retire: boolean; force: boolean }> {
+    return this.service.retirerCrSnapshot(
+      versionId,
+      crCode,
+      dto.motif,
+      user,
+      dto.forcer ?? false,
+    );
+  }
+
+  @Post('version/:versionId/cr/:crCode/reintegrer-snapshot')
+  @HttpCode(HttpStatus.OK)
+  @RequirePermissions('BUDGET.COORDONNER')
+  @ApiOperation({
+    summary:
+      'Réintègre un CR précédemment retiré du snapshot (actif=false → ' +
+      'true). Réservé au Coordinateur ; version OUVERTE requise (Option A).',
+  })
+  reintegrerCrSnapshot(
+    @Param('versionId') versionId: string,
+    @Param('crCode') crCode: string,
+    @CurrentUser() user: AuthUser,
+  ): Promise<{ crCode: string; reintegre: boolean }> {
+    return this.service.reintegrerCrSnapshot(versionId, crCode, user);
   }
 
   @Get('version/:versionId/cr/:crCode/lignes')
