@@ -629,4 +629,84 @@ describe('CompteService', () => {
       expect(res.limit).toBe(2);
     });
   });
+
+  // ─── findParentsEligibles (dropdown Compte parent)
+
+  describe('findParentsEligibles', () => {
+    beforeEach(async () => {
+      // 6 > 63 > 631 > 6311 (tous classe 6 actifs) ; 632 inactif ;
+      // 7 (classe 7) ; 6off (classe 6, inactif).
+      const id6 = await rawInsert(dataSource, {
+        codeCompte: '6',
+        classe: '6',
+        niveau: 1,
+      });
+      const id63 = await rawInsert(dataSource, {
+        codeCompte: '63',
+        classe: '6',
+        niveau: 2,
+        parentId: id6,
+      });
+      const id631 = await rawInsert(dataSource, {
+        codeCompte: '631',
+        classe: '6',
+        niveau: 3,
+        parentId: id63,
+      });
+      await rawInsert(dataSource, {
+        codeCompte: '6311',
+        classe: '6',
+        niveau: 4,
+        parentId: id631,
+      });
+      await rawInsert(dataSource, {
+        codeCompte: '639',
+        classe: '6',
+        niveau: 2,
+        parentId: id6,
+        estActif: false,
+      });
+      await rawInsert(dataSource, {
+        codeCompte: '7',
+        classe: '7',
+        niveau: 1,
+      });
+    });
+
+    it('niveau 5 classe 6 → propose les niveaux 1-4 classe 6 actifs courants', async () => {
+      const rows = await service.findParentsEligibles('6', 5);
+      expect(rows.map((r) => r.codeCompte)).toEqual(['6', '63', '631', '6311']);
+    });
+
+    it('exclut les comptes inactifs et d’une autre classe', async () => {
+      const rows = await service.findParentsEligibles('6', 5);
+      const codes = rows.map((r) => r.codeCompte);
+      expect(codes).not.toContain('639'); // inactif
+      expect(codes).not.toContain('7'); // classe 7
+    });
+
+    it('niveau 2 → ne propose que les niveaux 1 (parents possibles)', async () => {
+      const rows = await service.findParentsEligibles('6', 2);
+      expect(rows.map((r) => r.codeCompte)).toEqual(['6']);
+    });
+
+    it('excludeId : exclut le compte et ses descendants (anti-cycle)', async () => {
+      const id63row = (await dataSource.query(
+        `SELECT id FROM dim_compte WHERE code_compte='63' AND version_courante=true`,
+      )) as Array<{ id: string }>;
+      const rows = await service.findParentsEligibles(
+        '6',
+        5,
+        String(id63row[0]!.id),
+      );
+      const codes = rows.map((r) => r.codeCompte);
+      // 63 (exclu) + ses descendants 631, 6311 (exclus) → reste 6.
+      expect(codes).toEqual(['6']);
+    });
+
+    it('aucun parent éligible → liste vide', async () => {
+      const rows = await service.findParentsEligibles('6', 1);
+      expect(rows).toEqual([]);
+    });
+  });
 });

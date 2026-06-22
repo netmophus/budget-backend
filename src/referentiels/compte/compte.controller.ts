@@ -41,6 +41,7 @@ import { ImportRapportDto } from './dto/import-rapport.dto';
 import type { ImportMode } from './dto/import-request.dto';
 import { ListComptesQueryDto } from './dto/list-comptes-query.dto';
 import { PaginatedComptesDto } from './dto/paginated-comptes.dto';
+import { ParentsEligiblesQueryDto } from './dto/parents-eligibles-query.dto';
 import { UpdateCompteDto } from './dto/update-compte.dto';
 
 /**
@@ -83,6 +84,26 @@ export class CompteController {
   @ApiOkResponse({ type: [CompteResponseDto] })
   async findRoots(): Promise<CompteResponseDto[]> {
     const rows = await this.compteService.findRoots();
+    return rows.map((r) => this.mapRow(r));
+  }
+
+  @Get('parents-eligibles')
+  @RequirePermissions('REFERENTIEL.LIRE')
+  @ApiOperation({
+    summary:
+      'Comptes éligibles comme parent (niveau < N, même classe, ' +
+      'courants, actifs, hors descendants de excludeId). Liste ciblée, ' +
+      'non paginée — alimente le dropdown « Compte parent ».',
+  })
+  @ApiOkResponse({ type: [CompteResponseDto] })
+  async findParentsEligibles(
+    @Query() query: ParentsEligiblesQueryDto,
+  ): Promise<CompteResponseDto[]> {
+    const rows = await this.compteService.findParentsEligibles(
+      query.classe,
+      query.niveau,
+      query.excludeId,
+    );
     return rows.map((r) => this.mapRow(r));
   }
 
