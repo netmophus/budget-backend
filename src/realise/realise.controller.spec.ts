@@ -5,9 +5,10 @@
  * La logique RBAC fine et le filtrage périmètre sont déjà couverts
  * par les tests RealiseService. Ici on vérifie la couche transport.
  */
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 
+import { ParametreSystemeService } from '../parametre-systeme/parametre-systeme.service';
 import { RealiseController } from './realise.controller';
 import { RealiseImportService } from './services/realise-import.service';
 import { RealiseService } from './services/realise.service';
@@ -18,6 +19,7 @@ describe('RealiseController', () => {
   let svc: jest.Mocked<RealiseService>;
   let importSvc: jest.Mocked<RealiseImportService>;
   let templateSvc: jest.Mocked<RealiseTemplateService>;
+  let parametreSvc: jest.Mocked<ParametreSystemeService>;
   const auteur = { userId: '10', email: 'admin@test.local' };
 
   beforeEach(async () => {
@@ -36,6 +38,11 @@ describe('RealiseController', () => {
     templateSvc = {
       genererTemplateXlsx: jest.fn(),
     } as unknown as jest.Mocked<RealiseTemplateService>;
+    parametreSvc = {
+      // Défaut MIXTE : la saisie manuelle est autorisée pour les tests
+      // de routage existants. Les tests dédiés overrident le mode.
+      getModeSaisieRealise: jest.fn().mockResolvedValue('MIXTE'),
+    } as unknown as jest.Mocked<ParametreSystemeService>;
 
     const moduleRef: TestingModule = await Test.createTestingModule({
       controllers: [RealiseController],
@@ -43,6 +50,7 @@ describe('RealiseController', () => {
         { provide: RealiseService, useValue: svc },
         { provide: RealiseImportService, useValue: importSvc },
         { provide: RealiseTemplateService, useValue: templateSvc },
+        { provide: ParametreSystemeService, useValue: parametreSvc },
       ],
     }).compile();
     controller = moduleRef.get(RealiseController);
@@ -79,6 +87,23 @@ describe('RealiseController', () => {
       fkDevise: '5',
       montant: 1000,
     } as never;
+    await controller.creer(dto, auteur);
+    expect(svc.creer).toHaveBeenCalledWith(dto, auteur);
+  });
+
+  it('POST /realise refusé (ForbiddenException) en mode CENTRALISE', async () => {
+    parametreSvc.getModeSaisieRealise.mockResolvedValue('CENTRALISE');
+    const dto = { montant: 1000 } as never;
+    await expect(controller.creer(dto, auteur)).rejects.toThrow(
+      ForbiddenException,
+    );
+    expect(svc.creer).not.toHaveBeenCalled();
+  });
+
+  it('POST /realise autorisé en mode DECENTRALISE', async () => {
+    parametreSvc.getModeSaisieRealise.mockResolvedValue('DECENTRALISE');
+    svc.creer.mockResolvedValue({} as never);
+    const dto = { montant: 1000 } as never;
     await controller.creer(dto, auteur);
     expect(svc.creer).toHaveBeenCalledWith(dto, auteur);
   });

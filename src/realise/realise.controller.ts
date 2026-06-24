@@ -17,6 +17,7 @@ import {
   Body,
   Controller,
   Delete,
+  ForbiddenException,
   Get,
   HttpCode,
   HttpStatus,
@@ -52,6 +53,7 @@ import {
   RapportImportRealiseDto,
   ValiderFaitsRealiseDto,
 } from './dto/realise.dto';
+import { ParametreSystemeService } from '../parametre-systeme/parametre-systeme.service';
 import { RealiseImportService } from './services/realise-import.service';
 import { RealiseService } from './services/realise.service';
 import { RealiseTemplateService } from './services/realise-template.service';
@@ -73,6 +75,7 @@ export class RealiseController {
     private readonly svc: RealiseService,
     private readonly importSvc: RealiseImportService,
     private readonly templateSvc: RealiseTemplateService,
+    private readonly parametreSvc: ParametreSystemeService,
   ) {}
 
   @Get()
@@ -147,13 +150,22 @@ export class RealiseController {
   @RequirePermissions('REALISE.SAISIR')
   @ApiOperation({
     summary:
-      "Saisie manuelle d'une ligne réalisé. Filtrage périmètre user_perimetres en écriture.",
+      "Saisie manuelle d'une ligne réalisé. Filtrage périmètre user_perimetres en écriture. Désactivée en mode CENTRALISE (Palier 1).",
   })
   @ApiCreatedResponse({ type: FaitRealiseResponseDto })
-  creer(
+  async creer(
     @Body() dto: CreerFaitRealiseDto,
     @CurrentUser() user: AuthUser,
   ): Promise<FaitRealiseResponseDto> {
+    // Garde-fou mode CENTRALISE : la saisie manuelle est réservée à
+    // l'import (Direction Finance). L'import (POST /import) reste ouvert.
+    const mode = await this.parametreSvc.getModeSaisieRealise();
+    if (mode === 'CENTRALISE') {
+      throw new ForbiddenException(
+        'Mode CENTRALISÉ : la saisie manuelle du réalisé est désactivée. ' +
+          'Elle est réservée à la Direction Finance via import.',
+      );
+    }
     return this.svc.creer(dto, user);
   }
 
