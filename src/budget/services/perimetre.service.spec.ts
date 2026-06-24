@@ -458,7 +458,7 @@ describe('PerimetreService.getPerimetreEffectif (Lot 4.1)', () => {
 
   async function ajouterPerimetre(
     userId: string,
-    cibleType: 'STRUCTURE' | 'CR' | 'CR_SET',
+    cibleType: 'STRUCTURE' | 'CR' | 'CR_SET' | 'GLOBAL',
     options: {
       cibleId?: string | null;
       cibleCrIds?: string[] | null;
@@ -537,6 +537,58 @@ describe('PerimetreService.getPerimetreEffectif (Lot 4.1)', () => {
     });
     const result = await service.getPerimetreEffectif(userId);
     expect(result).toHaveLength(2);
+  });
+
+  // ─── GLOBAL (gouvernance — migration 560) ─────────────────────
+
+  it('GLOBAL : getPerimetreEffectif → tous les CR actifs', async () => {
+    const userId = seed.userIds['preparateur_civ@miznas.local']!;
+    await ajouterPerimetre(userId, 'GLOBAL', {});
+    const result = await service.getPerimetreEffectif(userId);
+    expect(result).toHaveLength(7); // 7 CR seedés
+  });
+
+  it('GLOBAL : getCrAutorisesPourUser → null (pas de filtre)', async () => {
+    const userId = seed.userIds['preparateur_civ@miznas.local']!;
+    // Un rôle actif est requis (sinon Unauthorized).
+    await ds.query(
+      `INSERT INTO bridge_user_role ("fk_user","fk_role","perimetre_type","est_actif","utilisateur_creation")
+       VALUES ($1, $2, 'centre_responsabilite', true, 'system')`,
+      [userId, seed.roleIds['PREPARATEUR']!],
+    );
+    await ajouterPerimetre(userId, 'GLOBAL', {});
+    const result = await service.getCrAutorisesPourUser(userId);
+    expect(result).toBeNull();
+  });
+
+  it('GLOBAL + CR_SET : GLOBAL domine → null (getCrAutorises) / tous (effectif)', async () => {
+    const userId = seed.userIds['preparateur_civ@miznas.local']!;
+    await ds.query(
+      `INSERT INTO bridge_user_role ("fk_user","fk_role","perimetre_type","est_actif","utilisateur_creation")
+       VALUES ($1, $2, 'centre_responsabilite', true, 'system')`,
+      [userId, seed.roleIds['PREPARATEUR']!],
+    );
+    // Scope validateur conservé (CR_SET de 2) + GLOBAL en plus.
+    await ajouterPerimetre(userId, 'CR_SET', {
+      cibleCrIds: [
+        seed.crIds['CR_AG_ABJ_PLATEAU']!,
+        seed.crIds['CR_AG_ABJ_COCODY']!,
+      ],
+    });
+    await ajouterPerimetre(userId, 'GLOBAL', {});
+    expect(await service.getCrAutorisesPourUser(userId)).toBeNull();
+    expect(await service.getPerimetreEffectif(userId)).toHaveLength(7);
+  });
+
+  it('GLOBAL inactif → ignoré (pas de bypass)', async () => {
+    const userId = seed.userIds['preparateur_civ@miznas.local']!;
+    await ajouterPerimetre(userId, 'CR', {
+      cibleId: seed.crIds['CR_AG_ABJ_PLATEAU']!,
+    });
+    await ajouterPerimetre(userId, 'GLOBAL', { actif: false });
+    // GLOBAL inactif → on retombe sur le CR explicite.
+    const result = await service.getPerimetreEffectif(userId);
+    expect(result).toEqual([seed.crIds['CR_AG_ABJ_PLATEAU']!]);
   });
 
   it('exclut les périmètres avec date_fin dépassée', async () => {

@@ -16,7 +16,12 @@ import type {
   OriginePerimetre,
 } from '../entities/user-perimetre.entity';
 
-const CIBLE_TYPES: CiblePerimetreType[] = ['STRUCTURE', 'CR', 'CR_SET'];
+const CIBLE_TYPES: CiblePerimetreType[] = [
+  'STRUCTURE',
+  'CR',
+  'CR_SET',
+  'GLOBAL',
+];
 const ORIGINES: OriginePerimetre[] = ['PRINCIPAL', 'AFFECTATION', 'DELEGATION'];
 
 export class CreerAffectationPerimetreDto {

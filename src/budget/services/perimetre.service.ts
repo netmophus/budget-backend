@@ -89,6 +89,19 @@ export class PerimetreService {
 
     if (aDesAffectations > 0) {
       // user_perimetres prend la main → on ignore bridge_user_role.
+      // Cas GLOBAL : une affectation cible_type='GLOBAL' active vaut
+      // « tous les CR » → on renvoie null (même sémantique qu'un admin
+      // global : pas de filtre). GLOBAL domine l'union d'éventuels
+      // CR/CR_SET coexistants (superset).
+      const aGlobal = await this.userPerimetreRepo
+        .createQueryBuilder('up')
+        .where('up.fkUser = :userId', { userId })
+        .andWhere('up.actif = true')
+        .andWhere("up.cibleType = 'GLOBAL'")
+        .andWhere('up.dateDebut <= :today', { today })
+        .andWhere('(up.dateFin IS NULL OR up.dateFin >= :today)', { today })
+        .getCount();
+      if (aGlobal > 0) return null;
       return this.getPerimetreEffectif(userId, today);
     }
 
@@ -161,6 +174,13 @@ export class PerimetreService {
       .andWhere('up.dateDebut <= :today', { today })
       .andWhere('(up.dateFin IS NULL OR up.dateFin >= :today)', { today })
       .getMany();
+
+    // GLOBAL domine : une seule affectation GLOBAL active ⇒ tous les CR
+    // actifs courants (getPerimetreEffectif ne renvoyant jamais null,
+    // on matérialise la liste complète).
+    if (perimetres.some((p) => p.cibleType === 'GLOBAL')) {
+      return this.tousLesCrActifs();
+    }
 
     const setIds = new Set<string>();
     for (const p of perimetres) {
@@ -276,6 +296,19 @@ export class PerimetreService {
   }
 
   // ─── Helpers privés ────────────────────────────────────────────────
+
+  /**
+   * Liste de tous les `id` de CR courants et actifs — matérialise la
+   * sémantique d'un périmètre GLOBAL pour les callers qui exigent une
+   * liste explicite (getPerimetreEffectif ne renvoie jamais null).
+   */
+  private async tousLesCrActifs(): Promise<string[]> {
+    const rows = await this.userRoleRepo.manager.query<Array<{ id: string }>>(
+      `SELECT id FROM dim_centre_responsabilite
+        WHERE version_courante = true AND est_actif = true`,
+    );
+    return rows.map((r) => String(r.id));
+  }
 
   private async loadRolesActifs(userId: string): Promise<UserRole[]> {
     const today = new Date().toISOString().slice(0, 10);

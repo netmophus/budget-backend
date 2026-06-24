@@ -10,21 +10,25 @@ import {
 
 import { User } from './user.entity';
 
-export type CiblePerimetreType = 'STRUCTURE' | 'CR' | 'CR_SET';
+export type CiblePerimetreType = 'STRUCTURE' | 'CR' | 'CR_SET' | 'GLOBAL';
 export type OriginePerimetre = 'PRINCIPAL' | 'AFFECTATION' | 'DELEGATION';
 
 /**
  * `user_perimetres` (Lot 4.1.A) — affectation N-N user ↔ périmètre
- * budgétaire avec dates d'effet et 3 cible_type :
+ * budgétaire avec dates d'effet et 4 cible_type :
  *
  *  - STRUCTURE : descente d'arborescence (recursive — BFS itératif
  *    côté service car pg-mem ne supporte pas WITH RECURSIVE)
  *  - CR        : un seul centre de responsabilité (pas de descente)
  *  - CR_SET    : liste explicite de ≥ 2 CR (pas de descente)
+ *  - GLOBAL    : accès à TOUS les CR (gouvernance — DG, Comité,
+ *    Coordinateur, Auditeur…). Ni cible_id ni cible_cr_ids. Dans
+ *    l'union des périmètres, GLOBAL domine (superset).
  *
  * Cohérence garantie par la contrainte SQL `ck_user_perimetres_cible_coherence` :
  *   - STRUCTURE | CR  → cible_id NOT NULL, cible_cr_ids NULL
  *   - CR_SET          → cible_id NULL, cible_cr_ids NOT NULL avec ≥ 2 éléments
+ *   - GLOBAL          → cible_id NULL, cible_cr_ids NULL
  *
  * `delegation_id` sera FK vers la table `delegations` au Lot 4.2.
  */
@@ -33,7 +37,7 @@ export type OriginePerimetre = 'PRINCIPAL' | 'AFFECTATION' | 'DELEGATION';
 @Index('idx_user_perimetres_cible', ['cibleType', 'cibleId'])
 @Check(
   'ck_user_perimetres_cible_type_check',
-  `"cible_type" IN ('STRUCTURE','CR','CR_SET')`,
+  `"cible_type" IN ('STRUCTURE','CR','CR_SET','GLOBAL')`,
 )
 export class UserPerimetre {
   @PrimaryGeneratedColumn('identity', { type: 'bigint' })
