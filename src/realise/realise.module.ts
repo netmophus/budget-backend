@@ -6,6 +6,7 @@ import { AuditModule } from '../audit/audit.module';
 import { AuthModule } from '../auth/auth.module';
 import { BudgetModule } from '../budget/budget.module';
 import { NotificationsModule } from '../notifications/notifications.module';
+import { ParametreSystemeModule } from '../parametre-systeme/parametre-systeme.module';
 import { TableauBordModule } from '../tableau-de-bord/tableau-bord.module';
 import { FaitRealise } from './entities/fait-realise.entity';
 import { RealiseController } from './realise.controller';
@@ -37,6 +38,7 @@ import { RealiseTemplateService } from './services/realise-template.service';
     BudgetModule, // pour PerimetreService
     TableauBordModule, // pour AnalyseEcartsService (Lot 8.5.E)
     NotificationsModule, // pour NotificationsService (Lot 8.5.E)
+    ParametreSystemeModule, // pour le toggle mode_saisie_realise (Palier 1)
   ],
   controllers: [RealiseController],
   providers: [

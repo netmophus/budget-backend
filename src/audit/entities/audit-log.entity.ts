@@ -148,7 +148,12 @@ export type TypeAction =
   // Code seede en base via migration 1779200000550
   // Action Coordinateur inverse de RETIRER_CR_SNAPSHOT (actif false vers true)
   // Pas de point-virgule dans ce commentaire (regex CI fragile)
-  | 'CR_REINTEGRE_SNAPSHOT';
+  | 'CR_REINTEGRE_SNAPSHOT'
+  // Palier 1 gouvernance saisie realise — modification d un parametre
+  // systeme (ex mode_saisie_realise) via PATCH configuration
+  // Code seede en base via migration 1779200000570
+  // Pas de point-virgule dans ce commentaire (regex CI fragile)
+  | 'MODIFIER_PARAMETRE_SYSTEME';
 
 export type AuditStatut = 'success' | 'failure';
 

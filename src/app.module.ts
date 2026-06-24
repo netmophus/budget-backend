@@ -18,6 +18,7 @@ import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 import { DelegationsModule } from './delegations/delegations.module';
 import { DocumentsOfficielsModule } from './documents-officiels/documents-officiels.module';
 import { NotificationsModule } from './notifications/notifications.module';
+import { ParametreSystemeModule } from './parametre-systeme/parametre-systeme.module';
 import { RealiseModule } from './realise/realise.module';
 import { ReforecastModule } from './reforecast/reforecast.module';
 import { ReportingModule } from './reporting/reporting.module';
@@ -146,6 +147,7 @@ import { UsersModule } from './users/users.module';
     NotificationsModule,
     // Lot 5.1 — réalisé budgétaire
     RealiseModule,
+    ParametreSystemeModule,
     // Lot 5.2 — tableau de bord budget vs réalisé
     TableauBordModule,
     // Lot 5.3 — reforecast trimestriel
