@@ -16,10 +16,11 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
  *     La résolution de périmètre (PerimetreService.getCrAutorisesPourUser
  *     → null ; UserPerimetreService.resoudreCrAccessibles → tous les CR)
  *     honore GLOBAL : c'est le code qui matérialise le « voit tout ».
- *  2. Insère une affectation GLOBAL pour les 4 utilisateurs de
- *     gouvernance : DG, Président Comité, et 2 membres Comité. GLOBAL
- *     domine l'union → leurs CR_SET validateur éventuels sont conservés
- *     (documentation du scope nominal) mais n'ont plus d'effet restrictif.
+ *  2. Insère une affectation GLOBAL pour les 5 utilisateurs de
+ *     gouvernance : DG, Président Comité, 2 membres Comité et le
+ *     Coordinateur. GLOBAL domine l'union → leurs CR_SET validateur /
+ *     coordination éventuels sont conservés (documentation du scope
+ *     nominal) mais n'ont plus d'effet restrictif.
  *  3. Assainit `bridge_user_role.perimetre_type` : il valait 'global'
  *     pour TOUT le monde (faux). On le repasse à 'centre_responsabilite'
  *     pour les rôles terrain (SAISISSEUR/VALIDATEUR) UNIQUEMENT quand le
@@ -42,6 +43,7 @@ export class AjouterPerimetreGlobalEtAssainirBridge1779200000560 implements Migr
     'souleymane.diori@bsic.ne', // Président Comité (VALIDATEUR)
     'halima.ousmane@bsic.ne', // Membre Comité (VALIDATEUR)
     'ibrahima.mahamadou@bsic.ne', // Membre Comité (VALIDATEUR)
+    'ousmane.mamane@bsic.ne', // Coordinateur (cumul avec son CR_SET)
   ];
 
   private static readonly MOTIF_GLOBAL =
