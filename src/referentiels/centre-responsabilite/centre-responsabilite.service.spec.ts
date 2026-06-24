@@ -534,6 +534,32 @@ describe('CentreResponsabiliteService', () => {
       expect(result.limit).toBe(200);
     });
 
+    it('non-ADMIN avec périmètre GLOBAL → voit tous les CR (migration 560)', async () => {
+      // GLOBAL : resoudreCrAccessibles renvoie TOUS les CR courants/actifs
+      // (cf. user-perimetre.service.spec). Un DG/Comité non-ADMIN n'est
+      // plus bloqué par un dropdown vide.
+      const sId = await insertStructure(dataSource, { codeStructure: 'SOC' });
+      const tous: string[] = [];
+      for (const code of ['CR_1', 'CR_2', 'CR_3', 'CR_4']) {
+        tous.push(
+          await insertCr(dataSource, { codeCr: code, fkStructure: sId }),
+        );
+      }
+
+      permsMock.hasPermission.mockResolvedValue(false); // pas SYSTEM.ADMIN
+      perimMock.resoudreCrAccessibles.mockResolvedValue(tous);
+
+      const result = await service.findAllPaginated(query, userTest);
+
+      expect(result.total).toBe(4);
+      expect(result.items.map((c) => c.codeCr).sort()).toEqual([
+        'CR_1',
+        'CR_2',
+        'CR_3',
+        'CR_4',
+      ]);
+    });
+
     it('non-ADMIN avec filtre codeStructure + périmètre limité → intersection', async () => {
       const sId1 = await insertStructure(dataSource, { codeStructure: 'AG' });
       const sId2 = await insertStructure(dataSource, { codeStructure: 'DG' });

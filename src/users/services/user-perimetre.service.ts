@@ -145,6 +145,17 @@ export class UserPerimetreService {
       where: { fkUser: userId, actif: true },
     });
 
+    // GLOBAL domine : une affectation cible_type='GLOBAL' active ⇒ tous
+    // les CR courants et actifs (gouvernance — DG / Comité / Coordinateur
+    // qui n'ont pas la permission SYSTEM.ADMIN mais voient tout).
+    if (perimetres.some((p) => p.cibleType === 'GLOBAL')) {
+      const all = await this.repo.manager.query<Array<{ id: string }>>(
+        `SELECT id FROM dim_centre_responsabilite
+          WHERE version_courante = true AND est_actif = true`,
+      );
+      return all.map((cr) => String(cr.id));
+    }
+
     const idsSet = new Set<string>();
 
     for (const p of perimetres) {
@@ -360,6 +371,14 @@ export class UserPerimetreService {
   // ─── Helpers ─────────────────────────────────────────────────────
 
   private validerCible(dto: CreerAffectationPerimetreInput): void {
+    if (dto.cibleType === 'GLOBAL') {
+      if (dto.cibleId || dto.cibleCrIds) {
+        throw new BadRequestException(
+          `cible_type='GLOBAL' interdit cible_id et cible_cr_ids.`,
+        );
+      }
+      return;
+    }
     if (dto.cibleType === 'CR_SET') {
       if (dto.cibleId) {
         throw new BadRequestException(

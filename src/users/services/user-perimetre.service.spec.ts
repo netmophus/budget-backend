@@ -186,6 +186,27 @@ describe('UserPerimetreService', () => {
     expect(r.cibleId).toBeNull();
   });
 
+  it('crée une affectation GLOBAL valide (sans cible)', async () => {
+    const r = await service.creer(
+      ids.userId,
+      { cibleType: 'GLOBAL' },
+      'admin@miznas.local',
+    );
+    expect(r.cibleType).toBe('GLOBAL');
+    expect(r.cibleId).toBeNull();
+    expect(r.cibleCrIds).toBeNull();
+  });
+
+  it('rejette GLOBAL avec cible_id (BadRequest)', async () => {
+    await expect(
+      service.creer(
+        ids.userId,
+        { cibleType: 'GLOBAL', cibleId: ids.crCivId },
+        'admin',
+      ),
+    ).rejects.toThrow(BadRequestException);
+  });
+
   it('rejette CR_SET avec un seul CR (BadRequest)', async () => {
     await expect(
       service.creer(
@@ -550,6 +571,55 @@ describe('UserPerimetreService', () => {
         [ids.userId, get.CR_DIRECT, get.CR_IN_SET_1],
       );
 
+      const result = await service.resoudreCrAccessibles(ids.userId);
+      expect(result).toEqual([get.CR_DIRECT]);
+    });
+
+    it('GLOBAL → tous les CR courants/actifs (migration 560)', async () => {
+      const get = await resetEtSeedCrs();
+      await ds.query(
+        `INSERT INTO user_perimetres
+           (fk_user, cible_type, cible_id, cible_cr_ids, origine, date_debut, actif, utilisateur_creation)
+         VALUES ($1, 'GLOBAL', NULL, NULL, 'AFFECTATION', CURRENT_DATE, true, 'system')`,
+        [ids.userId],
+      );
+      const result = await service.resoudreCrAccessibles(ids.userId);
+      // Les 5 CR seedés (CR_DIRECT, CR_IN_SET_1/2, CR_STRUCT_1/2).
+      expect(result.sort()).toEqual(
+        [
+          get.CR_DIRECT,
+          get.CR_IN_SET_1,
+          get.CR_IN_SET_2,
+          get.CR_STRUCT_1,
+          get.CR_STRUCT_2,
+        ].sort(),
+      );
+    });
+
+    it('GLOBAL + CR_SET → GLOBAL domine (tous les CR)', async () => {
+      const get = await resetEtSeedCrs();
+      await ds.query(
+        `INSERT INTO user_perimetres
+           (fk_user, cible_type, cible_id, cible_cr_ids, origine, date_debut, actif, utilisateur_creation)
+         VALUES
+           ($1, 'CR_SET', NULL, ARRAY[$2, $3]::bigint[], 'AFFECTATION', CURRENT_DATE, true, 'system'),
+           ($1, 'GLOBAL', NULL, NULL,                    'AFFECTATION', CURRENT_DATE, true, 'system')`,
+        [ids.userId, get.CR_DIRECT, get.CR_IN_SET_1],
+      );
+      const result = await service.resoudreCrAccessibles(ids.userId);
+      expect(result).toHaveLength(5);
+    });
+
+    it('GLOBAL inactif → ignoré (retombe sur le scope explicite)', async () => {
+      const get = await resetEtSeedCrs();
+      await ds.query(
+        `INSERT INTO user_perimetres
+           (fk_user, cible_type, cible_id, cible_cr_ids, origine, date_debut, actif, utilisateur_creation)
+         VALUES
+           ($1, 'CR',     $2,   NULL, 'AFFECTATION', CURRENT_DATE, true,  'system'),
+           ($1, 'GLOBAL', NULL, NULL, 'AFFECTATION', CURRENT_DATE, false, 'system')`,
+        [ids.userId, get.CR_DIRECT],
+      );
       const result = await service.resoudreCrAccessibles(ids.userId);
       expect(result).toEqual([get.CR_DIRECT]);
     });
