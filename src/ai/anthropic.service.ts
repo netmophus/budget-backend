@@ -197,7 +197,7 @@ export class AnthropicService {
       cr: l.codeCr,
       compte: `${l.codeCompte} ${l.libelleCompte}`,
       mois: l.libelleMois,
-      budget: Math.round(l.montantBudget),
+      budget: Math.round(l.montantBudget ?? 0),
       realise: l.montantRealise === null ? null : Math.round(l.montantRealise),
       ecartPct: l.ecartPct,
       niveau: l.niveauAlerte,
@@ -260,17 +260,18 @@ export class AnthropicService {
     for (const l of lignes) {
       const existing = acc.get(l.mois);
       const realise = l.montantRealise ?? 0;
+      const budget = l.montantBudget ?? 0;
       if (existing) {
-        existing.totalBudget += l.montantBudget;
+        existing.totalBudget += budget;
         existing.totalRealise += realise;
-        existing.totalEcart += realise - l.montantBudget;
+        existing.totalEcart += realise - budget;
       } else {
         acc.set(l.mois, {
           mois: l.mois,
           libelleMois: l.libelleMois,
-          totalBudget: Math.round(l.montantBudget),
+          totalBudget: Math.round(budget),
           totalRealise: Math.round(realise),
-          totalEcart: Math.round(realise - l.montantBudget),
+          totalEcart: Math.round(realise - budget),
         });
       }
     }

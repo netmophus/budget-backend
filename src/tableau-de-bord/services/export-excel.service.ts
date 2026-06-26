@@ -1,7 +1,8 @@
 /**
- * ExportExcelService (Lot 5.2.B) — génère un .xlsx avec 3 onglets
- * (Synthèse / Détail des écarts / Filtres) et mise en forme
- * conditionnelle sur la colonne « Niveau ».
+ * ExportExcelService (Lot 5.2.B + PR3) — génère un .xlsx à 4 onglets :
+ * Synthèse (KPI + bloc compte de résultat PNB/CE/Solde), Détail des
+ * écarts (avec colonne % d'exécution + mise en forme conditionnelle
+ * « Niveau »), Filtres, et Top performances (sur / sous-performances).
  *
  * Réutilise exceljs (déjà dans le projet depuis Lot 3.7).
  */
@@ -15,6 +16,7 @@ const COULEURS_NIVEAU: Record<NiveauAlerte, string> = {
   ATTENTION: 'FFEB9C', // orange clair
   CRITIQUE: 'FFC7CE', // rouge clair
   MANQUANT: 'D9D9D9', // gris clair
+  SANS_BUDGET: 'FCD5B4', // orange (réalisé sans budget)
 };
 
 const NIVEAU_LIBELLE: Record<NiveauAlerte, string> = {
@@ -22,6 +24,7 @@ const NIVEAU_LIBELLE: Record<NiveauAlerte, string> = {
   ATTENTION: 'Attention',
   CRITIQUE: 'Critique',
   MANQUANT: 'Manquant',
+  SANS_BUDGET: 'Sans budget',
 };
 
 @Injectable()
@@ -48,6 +51,7 @@ export class ExportExcelService {
     };
 
     const k = ecarts.kpi;
+    const t = ecarts.totaux;
     const lignesSynth: Array<{ k: string; v: number | string }> = [
       { k: 'Version', v: metaCodeVersion },
       {
@@ -63,22 +67,40 @@ export class ExportExcelService {
         v: ecarts.filtres.seuilEcartPctCritique ?? 10,
       },
       { k: '', v: '' },
+      // Compte de résultat (PR3).
+      { k: 'PNB Budget (FCFA)', v: t.pnb.budget },
+      { k: 'PNB Réalisé (FCFA)', v: t.pnb.realise },
+      {
+        k: 'Coef. exploitation Budget (%)',
+        v: t.coefExploitationBudget ?? '—',
+      },
+      {
+        k: 'Coef. exploitation Réalisé (%)',
+        v: t.coefExploitationRealise ?? '—',
+      },
+      { k: 'Solde Budget (FCFA)', v: t.solde.budget },
+      { k: 'Solde Réalisé (FCFA)', v: t.solde.realise },
+      { k: '', v: '' },
       { k: 'Nb total écarts', v: k.nbEcartsTotal },
       { k: 'Nb écarts CRITIQUES', v: k.nbEcartsCritique },
       { k: 'Nb écarts ATTENTION', v: k.nbEcartsAttention },
       { k: 'Nb lignes MANQUANTES', v: k.nbLignesManquantes },
+      { k: 'Nb lignes SANS BUDGET', v: k.nbSansBudget },
       { k: '', v: '' },
       { k: 'Écart total absolu (FCFA)', v: k.ecartTotalAbs },
-      { k: '  dont défavorable', v: k.ecartTotalDefavorable },
-      { k: '  dont favorable', v: k.ecartTotalFavorable },
+      { k: '  dont défavorable (FCFA)', v: k.ecartTotalDefavorable },
+      { k: '  dont favorable (FCFA)', v: k.ecartTotalFavorable },
       { k: '', v: '' },
       { k: 'Date de génération', v: new Date().toISOString() },
     ];
     for (const r of lignesSynth) wsSynth.addRow(r);
-    // Format milliers sur les colonnes monétaires (rangées 11-13)
-    for (const i of [11, 12, 13]) {
-      wsSynth.getCell(`B${i}`).numFmt = '#,##0';
-    }
+    // Format milliers sur toutes les lignes monétaires (piloté par le
+    // libellé, robuste à l'ordre des lignes).
+    lignesSynth.forEach((r, idx) => {
+      if (typeof r.v === 'number' && /FCFA/i.test(r.k)) {
+        wsSynth.getCell(`B${idx + 2}`).numFmt = '#,##0';
+      }
+    });
 
     // ─── Onglet 2 — Détail des écarts ─────────────────────────
     const wsDetail = wb.addWorksheet('Détail des écarts');
@@ -95,6 +117,7 @@ export class ExportExcelService {
       { header: 'Réalisé', key: 'montantRealise', width: 16 },
       { header: 'Écart', key: 'ecart', width: 16 },
       { header: 'Écart %', key: 'ecartPct', width: 12 },
+      { header: '% exéc.', key: 'tauxExecution', width: 10 },
       { header: 'Niveau', key: 'niveauLibelle', width: 12 },
       { header: 'Sens', key: 'sensEcart', width: 14 },
     ];
@@ -121,6 +144,7 @@ export class ExportExcelService {
         montantRealise: l.montantRealise,
         ecart: l.ecart,
         ecartPct: l.ecartPct === null ? null : l.ecartPct / 100,
+        tauxExecution: l.tauxExecution === null ? null : l.tauxExecution / 100,
         niveauLibelle: NIVEAU_LIBELLE[l.niveauAlerte],
         sensEcart: l.sensEcart ?? '—',
       });
@@ -129,6 +153,7 @@ export class ExportExcelService {
       row.getCell('montantRealise').numFmt = '#,##0';
       row.getCell('ecart').numFmt = '#,##0';
       row.getCell('ecartPct').numFmt = '0.0%';
+      row.getCell('tauxExecution').numFmt = '0.0%';
       // Couleur de fond conditionnelle sur la colonne Niveau
       row.getCell('niveauLibelle').fill = {
         type: 'pattern',
@@ -174,6 +199,48 @@ export class ExportExcelService {
       k: 'Seuil CRITIQUE (%)',
       v: f.seuilEcartPctCritique ?? 10,
     });
+
+    // ─── Onglet 4 — Top performances (sur / sous) (PR3) ───────
+    const wsTop = wb.addWorksheet('Top performances');
+    wsTop.columns = [
+      { header: 'Catégorie', key: 'cat', width: 18 },
+      { header: 'CR', key: 'cr', width: 16 },
+      { header: 'Compte', key: 'compte', width: 36 },
+      { header: 'Mois', key: 'mois', width: 14 },
+      { header: 'Écart abs. (FCFA)', key: 'ecartAbs', width: 18 },
+      { header: 'Sens', key: 'sens', width: 14 },
+    ];
+    const topHeader = wsTop.getRow(1);
+    topHeader.font = { bold: true };
+    topHeader.fill = {
+      type: 'pattern',
+      pattern: 'solid',
+      fgColor: { argb: 'D9D9D9' },
+    };
+    wsTop.views = [{ state: 'frozen', ySplit: 1 }];
+
+    const topParSens = (sens: 'FAVORABLE' | 'DEFAVORABLE') =>
+      ecarts.lignes
+        .filter((l) => l.sensEcart === sens && l.ecartAbs !== null)
+        .sort((a, b) => (b.ecartAbs ?? 0) - (a.ecartAbs ?? 0))
+        .slice(0, 10);
+
+    for (const [cat, sens] of [
+      ['Sur-performance', 'FAVORABLE'],
+      ['Sous-performance', 'DEFAVORABLE'],
+    ] as const) {
+      for (const l of topParSens(sens)) {
+        const row = wsTop.addRow({
+          cat,
+          cr: l.codeCr,
+          compte: `${l.codeCompte} ${l.libelleCompte}`,
+          mois: l.libelleMois,
+          ecartAbs: l.ecartAbs,
+          sens,
+        });
+        row.getCell('ecartAbs').numFmt = '#,##0';
+      }
+    }
 
     const buf = await wb.xlsx.writeBuffer();
     return Buffer.from(buf);

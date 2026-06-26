@@ -408,7 +408,7 @@ export class AlerteEcartService {
       codeCompte: l.codeCompte,
       libelleCompte: l.libelleCompte,
       codeCr: l.codeCr,
-      montantBudgetFormatte: this.formatFcfa(l.montantBudget),
+      montantBudgetFormatte: this.formatFcfa(l.montantBudget ?? 0),
       montantRealiseFormatte:
         l.montantRealise === null ? '—' : this.formatFcfa(l.montantRealise),
       ecartPctFormatte:
