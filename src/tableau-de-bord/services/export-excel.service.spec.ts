@@ -102,12 +102,30 @@ describe('ExportExcelService', () => {
     svc = new ExportExcelService();
   });
 
-  it('génère un .xlsx valide avec 3 onglets', async () => {
+  it('génère un .xlsx valide avec 4 onglets', async () => {
     const buf = await svc.genererXlsx(makeEcarts(), 'BI_2027');
     expect(buf.length).toBeGreaterThan(1000);
     const wb = await loadXlsxFromBuffer(buf);
     const noms = wb.worksheets.map((w) => w.name).sort();
-    expect(noms).toEqual(['Détail des écarts', 'Filtres', 'Synthèse']);
+    expect(noms).toEqual([
+      'Détail des écarts',
+      'Filtres',
+      'Synthèse',
+      'Top performances',
+    ]);
+  });
+
+  it('onglet Synthèse contient le bloc PNB / coef. exploitation', async () => {
+    const buf = await svc.genererXlsx(makeEcarts(), 'BI_2027');
+    const wb = await loadXlsxFromBuffer(buf);
+    const ws = wb.getWorksheet('Synthèse')!;
+    const keys: string[] = [];
+    ws.eachRow((row) =>
+      keys.push((row.getCell(1).value as string | null) ?? ''),
+    );
+    expect(keys).toContain('PNB Budget (FCFA)');
+    expect(keys).toContain('PNB Réalisé (FCFA)');
+    expect(keys).toContain('Coef. exploitation Budget (%)');
   });
 
   it('onglet Synthèse contient les KPI cohérents', async () => {
@@ -133,12 +151,13 @@ describe('ExportExcelService', () => {
     const buf = await svc.genererXlsx(makeEcarts(), 'BI_2027');
     const wb = await loadXlsxFromBuffer(buf);
     const ws = wb.getWorksheet('Détail des écarts')!;
-    // Header attendu en ligne 1
-    expect(ws.getCell('M1').value).toBe('Niveau');
+    // Header attendu en ligne 1 — Niveau en colonne N (après l'ajout de
+    // « % exéc. » en colonne M).
+    expect(ws.getCell('M1').value).toBe('% exéc.');
+    expect(ws.getCell('N1').value).toBe('Niveau');
     // 4 lignes de données (lignes 2 à 5)
     const couleursAttendues: Record<number, string> = {
-      // Tri par ecartAbs décroissant : NORMAL ecartAbs = 1000 → ligne 5 (en bas).
-      // L'ordre EXACT est l'ordre fourni dans `lignes` du DTO :
+      // Ordre fourni dans `lignes` du DTO :
       // [CRITIQUE 150K, ATTENTION 70K, MANQUANT, NORMAL 1K]
       2: 'FFC7CE', // CRITIQUE rouge clair
       3: 'FFEB9C', // ATTENTION orange clair
@@ -146,11 +165,24 @@ describe('ExportExcelService', () => {
       5: 'C6EFCE', // NORMAL vert clair
     };
     for (const [row, argb] of Object.entries(couleursAttendues)) {
-      const cell = ws.getCell(`M${row}`);
+      const cell = ws.getCell(`N${row}`);
       const fill = cell.fill as ExcelJS.FillPattern | undefined;
       expect(fill?.type).toBe('pattern');
       expect((fill?.fgColor as { argb?: string } | undefined)?.argb).toBe(argb);
     }
+  });
+
+  it('onglet Top performances : sur + sous-performances', async () => {
+    const buf = await svc.genererXlsx(makeEcarts(), 'BI_2027');
+    const wb = await loadXlsxFromBuffer(buf);
+    const ws = wb.getWorksheet('Top performances')!;
+    const cats: string[] = [];
+    ws.eachRow((row, idx) => {
+      if (idx === 1) return;
+      cats.push((row.getCell(1).value as string | null) ?? '');
+    });
+    // Le dataset makeEcarts() a des lignes DEFAVORABLE → sous-performance.
+    expect(cats).toContain('Sous-performance');
   });
 
   it("onglet Filtres reflète les paramètres d'analyse", async () => {

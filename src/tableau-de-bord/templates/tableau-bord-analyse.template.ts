@@ -258,7 +258,32 @@ function renderPage1HeaderEtKpi(
     .text(
       `Dont défavorable : ${formatMontant(k.ecartTotalDefavorable)} FCFA  ·  ` +
         `Dont favorable : ${formatMontant(k.ecartTotalFavorable)} FCFA  ·  ` +
-        `Lignes sans réalisé : ${String(k.nbLignesManquantes)}`,
+        `Lignes sans réalisé : ${String(k.nbLignesManquantes)}  ·  ` +
+        `Sans budget : ${String(k.nbSansBudget)}`,
+      left,
+      y,
+      { width: widthDispo, align: 'center', lineBreak: false },
+    );
+
+  // Compte de résultat — PNB / coefficient d'exploitation (PR3).
+  y += 16;
+  const t = data.ecarts.totaux;
+  const ceB =
+    t.coefExploitationBudget === null
+      ? '—'
+      : `${t.coefExploitationBudget.toFixed(1)} %`;
+  const ceR =
+    t.coefExploitationRealise === null
+      ? '—'
+      : `${t.coefExploitationRealise.toFixed(1)} %`;
+  doc
+    .fillColor(BSIC_BRAND.colors.bleuNuit)
+    .font(BSIC_BRAND.fonts.titre)
+    .fontSize(BSIC_BRAND.fontSizes.bodySmall)
+    .text(
+      `Compte de résultat — PNB Budget : ${formatMontant(t.pnb.budget)} FCFA  ·  ` +
+        `PNB Réalisé : ${formatMontant(t.pnb.realise)} FCFA  ·  ` +
+        `Coef. exploitation B/R : ${ceB} / ${ceR}`,
       left,
       y,
       { width: widthDispo, align: 'center', lineBreak: false },
