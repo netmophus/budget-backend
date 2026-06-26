@@ -28,6 +28,8 @@ import {
   type NatureCompte,
   type NiveauAlerte,
   type SensEcart,
+  TotalEcartDto,
+  TotauxEcartsDto,
 } from '../dto/tableau-bord.dto';
 
 const SEUIL_ATTENTION_DEFAUT = 5;
@@ -39,16 +41,12 @@ interface AuthCaller {
 }
 
 interface LigneBrute {
-  fk_centre_responsabilite: string;
   code_cr: string;
   libelle_cr: string;
-  fk_compte: string;
   code_compte: string;
   libelle_compte: string;
   classe_compte: string;
-  fk_ligne_metier: string;
   code_ligne_metier: string;
-  fk_temps: string;
   /**
    * Important : en prod, le pilote `pg` renvoie un `Date` JS pour
    * une colonne `date`. `String(date).slice(0,7)` produit alors
@@ -58,9 +56,28 @@ interface LigneBrute {
    */
   mois_num: number;
   annee: number;
-  montant_budget: string; // numeric → string PG
+  montant_budget: string | null; // null si réalisé sans budget (FULL JOIN)
   montant_realise: string | null;
 }
+
+/** Construit un agrégat budget/réalisé avec écart + taux d'exécution. */
+function totalEcart(budget: number, realise: number): TotalEcartDto {
+  return {
+    budget,
+    realise,
+    ecart: realise - budget,
+    tauxExecution: budget !== 0 ? (realise / budget) * 100 : null,
+  };
+}
+
+const TOTAUX_VIDES: TotauxEcartsDto = {
+  produits: { budget: 0, realise: 0, ecart: 0, tauxExecution: null },
+  charges: { budget: 0, realise: 0, ecart: 0, tauxExecution: null },
+  solde: { budget: 0, realise: 0, ecart: 0, tauxExecution: null },
+  pnb: { budget: 0, realise: 0, ecart: 0, tauxExecution: null },
+  coefExploitationBudget: null,
+  coefExploitationRealise: null,
+};
 
 const MOIS_LIBELLES_FR = [
   'Janvier',
@@ -160,80 +177,109 @@ export class AnalyseEcartsService {
             nbEcartsCritique: 0,
             nbEcartsAttention: 0,
             nbLignesManquantes: 0,
+            nbSansBudget: 0,
             ecartTotalAbs: 0,
             ecartTotalDefavorable: 0,
             ecartTotalFavorable: 0,
           },
+          totaux: TOTAUX_VIDES,
           lignes: [],
         };
       }
     }
 
-    // 3. Construction du SQL — LEFT JOIN central
+    // 3. Construction du SQL — équivalent FULL JOIN émulé.
+    //    pg-mem (tests) ne supporte pas FULL OUTER JOIN → on combine
+    //    deux requêtes : (1) lignes pilotées par le budget (réalisé
+    //    éventuel, MANQUANT sinon) et (2) lignes réalisé SANS budget
+    //    (anti-join). Les deux côtés sont AGRÉGÉS au grain
+    //    (CR × compte × ligne_metier × mois) pour éviter le double
+    //    comptage du réalisé sur le grain produit/segment du budget.
     const params: unknown[] = [
       filtres.versionId,
       filtres.scenarioId,
       `${filtres.moisDebut}-01`,
       `${filtres.moisFin}-01`,
     ];
-    let crFilter = '';
+    let crBudget = '';
+    let crRealise = '';
     if (crIdsFinal !== null) {
       const placeholders = crIdsFinal
         .map((_, i) => `$${params.length + i + 1}`)
         .join(',');
-      // Note : la colonne dans fait_budget s'appelle `fk_centre`
-      // (différent de fait_realise qui a `fk_centre_responsabilite`).
-      crFilter = `AND fb.fk_centre IN (${placeholders})`;
+      // fait_budget = `fk_centre` ; fait_realise = `fk_centre_responsabilite`.
+      crBudget = `AND fb.fk_centre IN (${placeholders})`;
+      crRealise = `AND fr.fk_centre_responsabilite IN (${placeholders})`;
       params.push(...crIdsFinal);
     }
-    let lmFilter = '';
+    let lmBudget = '';
+    let lmRealise = '';
     if (filtres.ligneMetierIds && filtres.ligneMetierIds.length > 0) {
       const placeholders = filtres.ligneMetierIds
         .map((_, i) => `$${params.length + i + 1}`)
         .join(',');
-      lmFilter = `AND fb.fk_ligne_metier IN (${placeholders})`;
+      lmBudget = `AND fb.fk_ligne_metier IN (${placeholders})`;
+      lmRealise = `AND fr.fk_ligne_metier IN (${placeholders})`;
       params.push(...filtres.ligneMetierIds);
     }
 
-    const sql = `
-      SELECT
-        fb.fk_centre AS fk_centre_responsabilite,
-        cr.code_cr,
-        cr.libelle AS libelle_cr,
-        fb.fk_compte,
-        c.code_compte,
-        c.libelle AS libelle_compte,
-        c.classe AS classe_compte,
-        fb.fk_ligne_metier,
-        lm.code_ligne_metier,
-        fb.fk_temps,
-        t.mois AS mois_num,
-        t.annee,
-        fb.montant_fcfa AS montant_budget,
-        fr.montant AS montant_realise
+    const budgetAgg = `
+      SELECT fb.fk_centre AS cr_id, fb.fk_compte AS compte_id,
+             fb.fk_ligne_metier AS lm_id, fb.fk_temps AS temps_id,
+             SUM(fb.montant_fcfa) AS montant_budget
       FROM fait_budget fb
-      INNER JOIN dim_compte c ON c.id = fb.fk_compte
-      INNER JOIN dim_centre_responsabilite cr ON cr.id = fb.fk_centre
-      INNER JOIN dim_ligne_metier lm ON lm.id = fb.fk_ligne_metier
-      INNER JOIN dim_temps t ON t.id = fb.fk_temps
-      LEFT JOIN fait_realise fr ON
-        fr.fk_centre_responsabilite = fb.fk_centre
-        AND fr.fk_compte = fb.fk_compte
-        AND fr.fk_ligne_metier = fb.fk_ligne_metier
-        AND fr.fk_temps = fb.fk_temps
-        AND fr.fk_devise = fb.fk_devise
-        AND fr.statut = 'VALIDE'
-      WHERE fb.fk_version = $1
-        AND fb.fk_scenario = $2
-        AND t.date >= $3::date
-        AND t.date <= $4::date
-        AND t.jour = 1
-        ${crFilter}
-        ${lmFilter}
-      ORDER BY cr.code_cr ASC, c.code_compte ASC, t.date ASC
+      INNER JOIN dim_temps tb ON tb.id = fb.fk_temps
+        AND tb.date >= $3::date AND tb.date <= $4::date AND tb.jour = 1
+      WHERE fb.fk_version = $1 AND fb.fk_scenario = $2 ${crBudget} ${lmBudget}
+      GROUP BY fb.fk_centre, fb.fk_compte, fb.fk_ligne_metier, fb.fk_temps
+    `;
+    const realiseAgg = `
+      SELECT fr.fk_centre_responsabilite AS cr_id, fr.fk_compte AS compte_id,
+             fr.fk_ligne_metier AS lm_id, fr.fk_temps AS temps_id,
+             SUM(fr.montant) AS montant_realise
+      FROM fait_realise fr
+      INNER JOIN dim_temps tr ON tr.id = fr.fk_temps
+        AND tr.date >= $3::date AND tr.date <= $4::date AND tr.jour = 1
+      WHERE fr.statut = 'VALIDE' ${crRealise} ${lmRealise}
+      GROUP BY fr.fk_centre_responsabilite, fr.fk_compte, fr.fk_ligne_metier, fr.fk_temps
+    `;
+    const colonnes = `
+      cr.code_cr, cr.libelle AS libelle_cr,
+      c.code_compte, c.libelle AS libelle_compte, c.classe AS classe_compte,
+      lm.code_ligne_metier, t.mois AS mois_num, t.annee
     `;
 
-    const rows = await this.dataSource.query<LigneBrute[]>(sql, params);
+    const sqlBudget = `
+      SELECT ${colonnes}, b.montant_budget, r.montant_realise
+      FROM (${budgetAgg}) b
+      LEFT JOIN (${realiseAgg}) r
+        ON r.cr_id = b.cr_id AND r.compte_id = b.compte_id
+       AND r.lm_id = b.lm_id AND r.temps_id = b.temps_id
+      INNER JOIN dim_compte c ON c.id = b.compte_id
+      INNER JOIN dim_centre_responsabilite cr ON cr.id = b.cr_id
+      INNER JOIN dim_ligne_metier lm ON lm.id = b.lm_id
+      INNER JOIN dim_temps t ON t.id = b.temps_id
+    `;
+    // Anti-join via LEFT JOIN + IS NULL (pg-mem ne supporte pas le
+    // NOT EXISTS corrélé sur une sous-requête dérivée).
+    const sqlSansBudget = `
+      SELECT ${colonnes}, NULL AS montant_budget, r.montant_realise
+      FROM (${realiseAgg}) r
+      LEFT JOIN (${budgetAgg}) b
+        ON b.cr_id = r.cr_id AND b.compte_id = r.compte_id
+       AND b.lm_id = r.lm_id AND b.temps_id = r.temps_id
+      INNER JOIN dim_compte c ON c.id = r.compte_id
+      INNER JOIN dim_centre_responsabilite cr ON cr.id = r.cr_id
+      INNER JOIN dim_ligne_metier lm ON lm.id = r.lm_id
+      INNER JOIN dim_temps t ON t.id = r.temps_id
+      WHERE b.cr_id IS NULL
+    `;
+
+    const [rowsBudget, rowsSansBudget] = await Promise.all([
+      this.dataSource.query<LigneBrute[]>(sqlBudget, params),
+      this.dataSource.query<LigneBrute[]>(sqlSansBudget, params),
+    ]);
+    const rows = [...rowsBudget, ...rowsSansBudget];
 
     // 4. Calcul lignes + KPI en mémoire (post-SQL)
     const lignes: LigneEcartDto[] = [];
@@ -242,30 +288,57 @@ export class AnalyseEcartsService {
       nbEcartsCritique: 0,
       nbEcartsAttention: 0,
       nbLignesManquantes: 0,
+      nbSansBudget: 0,
       ecartTotalAbs: 0,
       ecartTotalDefavorable: 0,
       ecartTotalFavorable: 0,
     };
 
+    // Accumulateurs « compte de résultat » : classe 7 = produits,
+    // classe 6 = charges, sous-classe 67xx = charges d'intérêts (exclues
+    // du PNB UEMOA et du dénominateur hors-intérêts du coefficient).
+    let produitsBudget = 0;
+    let produitsRealise = 0;
+    let chargesBudget = 0;
+    let chargesRealise = 0;
+    let chargesInteretsBudget = 0;
+    let chargesInteretsRealise = 0;
+
     for (const r of rows) {
-      const montantBudget = Number(r.montant_budget);
+      const montantBudget =
+        r.montant_budget === null ? null : Number(r.montant_budget);
       const montantRealise =
         r.montant_realise === null ? null : Number(r.montant_realise);
+      const budgetAbsent = montantBudget === null; // réalisé sans budget
+      const realiseManquant = montantRealise === null; // budget sans réalisé
+
+      // Écart = réalisé − budget (budget absent traité comme 0).
       const ecart =
-        montantRealise === null ? null : montantRealise - montantBudget;
+        montantRealise === null ? null : montantRealise - (montantBudget ?? 0);
       const ecartAbs = ecart === null ? null : Math.abs(ecart);
       let ecartPct: number | null = null;
-      if (ecart !== null && montantBudget !== 0) {
+      if (ecart !== null && montantBudget !== null && montantBudget !== 0) {
         ecartPct = (ecart / Math.abs(montantBudget)) * 100;
       }
-      const niveauAlerte = niveauAlerteFor(
-        ecartPct,
-        montantRealise === null,
-        seuilAttention,
-        seuilCritique,
-      );
+      let tauxExecution: number | null = null;
+      if (
+        montantRealise !== null &&
+        montantBudget !== null &&
+        montantBudget !== 0
+      ) {
+        tauxExecution = (montantRealise / montantBudget) * 100;
+      }
+
       const nature = classeToNature(r.classe_compte);
       const sens = sensEcartFor(nature, ecart);
+      const niveauAlerte: NiveauAlerte = budgetAbsent
+        ? 'SANS_BUDGET'
+        : niveauAlerteFor(
+            ecartPct,
+            realiseManquant,
+            seuilAttention,
+            seuilCritique,
+          );
 
       const moisNum = Number(r.mois_num);
       const moisStr = `${r.annee}-${String(moisNum).padStart(2, '0')}`;
@@ -287,26 +360,69 @@ export class AnalyseEcartsService {
         ecart,
         ecartAbs,
         ecartPct: ecartPct === null ? null : Math.round(ecartPct * 10) / 10,
+        tauxExecution:
+          tauxExecution === null ? null : Math.round(tauxExecution * 10) / 10,
         niveauAlerte,
         sensEcart: sens,
       });
 
+      // Compte de résultat (budget/réalisé absents traités comme 0).
+      const b = montantBudget ?? 0;
+      const rl = montantRealise ?? 0;
+      if (r.classe_compte === '7') {
+        produitsBudget += b;
+        produitsRealise += rl;
+      } else if (r.classe_compte === '6') {
+        chargesBudget += b;
+        chargesRealise += rl;
+        if (r.code_compte.startsWith('67')) {
+          chargesInteretsBudget += b;
+          chargesInteretsRealise += rl;
+        }
+      }
+
       // KPI
-      if (montantRealise === null) {
+      if (realiseManquant) {
         kpi.nbLignesManquantes++;
         kpi.nbEcartsTotal++;
-      } else if (ecart !== 0) {
-        kpi.nbEcartsTotal++;
-        kpi.ecartTotalAbs += ecartAbs ?? 0;
-        if (sens === 'DEFAVORABLE') {
-          kpi.ecartTotalDefavorable += ecartAbs ?? 0;
-        } else if (sens === 'FAVORABLE') {
-          kpi.ecartTotalFavorable += ecartAbs ?? 0;
+      } else {
+        if (budgetAbsent) kpi.nbSansBudget++;
+        if (ecart !== 0) {
+          kpi.nbEcartsTotal++;
+          kpi.ecartTotalAbs += ecartAbs ?? 0;
+          if (sens === 'DEFAVORABLE') {
+            kpi.ecartTotalDefavorable += ecartAbs ?? 0;
+          } else if (sens === 'FAVORABLE') {
+            kpi.ecartTotalFavorable += ecartAbs ?? 0;
+          }
         }
       }
       if (niveauAlerte === 'CRITIQUE') kpi.nbEcartsCritique++;
       else if (niveauAlerte === 'ATTENTION') kpi.nbEcartsAttention++;
     }
+
+    // Bloc « compte de résultat » du périmètre filtré.
+    const pnbBudget = produitsBudget - chargesInteretsBudget;
+    const pnbRealise = produitsRealise - chargesInteretsRealise;
+    const chargesHorsInteretsBudget = chargesBudget - chargesInteretsBudget;
+    const chargesHorsInteretsRealise = chargesRealise - chargesInteretsRealise;
+    const totaux: TotauxEcartsDto = {
+      produits: totalEcart(produitsBudget, produitsRealise),
+      charges: totalEcart(chargesBudget, chargesRealise),
+      solde: totalEcart(
+        produitsBudget - chargesBudget,
+        produitsRealise - chargesRealise,
+      ),
+      pnb: totalEcart(pnbBudget, pnbRealise),
+      coefExploitationBudget:
+        pnbBudget > 0
+          ? Math.round((chargesHorsInteretsBudget / pnbBudget) * 1000) / 10
+          : null,
+      coefExploitationRealise:
+        pnbRealise > 0
+          ? Math.round((chargesHorsInteretsRealise / pnbRealise) * 1000) / 10
+          : null,
+    };
 
     // 5. Tri final : ecart_abs décroissant (les plus gros écarts en haut)
     lignes.sort((a, b) => {
@@ -331,6 +447,7 @@ export class AnalyseEcartsService {
     return {
       filtres: this.normaliserFiltres(filtres, seuilAttention, seuilCritique),
       kpi,
+      totaux,
       lignes,
     };
   }

@@ -104,9 +104,24 @@ export class FiltresEcartsDto {
   seuilEcartPctCritique?: number;
 }
 
-export type NiveauAlerte = 'NORMAL' | 'ATTENTION' | 'CRITIQUE' | 'MANQUANT';
+// SANS_BUDGET (Lot compte de résultat) : réalisé sans ligne de budget
+// correspondante (capté par le FULL JOIN).
+export type NiveauAlerte =
+  | 'NORMAL'
+  | 'ATTENTION'
+  | 'CRITIQUE'
+  | 'MANQUANT'
+  | 'SANS_BUDGET';
 export type NatureCompte = 'CHARGE' | 'PRODUIT' | 'BILAN';
 export type SensEcart = 'FAVORABLE' | 'DEFAVORABLE' | 'NEUTRE';
+
+const NIVEAUX_ALERTE = [
+  'NORMAL',
+  'ATTENTION',
+  'CRITIQUE',
+  'MANQUANT',
+  'SANS_BUDGET',
+];
 
 export class LigneEcartDto {
   @ApiProperty()
@@ -127,8 +142,11 @@ export class LigneEcartDto {
   mois!: string; // YYYY-MM
   @ApiProperty()
   libelleMois!: string; // "Mars 2027"
-  @ApiProperty()
-  montantBudget!: number;
+  @ApiPropertyOptional({
+    nullable: true,
+    description: 'null si réalisé sans budget (SANS_BUDGET).',
+  })
+  montantBudget!: number | null;
   @ApiPropertyOptional({ nullable: true })
   montantRealise!: number | null;
   @ApiPropertyOptional({ nullable: true })
@@ -137,7 +155,13 @@ export class LigneEcartDto {
   ecartAbs!: number | null;
   @ApiPropertyOptional({ nullable: true })
   ecartPct!: number | null;
-  @ApiProperty({ enum: ['NORMAL', 'ATTENTION', 'CRITIQUE', 'MANQUANT'] })
+  @ApiPropertyOptional({
+    nullable: true,
+    description:
+      'Taux d’exécution = réalisé / budget × 100 (null si budget 0/absent).',
+  })
+  tauxExecution!: number | null;
+  @ApiProperty({ enum: NIVEAUX_ALERTE })
   niveauAlerte!: NiveauAlerte;
   @ApiPropertyOptional({
     enum: ['FAVORABLE', 'DEFAVORABLE', 'NEUTRE'],
@@ -156,6 +180,8 @@ export class KpiEcartsDto {
   @ApiProperty()
   nbLignesManquantes!: number;
   @ApiProperty()
+  nbSansBudget!: number;
+  @ApiProperty()
   ecartTotalAbs!: number;
   @ApiProperty()
   ecartTotalDefavorable!: number;
@@ -163,11 +189,51 @@ export class KpiEcartsDto {
   ecartTotalFavorable!: number;
 }
 
+/**
+ * Agrégat « compte de résultat » d'un poste (produits, charges, solde,
+ * PNB) en Budget vs Réalisé, avec écart et taux d'exécution.
+ */
+export class TotalEcartDto {
+  @ApiProperty()
+  budget!: number;
+  @ApiProperty()
+  realise!: number;
+  @ApiProperty({ description: 'realise - budget' })
+  ecart!: number;
+  @ApiPropertyOptional({
+    nullable: true,
+    description: 'realise / budget × 100 (null si budget = 0).',
+  })
+  tauxExecution!: number | null;
+}
+
+/**
+ * Bloc « compte de résultat » du périmètre filtré (Lot compte de
+ * résultat). PNB = produits (classe 7) − charges d'intérêts (67xxx).
+ * Coefficient d'exploitation = charges hors intérêts / PNB × 100.
+ */
+export class TotauxEcartsDto {
+  @ApiProperty({ type: TotalEcartDto })
+  produits!: TotalEcartDto;
+  @ApiProperty({ type: TotalEcartDto })
+  charges!: TotalEcartDto;
+  @ApiProperty({ type: TotalEcartDto, description: 'Produits − Charges.' })
+  solde!: TotalEcartDto;
+  @ApiProperty({ type: TotalEcartDto, description: 'PNB (UEMOA).' })
+  pnb!: TotalEcartDto;
+  @ApiPropertyOptional({ nullable: true, description: 'CE budget en %.' })
+  coefExploitationBudget!: number | null;
+  @ApiPropertyOptional({ nullable: true, description: 'CE réalisé en %.' })
+  coefExploitationRealise!: number | null;
+}
+
 export class EcartsResponseDto {
   @ApiProperty()
   filtres!: FiltresEcartsDto;
   @ApiProperty({ type: KpiEcartsDto })
   kpi!: KpiEcartsDto;
+  @ApiProperty({ type: TotauxEcartsDto })
+  totaux!: TotauxEcartsDto;
   @ApiProperty({ type: [LigneEcartDto] })
   lignes!: LigneEcartDto[];
 }

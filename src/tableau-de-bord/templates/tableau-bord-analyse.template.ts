@@ -61,6 +61,7 @@ const COULEURS_NIVEAU: Record<NiveauAlerte, string> = {
   ATTENTION: '#BA7517',
   NORMAL: '#0F6E56',
   MANQUANT: '#5F6B7A',
+  SANS_BUDGET: '#C2410C',
 };
 
 const LIBELLES_NIVEAU: Record<NiveauAlerte, string> = {
@@ -68,12 +69,14 @@ const LIBELLES_NIVEAU: Record<NiveauAlerte, string> = {
   ATTENTION: 'Attention',
   NORMAL: 'Normal',
   MANQUANT: 'Manquant',
+  SANS_BUDGET: 'Sans budget',
 };
 
 const NIVEAUX_ORDONNES: NiveauAlerte[] = [
   'CRITIQUE',
   'ATTENTION',
   'MANQUANT',
+  'SANS_BUDGET',
   'NORMAL',
 ];
 
@@ -346,13 +349,13 @@ function aggregerParMois(lignes: LigneEcartDto[]): PointMensuel[] {
   for (const l of lignes) {
     const existing = acc.get(l.mois);
     if (existing) {
-      existing.budget += l.montantBudget;
+      existing.budget += l.montantBudget ?? 0;
       existing.realise += l.montantRealise ?? 0;
     } else {
       acc.set(l.mois, {
         mois: l.mois,
         libelleMois: l.libelleMois,
-        budget: l.montantBudget,
+        budget: l.montantBudget ?? 0,
         realise: l.montantRealise ?? 0,
       });
     }
@@ -528,6 +531,7 @@ function drawDonutNiveaux(
     CRITIQUE: 0,
     ATTENTION: 0,
     MANQUANT: 0,
+    SANS_BUDGET: 0,
     NORMAL: 0,
   };
   for (const l of lignes) counts[l.niveauAlerte]++;

@@ -808,4 +808,145 @@ describe('AnalyseEcartsService', () => {
     );
     expect(r.lignes[0]!.niveauAlerte).toBe('ATTENTION');
   });
+
+  // ─── FULL JOIN : réalisé sans budget (SANS_BUDGET) ────────
+
+  it('FULL JOIN : réalisé sans budget → niveau SANS_BUDGET', async () => {
+    // Réalisé seul (aucune ligne de budget pour cette combinaison).
+    await insertRealise(
+      ds,
+      ids,
+      ids.compteProduit,
+      ids.temps1,
+      ids.cr1,
+      800_000,
+    );
+    const r = await svc.getBudgetVsRealise(filtres(), admin());
+    expect(r.lignes).toHaveLength(1);
+    const l = r.lignes[0]!;
+    expect(l.niveauAlerte).toBe('SANS_BUDGET');
+    expect(l.montantBudget).toBeNull();
+    expect(l.montantRealise).toBe(800_000);
+    expect(l.ecart).toBe(800_000);
+    expect(l.ecartPct).toBeNull();
+    expect(l.tauxExecution).toBeNull();
+    expect(r.kpi.nbSansBudget).toBe(1);
+  });
+
+  // ─── Totaux compte de résultat ────────────────────────────
+
+  it('totaux : sous-totaux produits/charges + solde Budget vs Réalisé', async () => {
+    // Produits (classe 7) : budget 5M, réalisé 4.8M
+    await insertBudget(
+      ds,
+      ids,
+      ids.compteProduit,
+      ids.temps1,
+      ids.cr1,
+      5_000_000,
+    );
+    await insertRealise(
+      ds,
+      ids,
+      ids.compteProduit,
+      ids.temps1,
+      ids.cr1,
+      4_800_000,
+    );
+    // Charges (classe 6) : budget 3M, réalisé 3.2M
+    await insertBudget(
+      ds,
+      ids,
+      ids.compteCharge,
+      ids.temps1,
+      ids.cr1,
+      3_000_000,
+    );
+    await insertRealise(
+      ds,
+      ids,
+      ids.compteCharge,
+      ids.temps1,
+      ids.cr1,
+      3_200_000,
+    );
+    const r = await svc.getBudgetVsRealise(filtres(), admin());
+    expect(r.totaux.produits.budget).toBe(5_000_000);
+    expect(r.totaux.produits.realise).toBe(4_800_000);
+    expect(r.totaux.produits.tauxExecution).toBe(96); // 4.8 / 5
+    expect(r.totaux.charges.budget).toBe(3_000_000);
+    expect(r.totaux.charges.realise).toBe(3_200_000);
+    expect(r.totaux.solde.budget).toBe(2_000_000); // 5M − 3M
+    expect(r.totaux.solde.realise).toBe(1_600_000); // 4.8M − 3.2M
+  });
+
+  it('totaux : PNB exclut les charges d’intérêts (67xx) + coefficient d’exploitation', async () => {
+    // Compte de charges d'intérêts 671100 (classe 6, sous-classe 67).
+    await ds.query(
+      `INSERT INTO dim_compte
+         (code_compte, libelle, classe, niveau, est_compte_collectif,
+          est_porteur_interets, date_debut_validite, version_courante,
+          est_actif, utilisateur_creation)
+       VALUES ('671100','Intérêts payés','6',4,false,false,'2026-01-01',true,true,'system')`,
+    );
+    const cmpt = (await ds.query(
+      `SELECT id FROM dim_compte WHERE code_compte='671100'`,
+    )) as Array<{ id: string }>;
+    const compteInterets = String(cmpt[0]!.id);
+
+    // Produits 10M / 10M
+    await insertBudget(
+      ds,
+      ids,
+      ids.compteProduit,
+      ids.temps1,
+      ids.cr1,
+      10_000_000,
+    );
+    await insertRealise(
+      ds,
+      ids,
+      ids.compteProduit,
+      ids.temps1,
+      ids.cr1,
+      10_000_000,
+    );
+    // Charges hors intérêts (611100) 4M / 4M
+    await insertBudget(
+      ds,
+      ids,
+      ids.compteCharge,
+      ids.temps1,
+      ids.cr1,
+      4_000_000,
+    );
+    await insertRealise(
+      ds,
+      ids,
+      ids.compteCharge,
+      ids.temps1,
+      ids.cr1,
+      4_000_000,
+    );
+    // Charges d'intérêts (671100) 2M / 2M
+    await insertBudget(ds, ids, compteInterets, ids.temps1, ids.cr1, 2_000_000);
+    await insertRealise(
+      ds,
+      ids,
+      compteInterets,
+      ids.temps1,
+      ids.cr1,
+      2_000_000,
+    );
+
+    const r = await svc.getBudgetVsRealise(filtres(), admin());
+    // PNB = produits − charges d'intérêts = 10M − 2M = 8M
+    expect(r.totaux.pnb.budget).toBe(8_000_000);
+    expect(r.totaux.pnb.realise).toBe(8_000_000);
+    // Solde = produits − toutes charges = 10M − 6M = 4M
+    expect(r.totaux.solde.budget).toBe(4_000_000);
+    // CE = charges hors intérêts / PNB = 4M / 8M = 50 %
+    expect(r.totaux.coefExploitationBudget).toBe(50);
+    expect(r.totaux.coefExploitationRealise).toBe(50);
+  });
 });

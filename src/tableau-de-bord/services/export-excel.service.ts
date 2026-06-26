@@ -15,6 +15,7 @@ const COULEURS_NIVEAU: Record<NiveauAlerte, string> = {
   ATTENTION: 'FFEB9C', // orange clair
   CRITIQUE: 'FFC7CE', // rouge clair
   MANQUANT: 'D9D9D9', // gris clair
+  SANS_BUDGET: 'FCD5B4', // orange (réalisé sans budget)
 };
 
 const NIVEAU_LIBELLE: Record<NiveauAlerte, string> = {
@@ -22,6 +23,7 @@ const NIVEAU_LIBELLE: Record<NiveauAlerte, string> = {
   ATTENTION: 'Attention',
   CRITIQUE: 'Critique',
   MANQUANT: 'Manquant',
+  SANS_BUDGET: 'Sans budget',
 };
 
 @Injectable()
@@ -67,6 +69,7 @@ export class ExportExcelService {
       { k: 'Nb écarts CRITIQUES', v: k.nbEcartsCritique },
       { k: 'Nb écarts ATTENTION', v: k.nbEcartsAttention },
       { k: 'Nb lignes MANQUANTES', v: k.nbLignesManquantes },
+      { k: 'Nb lignes SANS BUDGET', v: k.nbSansBudget },
       { k: '', v: '' },
       { k: 'Écart total absolu (FCFA)', v: k.ecartTotalAbs },
       { k: '  dont défavorable', v: k.ecartTotalDefavorable },
@@ -75,8 +78,9 @@ export class ExportExcelService {
       { k: 'Date de génération', v: new Date().toISOString() },
     ];
     for (const r of lignesSynth) wsSynth.addRow(r);
-    // Format milliers sur les colonnes monétaires (rangées 11-13)
-    for (const i of [11, 12, 13]) {
+    // Format milliers sur les colonnes monétaires (Écart total abs /
+    // défavorable / favorable — rangées 13-15 après l'ajout SANS BUDGET).
+    for (const i of [13, 14, 15]) {
       wsSynth.getCell(`B${i}`).numFmt = '#,##0';
     }
 
