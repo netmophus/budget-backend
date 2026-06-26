@@ -47,6 +47,7 @@ function ligne(
     ecart: 20000000,
     ecartAbs: 20000000,
     ecartPct: 10,
+    tauxExecution: 110,
     niveauAlerte: niveau,
     sensEcart: 'DEFAVORABLE',
     ...override,
@@ -71,9 +72,19 @@ function ecartsResponse(lignes: LigneEcartDto[]): EcartsResponseDto {
         .length,
       nbLignesManquantes: lignes.filter((l) => l.niveauAlerte === 'MANQUANT')
         .length,
+      nbSansBudget: lignes.filter((l) => l.niveauAlerte === 'SANS_BUDGET')
+        .length,
       ecartTotalAbs: 0,
       ecartTotalDefavorable: 0,
       ecartTotalFavorable: 0,
+    },
+    totaux: {
+      produits: { budget: 0, realise: 0, ecart: 0, tauxExecution: null },
+      charges: { budget: 0, realise: 0, ecart: 0, tauxExecution: null },
+      solde: { budget: 0, realise: 0, ecart: 0, tauxExecution: null },
+      pnb: { budget: 0, realise: 0, ecart: 0, tauxExecution: null },
+      coefExploitationBudget: null,
+      coefExploitationRealise: null,
     },
     lignes,
   };
