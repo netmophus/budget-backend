@@ -153,7 +153,14 @@ export type TypeAction =
   // systeme (ex mode_saisie_realise) via PATCH configuration
   // Code seede en base via migration 1779200000570
   // Pas de point-virgule dans ce commentaire (regex CI fragile)
-  | 'MODIFIER_PARAMETRE_SYSTEME';
+  | 'MODIFIER_PARAMETRE_SYSTEME'
+  // PR A gestion matrice role x permission — edition depuis l UI admin
+  // Codes seedes en base via migration 1779200000580 (ROLE.GERER)
+  // ATTRIBUER_PERMISSION = INSERT bridge_role_permission (idempotent)
+  // RETIRER_PERMISSION = DELETE bridge_role_permission (sous garde-fous)
+  // Pas de point-virgule dans ce commentaire (regex CI fragile)
+  | 'ATTRIBUER_PERMISSION'
+  | 'RETIRER_PERMISSION';
 
 export type AuditStatut = 'success' | 'failure';
 
