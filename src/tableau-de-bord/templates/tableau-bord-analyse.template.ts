@@ -157,7 +157,7 @@ function renderPage1HeaderEtKpi(
     .font(BSIC_BRAND.fonts.body)
     .fontSize(BSIC_BRAND.fontSizes.body + 1)
     .text(
-      `Période : ${data.ecarts.filtres.moisDebut} → ${data.ecarts.filtres.moisFin}`,
+      `Période : ${data.ecarts.filtres.moisDebut} -> ${data.ecarts.filtres.moisFin}`,
       left,
       y,
       { width: widthDispo, align: 'center', lineBreak: false },
@@ -178,11 +178,11 @@ function renderPage1HeaderEtKpi(
     },
     {
       label: 'Seuil ATTENTION',
-      value: `≥ ${String(data.ecarts.filtres.seuilEcartPctAttention ?? 5)} %`,
+      value: `>= ${String(data.ecarts.filtres.seuilEcartPctAttention ?? 5)} %`,
     },
     {
       label: 'Seuil CRITIQUE',
-      value: `≥ ${String(data.ecarts.filtres.seuilEcartPctCritique ?? 10)} %`,
+      value: `>= ${String(data.ecarts.filtres.seuilEcartPctCritique ?? 10)} %`,
     },
     {
       label: 'Généré le',
@@ -742,8 +742,12 @@ function renderPage3Top10(
   const rows = top.map((l, i) => [
     String(i + 1),
     l.codeCompte,
-    l.libelleCompte.length > 30
-      ? `${l.libelleCompte.slice(0, 29)}…`
+    // SOUS-LOT 1.4 — colonne Ligne métier pour distinguer un même
+    // compte présent sur plusieurs LM (ex. 7081/LM_PART vs 7081/LM_PME)
+    // qui apparaissaient en doublon visuel (grain CR×compte×LM×mois).
+    l.codeLigneMetier,
+    l.libelleCompte.length > 22
+      ? `${l.libelleCompte.slice(0, 21)}...`
       : l.libelleCompte,
     l.codeCr,
     l.libelleMois,
@@ -751,16 +755,20 @@ function renderPage3Top10(
     LIBELLES_NIVEAU[l.niveauAlerte],
   ]);
 
+  // Largeurs rééquilibrées pour tenir dans la largeur utile A4 (~495pt) :
+  // total 494pt = 20+48+60+100+76+56+90+44 (l'ancienne version totalisait
+  // 550pt et débordait la marge droite).
   pdfBuilder.drawTable(
     doc,
     [
-      { header: '#', width: 24, align: 'center' },
-      { header: 'Compte', width: 56 },
-      { header: 'Libellé', width: 160 },
-      { header: 'CR', width: 90 },
-      { header: 'Mois', width: 70 },
+      { header: '#', width: 20, align: 'center' },
+      { header: 'Compte', width: 48 },
+      { header: 'Ligne métier', width: 60 },
+      { header: 'Libellé', width: 100 },
+      { header: 'CR', width: 76 },
+      { header: 'Mois', width: 56 },
       { header: 'Écart abs.', width: 90, align: 'right' },
-      { header: 'Niveau', width: 60, align: 'center' },
+      { header: 'Niveau', width: 44, align: 'center' },
     ],
     rows,
   );

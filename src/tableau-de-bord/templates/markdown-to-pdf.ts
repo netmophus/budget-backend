@@ -28,6 +28,7 @@ const EMOJI_MAP: Array<[RegExp, string]> = [
   [/✅/gu, '[OK]'],
   [/❌/gu, '[NON]'],
   [/⚠️/gu, '[!]'],
+  [/⚠/gu, '[!]'],
   [/✨/gu, ''],
   [/💡/gu, ''],
   [/📌/gu, ''],
@@ -36,11 +37,52 @@ const EMOJI_MAP: Array<[RegExp, string]> = [
   [/📉/gu, ''],
 ];
 
+/**
+ * Substitutions de symboles Unicode étendus vers leur équivalent
+ * ASCII. Helvetica standard (WinAnsi/Latin-1) ne possède pas ces
+ * glyphes ; sans substitution ils rendent des caractères corrompus
+ * (≥ → "e, → → "). Appliqué AVANT le strip résiduel.
+ */
+const SYMBOL_MAP: Array<[RegExp, string]> = [
+  [/≥/gu, '>='],
+  [/≤/gu, '<='],
+  [/→/gu, '->'],
+  [/←/gu, '<-'],
+  [/↔/gu, '<->'],
+  [/≈/gu, '~'],
+  [/≠/gu, '!='],
+  [/[█▓▒░]/gu, ''], // block elements (barres de progression)
+  [/[─━│┃┌┐└┘├┤┬┴┼╔╗╚╝═║]/gu, ''], // box drawing
+];
+
+/**
+ * Strip de sécurité : tout symbole pictographique / flèche / opérateur
+ * mathématique / forme géométrique encore présent après les maps. Plage
+ * contiguë U+2190→U+27BF (flèches, opérateurs, technique, encadrés, box
+ * drawing, blocs, géométrie, symboles divers, dingbats) + symboles
+ * étendus + sélecteur de variante + plan emoji. Ne touche PAS les
+ * caractères typographiques CP1252 (– — ' ' " " • … € ™, tous < U+2190)
+ * qui rendent correctement en WinAnsi.
+ */
+const RESIDUAL_UNICODE = /[\u2190-\u27BF\u2B00-\u2BFF\u{1F000}-\u{1FAFF}]/gu;
+/** Selecteur de variante emoji (U+FE0F), strippe hors classe (regle lint). */
+const VARIATION_SELECTOR = /\uFE0F/gu;
+
+/**
+ * Nettoie le markdown pour un rendu Latin-1 sûr : emojis -> texte,
+ * symboles Unicode étendus -> ASCII, puis strip des résidus. Filet de
+ * sécurité côté serveur même si le system prompt cadre déjà l'IA.
+ */
 export function nettoyerEmojis(markdown: string): string {
   let out = markdown;
   for (const [re, replacement] of EMOJI_MAP) {
     out = out.replace(re, replacement);
   }
+  for (const [re, replacement] of SYMBOL_MAP) {
+    out = out.replace(re, replacement);
+  }
+  out = out.replace(RESIDUAL_UNICODE, '');
+  out = out.replace(VARIATION_SELECTOR, '');
   return out;
 }
 

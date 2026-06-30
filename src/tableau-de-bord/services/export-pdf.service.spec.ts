@@ -130,6 +130,48 @@ describe('ExportPdfService', () => {
     expect(avecIa.length).toBeGreaterThan(sansIa.length);
   });
 
+  it('SOUS-LOT 1 — analyse IA avec Unicode étendu : PDF valide sans crash', async () => {
+    // L'IA peut produire malgré le prompt des ≥, →, emojis, box-drawing.
+    // Le post-processing Latin-1 (nettoyerEmojis) doit les neutraliser
+    // sans casser la génération.
+    const analyseIa: AnalyseAiSnapshot = {
+      analyse:
+        '## Synthèse 🔴\n\n> Écart ≥ 10 % → action requise ████▒▒\n\n' +
+        '- 🟡 Compte `7081` à surveiller\n- Coef ≤ 65 %\n',
+      model: 'claude-sonnet-4-6',
+      tokensInput: 100,
+      tokensOutput: 50,
+      dureeMs: 1000,
+      dryRun: false,
+      generatedAt: '2027-01-31T10:00:00.000Z',
+    };
+    const buffer = await svc.genererPdf(ecartsFixture(), META, analyseIa);
+    expect(buffer.slice(0, 5).toString('ascii')).toBe('%PDF-');
+    expect(buffer.slice(-6).toString('ascii').trim()).toMatch(/%%EOF/);
+  });
+
+  it('SOUS-LOT 1.4 — Top 10 avec même compte sur 2 lignes métier : PDF valide', async () => {
+    // Distinction 7081/LM_PART vs 7081/LM_PME via la colonne Ligne métier.
+    const ecarts = ecartsFixture();
+    ecarts.lignes = [
+      ligne({
+        codeCompte: '7081',
+        codeLigneMetier: 'LM_PART',
+        ecartAbs: 40_000_000,
+        niveauAlerte: 'CRITIQUE',
+      }),
+      ligne({
+        codeCompte: '7081',
+        codeLigneMetier: 'LM_PME',
+        ecartAbs: 35_000_000,
+        niveauAlerte: 'ATTENTION',
+      }),
+    ];
+    const buffer = await svc.genererPdf(ecarts, META);
+    expect(buffer.slice(0, 5).toString('ascii')).toBe('%PDF-');
+    expect(buffer.length).toBeGreaterThan(5_000);
+  });
+
   it('génère un PDF même quand 0 écart (état vide géré sans throw)', async () => {
     const ecartsVides: EcartsResponseDto = {
       ...ecartsFixture(),
