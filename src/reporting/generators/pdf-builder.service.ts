@@ -725,4 +725,257 @@ export class PdfBuilderService {
     doc.moveDown(0.6);
     return doc.y;
   }
+
+  // ─── SOUS-LOT 2 — Identité institutionnelle ──────────────────────
+
+  /**
+   * Page de garde institutionnelle : bandeau bleu nuit + filet or,
+   * logo centré, titre + sous-titre, période en grand, destinataire,
+   * encadré métadonnées et mention de confidentialité en bas.
+   */
+  drawCoverPage(
+    doc: PDFKit.PDFDocument,
+    opts: {
+      title: string;
+      subtitle: string;
+      periodeGrande: string;
+      destinataire: string;
+      metaRows: Array<{ label: string; value: string }>;
+      confidentialMention: string;
+    },
+  ): void {
+    const pageW = doc.page.width;
+    const left = BSIC_BRAND.marges.gauche;
+    const widthDispo = pageW - left - BSIC_BRAND.marges.droite;
+
+    // Bandeau supérieur bleu nuit + filet or.
+    doc
+      .save()
+      .fillColor(BSIC_BRAND.colors.bleuNuit)
+      .rect(0, 0, pageW, 90)
+      .fill()
+      .restore();
+    doc
+      .save()
+      .lineWidth(2)
+      .strokeColor(BSIC_BRAND.colors.or)
+      .moveTo(0, 90)
+      .lineTo(pageW, 90)
+      .stroke()
+      .restore();
+
+    // Logo centré sous le bandeau.
+    this.drawLogoPlaceholder(doc, (pageW - 150) / 2, 130, 150, 70);
+
+    // Titre principal.
+    doc
+      .fillColor(BSIC_BRAND.colors.bleuNuit)
+      .font(BSIC_BRAND.fonts.titre)
+      .fontSize(30)
+      .text(opts.title, left, 250, {
+        width: widthDispo,
+        align: 'center',
+        lineBreak: false,
+      });
+    // Sous-titre or.
+    doc
+      .fillColor(BSIC_BRAND.colors.or)
+      .font(BSIC_BRAND.fonts.titre)
+      .fontSize(16)
+      .text(opts.subtitle, left, 290, {
+        width: widthDispo,
+        align: 'center',
+        lineBreak: false,
+      });
+
+    // Séparateur or court centré.
+    doc
+      .save()
+      .lineWidth(1.5)
+      .strokeColor(BSIC_BRAND.colors.or)
+      .moveTo(pageW / 2 - 45, 326)
+      .lineTo(pageW / 2 + 45, 326)
+      .stroke()
+      .restore();
+
+    // Période en grand.
+    doc
+      .fillColor(BSIC_BRAND.colors.bleuNuitDark)
+      .font(BSIC_BRAND.fonts.titre)
+      .fontSize(22)
+      .text(opts.periodeGrande, left, 348, {
+        width: widthDispo,
+        align: 'center',
+        lineBreak: false,
+      });
+
+    // Destinataire (ligne centrée).
+    doc
+      .fillColor(BSIC_BRAND.colors.grisFonce)
+      .font(BSIC_BRAND.fonts.italic)
+      .fontSize(BSIC_BRAND.fontSizes.body)
+      .text(opts.destinataire, left, 388, {
+        width: widthDispo,
+        align: 'center',
+      });
+
+    // Encadré métadonnées centré.
+    const boxW = 360;
+    this.drawInfoBox(doc, (pageW - boxW) / 2, 430, boxW, opts.metaRows);
+
+    // Mention de confidentialité en bas.
+    doc
+      .fillColor(BSIC_BRAND.colors.grisFonce)
+      .font(BSIC_BRAND.fonts.italic)
+      .fontSize(8)
+      .text(opts.confidentialMention, left, doc.page.height - 95, {
+        width: widthDispo,
+        align: 'center',
+      });
+  }
+
+  /**
+   * En-tête charté (bandeau bleu nuit + filet or) sur toutes les pages
+   * SAUF la page de garde. « BSIC NIGER » à gauche, titre centré,
+   * période à droite — en blanc sur le bandeau.
+   */
+  applyChartedHeaderToAllPagesExceptFirst(
+    doc: PDFKit.PDFDocument,
+    parts: { titre: string; periode: string },
+  ): void {
+    const range = doc.bufferedPageRange();
+    const total = range.count;
+    for (let i = 1; i < total; i++) {
+      doc.switchToPage(range.start + i);
+      this.drawChartedHeaderOnCurrentPage(doc, parts);
+    }
+  }
+
+  private drawChartedHeaderOnCurrentPage(
+    doc: PDFKit.PDFDocument,
+    parts: { titre: string; periode: string },
+  ): void {
+    const pageW = doc.page.width;
+    const h = 30;
+    const orig = { ...doc.page.margins };
+    doc.page.margins = { ...orig, top: 0, bottom: 0 };
+
+    doc
+      .save()
+      .fillColor(BSIC_BRAND.colors.bleuNuit)
+      .rect(0, 0, pageW, h)
+      .fill()
+      .restore();
+    doc
+      .save()
+      .lineWidth(1)
+      .strokeColor(BSIC_BRAND.colors.or)
+      .moveTo(0, h)
+      .lineTo(pageW, h)
+      .stroke()
+      .restore();
+
+    const left = BSIC_BRAND.marges.gauche;
+    const width = pageW - left - BSIC_BRAND.marges.droite;
+    doc
+      .fillColor('#FFFFFF')
+      .font(BSIC_BRAND.fonts.titre)
+      .fontSize(9)
+      .text('BSIC NIGER', left, 10, {
+        width: width / 3,
+        align: 'left',
+        lineBreak: false,
+      });
+    doc
+      .font(BSIC_BRAND.fonts.body)
+      .fontSize(9)
+      .text(parts.titre, left + width / 3, 10, {
+        width: width / 3,
+        align: 'center',
+        lineBreak: false,
+      });
+    doc.fontSize(8).text(parts.periode, left + (2 * width) / 3, 11, {
+      width: width / 3,
+      align: 'right',
+      lineBreak: false,
+    });
+    doc.page.margins = orig;
+  }
+
+  /**
+   * Pied de page charté (bandeau bleu nuit) sur toutes les pages
+   * (option skipFirstPage pour la garde). Confidentiel à gauche,
+   * « Document MIZNAS » au centre, pagination à droite — en blanc.
+   */
+  applyChartedFooterToAllPages(
+    doc: PDFKit.PDFDocument,
+    parts: { left: string; center: string },
+    options: { skipFirstPage?: boolean } = {},
+  ): void {
+    const range = doc.bufferedPageRange();
+    const total = range.count;
+    for (let i = 0; i < total; i++) {
+      if (options.skipFirstPage && i === 0) continue;
+      doc.switchToPage(range.start + i);
+      this.drawChartedFooterOnCurrentPage(doc, {
+        left: parts.left,
+        center: parts.center,
+        pageNumber: i + 1,
+        totalPages: total,
+      });
+    }
+  }
+
+  private drawChartedFooterOnCurrentPage(
+    doc: PDFKit.PDFDocument,
+    parts: {
+      left: string;
+      center: string;
+      pageNumber: number;
+      totalPages: number;
+    },
+  ): void {
+    const pageW = doc.page.width;
+    const h = 24;
+    const bandY = doc.page.height - h;
+    const orig = { ...doc.page.margins };
+    doc.page.margins = { ...orig, top: 0, bottom: 0 };
+
+    doc
+      .save()
+      .fillColor(BSIC_BRAND.colors.bleuNuit)
+      .rect(0, bandY, pageW, h)
+      .fill()
+      .restore();
+    doc
+      .save()
+      .lineWidth(1)
+      .strokeColor(BSIC_BRAND.colors.or)
+      .moveTo(0, bandY)
+      .lineTo(pageW, bandY)
+      .stroke()
+      .restore();
+
+    const left = BSIC_BRAND.marges.gauche;
+    const width = pageW - left - BSIC_BRAND.marges.droite;
+    const ty = bandY + 8;
+    doc.fillColor('#FFFFFF').font(BSIC_BRAND.fonts.body).fontSize(7);
+    doc.text(parts.left, left, ty, {
+      width: width / 3,
+      align: 'left',
+      lineBreak: false,
+    });
+    doc.text(parts.center, left + width / 3, ty, {
+      width: width / 3,
+      align: 'center',
+      lineBreak: false,
+    });
+    doc.text(
+      `Page ${String(parts.pageNumber)}/${String(parts.totalPages)}`,
+      left + (2 * width) / 3,
+      ty,
+      { width: width / 3, align: 'right', lineBreak: false },
+    );
+    doc.page.margins = orig;
+  }
 }

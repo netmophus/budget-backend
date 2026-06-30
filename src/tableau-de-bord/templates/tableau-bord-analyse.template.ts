@@ -55,13 +55,17 @@ export interface TableauBordAnalyseData {
   analyseIa?: AnalyseAiSnapshot;
 }
 
-/** Couleurs niveaux d'alerte — alignées sur le frontend (Lot 8.5.C). */
+/**
+ * Couleurs niveaux d'alerte (SOUS-LOT 2.3 — palette charte refonte
+ * Comité). CRITIQUE rouge, ATTENTION orange, NORMAL vert, SANS_BUDGET
+ * orange clair, MANQUANT gris.
+ */
 const COULEURS_NIVEAU: Record<NiveauAlerte, string> = {
   CRITIQUE: '#DC2626',
-  ATTENTION: '#BA7517',
-  NORMAL: '#0F6E56',
-  MANQUANT: '#5F6B7A',
-  SANS_BUDGET: '#C2410C',
+  ATTENTION: '#F59E0B',
+  NORMAL: '#10B981',
+  SANS_BUDGET: '#FB923C',
+  MANQUANT: '#94A3B8',
 };
 
 const LIBELLES_NIVEAU: Record<NiveauAlerte, string> = {
@@ -105,6 +109,37 @@ function formaterDateFr(iso: string): string {
   );
 }
 
+/** Mois en toutes lettres (majuscules) pour la page de garde. */
+const MOIS_PLEIN = [
+  'JANVIER',
+  'FÉVRIER',
+  'MARS',
+  'AVRIL',
+  'MAI',
+  'JUIN',
+  'JUILLET',
+  'AOÛT',
+  'SEPTEMBRE',
+  'OCTOBRE',
+  'NOVEMBRE',
+  'DÉCEMBRE',
+];
+
+/**
+ * Période « en grand » pour la page de garde, depuis deux `YYYY-MM`.
+ * Mono-mois -> "JANVIER 2027" ; même année -> "JANVIER - MARS 2027" ;
+ * sinon "DÉCEMBRE 2026 - FÉVRIER 2027".
+ */
+function formaterPeriodeGrande(moisDebut: string, moisFin: string): string {
+  const [ad, md] = moisDebut.split('-').map(Number);
+  const [af, mf] = moisFin.split('-').map(Number);
+  const nomD = MOIS_PLEIN[(md ?? 1) - 1] ?? moisDebut;
+  const nomF = MOIS_PLEIN[(mf ?? 1) - 1] ?? moisFin;
+  if (moisDebut === moisFin) return `${nomD} ${String(ad)}`;
+  if (ad === af) return `${nomD} - ${nomF} ${String(af)}`;
+  return `${nomD} ${String(ad)} - ${nomF} ${String(af)}`;
+}
+
 // ─── Point d'entrée principal ──────────────────────────────────────
 
 export function buildTableauBordAnalysePdf(
@@ -112,19 +147,48 @@ export function buildTableauBordAnalysePdf(
   data: TableauBordAnalyseData,
   pdfBuilder: PdfBuilderService,
 ): void {
-  // Page 1 — en-tête + métadonnées + KPI
+  // Page de garde institutionnelle (SOUS-LOT 2.1).
+  renderCoverPage(doc, data, pdfBuilder);
+  // Page — en-tête + métadonnées + KPI
+  doc.addPage();
   renderPage1HeaderEtKpi(doc, data, pdfBuilder);
-  // Page 2 — bar chart mensuel + donut niveaux
+  // Page — bar chart mensuel + donut niveaux
   doc.addPage();
   renderPage2Graphiques(doc, data);
-  // Page 3 — top 10 écarts (tableau)
+  // Page — top 10 écarts (tableau)
   doc.addPage();
   renderPage3Top10(doc, data, pdfBuilder);
-  // Page 4 — analyse MIZNAS AI (optionnelle)
+  // Page — analyse MIZNAS AI (optionnelle)
   if (data.analyseIa) {
     doc.addPage();
     renderPage4AnalyseIa(doc, data.analyseIa);
   }
+}
+
+// ─── Page de garde (SOUS-LOT 2.1) ──────────────────────────────────
+
+function renderCoverPage(
+  doc: PDFKit.PDFDocument,
+  data: TableauBordAnalyseData,
+  pdfBuilder: PdfBuilderService,
+): void {
+  const f = data.ecarts.filtres;
+  pdfBuilder.drawCoverPage(doc, {
+    title: 'ANALYSE BUDGÉTAIRE',
+    subtitle: 'BUDGET vs RÉALISÉ',
+    periodeGrande: formaterPeriodeGrande(f.moisDebut, f.moisFin),
+    destinataire:
+      "À l'attention de Monsieur le Directeur Général et du Comité Budgétaire",
+    metaRows: [
+      { label: 'Version', value: data.metadata.codeVersion },
+      { label: 'Scénario', value: data.metadata.codeScenario },
+      { label: 'Édité le', value: formaterDateFr(data.metadata.generatedAt) },
+      { label: 'Par', value: data.metadata.userEmail },
+    ],
+    confidentialMention:
+      'Document CONFIDENTIEL - BSIC NIGER S.A. - Usage interne réservé au ' +
+      'Comité Budgétaire. Généré par MIZNAS.',
+  });
 }
 
 // ─── Page 1 — Header + KPI ─────────────────────────────────────────
