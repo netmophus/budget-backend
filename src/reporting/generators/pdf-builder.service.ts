@@ -117,6 +117,13 @@ export interface PdfTableColumn {
   align?: 'left' | 'center' | 'right';
 }
 
+export interface PdfCellStyle {
+  /** Fond de la cellule (badge). Si défini, texte en blanc par défaut. */
+  bg?: string;
+  /** Couleur du texte de la cellule. */
+  color?: string;
+}
+
 export interface PdfTableOptions {
   /** Couleur de fond de la ligne d'en-tête. Défaut: bleuNuit. */
   headerBg?: string;
@@ -126,6 +133,16 @@ export interface PdfTableOptions {
   rowHeight?: number;
   /** Taille de police du contenu. Défaut: 9. */
   fontSize?: number;
+  /**
+   * SOUS-LOT 3.4 — style conditionnel par cellule (badge coloré). Reçoit
+   * l'index de ligne/colonne + la valeur, retourne un fond/couleur ou
+   * `undefined` pour le rendu par défaut.
+   */
+  cellStyle?: (
+    rowIndex: number,
+    colIndex: number,
+    value: string,
+  ) => PdfCellStyle | undefined;
 }
 
 @Injectable()
@@ -435,17 +452,38 @@ export class PdfBuilderService {
         // pagination verticale est inhibée par l'override de marges,
         // donc seul le wrap horizontal s'applique → comportement
         // souhaité (cellule à 3 lignes dans la même ligne tableau).
-        doc
-          .fillColor(BSIC_BRAND.colors.bleuNuitDark)
-          .font(BSIC_BRAND.fonts.body)
-          .fontSize(fontSize);
+        doc.font(BSIC_BRAND.fonts.body).fontSize(fontSize);
         let cx = x0;
         for (let j = 0; j < columns.length; j++) {
           const col = columns[j];
-          doc.text(row[j] ?? '', cx + 4, currentY + cellPaddingV, {
-            width: col.width - 8,
-            align: col.align ?? 'left',
-          });
+          const value = row[j] ?? '';
+          const style = options.cellStyle?.(i, j, value);
+          if (style?.bg) {
+            // Badge coloré centré verticalement dans la ligne.
+            const badgeH = fontSize + 8;
+            const badgeY = currentY + (actualRowHeight - badgeH) / 2;
+            const badgeW = col.width - 10;
+            doc
+              .save()
+              .fillColor(style.bg)
+              .roundedRect(cx + 5, badgeY, badgeW, badgeH, 3)
+              .fill()
+              .restore();
+            doc
+              .fillColor(style.color ?? '#FFFFFF')
+              .text(value, cx + 5, badgeY + 4, {
+                width: badgeW,
+                align: 'center',
+                lineBreak: false,
+              });
+          } else {
+            doc
+              .fillColor(style?.color ?? BSIC_BRAND.colors.bleuNuitDark)
+              .text(value, cx + 4, currentY + cellPaddingV, {
+                width: col.width - 8,
+                align: col.align ?? 'left',
+              });
+          }
           cx += col.width;
         }
 
@@ -772,7 +810,7 @@ export class PdfBuilderService {
       .fillColor(BSIC_BRAND.colors.bleuNuit)
       .font(BSIC_BRAND.fonts.titre)
       .fontSize(30)
-      .text(opts.title, left, 250, {
+      .text(opts.title, left, 245, {
         width: widthDispo,
         align: 'center',
         lineBreak: false,
@@ -782,7 +820,7 @@ export class PdfBuilderService {
       .fillColor(BSIC_BRAND.colors.or)
       .font(BSIC_BRAND.fonts.titre)
       .fontSize(16)
-      .text(opts.subtitle, left, 290, {
+      .text(opts.subtitle, left, 288, {
         width: widthDispo,
         align: 'center',
         lineBreak: false,
@@ -793,42 +831,42 @@ export class PdfBuilderService {
       .save()
       .lineWidth(1.5)
       .strokeColor(BSIC_BRAND.colors.or)
-      .moveTo(pageW / 2 - 45, 326)
-      .lineTo(pageW / 2 + 45, 326)
+      .moveTo(pageW / 2 - 45, 324)
+      .lineTo(pageW / 2 + 45, 324)
       .stroke()
       .restore();
 
-    // Période en grand.
+    // Période en grand (SOUS-LOT 3 ajust. 1 — aération renforcée).
     doc
       .fillColor(BSIC_BRAND.colors.bleuNuitDark)
       .font(BSIC_BRAND.fonts.titre)
       .fontSize(22)
-      .text(opts.periodeGrande, left, 348, {
+      .text(opts.periodeGrande, left, 350, {
         width: widthDispo,
         align: 'center',
         lineBreak: false,
       });
 
-    // Destinataire (ligne centrée).
+    // Destinataire (ligne centrée) — grand écart après la période.
     doc
       .fillColor(BSIC_BRAND.colors.grisFonce)
       .font(BSIC_BRAND.fonts.italic)
       .fontSize(BSIC_BRAND.fontSizes.body)
-      .text(opts.destinataire, left, 388, {
+      .text(opts.destinataire, left, 420, {
         width: widthDispo,
         align: 'center',
       });
 
-    // Encadré métadonnées centré.
+    // Encadré métadonnées centré — écart après le destinataire.
     const boxW = 360;
-    this.drawInfoBox(doc, (pageW - boxW) / 2, 430, boxW, opts.metaRows);
+    this.drawInfoBox(doc, (pageW - boxW) / 2, 480, boxW, opts.metaRows);
 
     // Mention de confidentialité en bas.
     doc
       .fillColor(BSIC_BRAND.colors.grisFonce)
       .font(BSIC_BRAND.fonts.italic)
       .fontSize(8)
-      .text(opts.confidentialMention, left, doc.page.height - 95, {
+      .text(opts.confidentialMention, left, doc.page.height - 90, {
         width: widthDispo,
         align: 'center',
       });
@@ -977,5 +1015,76 @@ export class PdfBuilderService {
       { width: width / 3, align: 'right', lineBreak: false },
     );
     doc.page.margins = orig;
+  }
+
+  // ─── SOUS-LOT 3 — Bandeaux de section + badges ───────────────────
+
+  /**
+   * Bandeau de section : rectangle plein pleine-largeur (marges) avec
+   * titre en blanc + filet inférieur. Couleur par défaut bleu nuit BSIC
+   * (passer l'or pour distinguer une section IA/approbations). Positionne
+   * `doc.y` sous le bandeau et retourne cette coordonnée.
+   */
+  drawColoredBanner(
+    doc: PDFKit.PDFDocument,
+    title: string,
+    opts: { bg?: string; height?: number; textColor?: string } = {},
+  ): number {
+    const bg = opts.bg ?? BSIC_BRAND.colors.bleuNuit;
+    const textColor = opts.textColor ?? '#FFFFFF';
+    const h = opts.height ?? 26;
+    const left = BSIC_BRAND.marges.gauche;
+    const width = doc.page.width - left - BSIC_BRAND.marges.droite;
+    const y = doc.y;
+
+    doc.save().fillColor(bg).rect(left, y, width, h).fill().restore();
+    // Filet or fin sous le bandeau (accent charte).
+    doc
+      .save()
+      .lineWidth(1)
+      .strokeColor(BSIC_BRAND.colors.or)
+      .moveTo(left, y + h)
+      .lineTo(left + width, y + h)
+      .stroke()
+      .restore();
+    doc
+      .fillColor(textColor)
+      .font(BSIC_BRAND.fonts.titre)
+      .fontSize(BSIC_BRAND.fontSizes.sousSection)
+      .text(title.toUpperCase(), left + 10, y + h / 2 - 6, {
+        width: width - 20,
+        lineBreak: false,
+      });
+    doc.y = y + h + 12;
+    doc.x = left;
+    return doc.y;
+  }
+
+  /**
+   * Badge rectangulaire (coins légèrement arrondis) fond coloré + texte
+   * blanc centré. Utilisé pour les niveaux d'alerte et les taux/badges
+   * de conformité. Retourne la largeur dessinée.
+   */
+  drawBadge(
+    doc: PDFKit.PDFDocument,
+    x: number,
+    y: number,
+    text: string,
+    bg: string,
+    opts: { width?: number; textColor?: string; fontSize?: number } = {},
+  ): number {
+    const fontSize = opts.fontSize ?? 8;
+    const w =
+      opts.width ??
+      doc.font(BSIC_BRAND.fonts.titre).fontSize(fontSize).widthOfString(text) +
+        14;
+    const h = fontSize + 8;
+    doc.save().fillColor(bg).roundedRect(x, y, w, h, 3).fill().restore();
+    doc
+      .fillColor(opts.textColor ?? '#FFFFFF')
+      .font(BSIC_BRAND.fonts.titre)
+      .fontSize(fontSize)
+      .text(text, x, y + 4, { width: w, align: 'center', lineBreak: false });
+    return w;
   }
 }
