@@ -122,6 +122,8 @@ export interface PdfCellStyle {
   bg?: string;
   /** Couleur du texte de la cellule. */
   color?: string;
+  /** Texte en gras (Helvetica-Bold) — ex. lignes de total. */
+  bold?: boolean;
 }
 
 export interface PdfTableOptions {
@@ -478,11 +480,15 @@ export class PdfBuilderService {
               });
           } else {
             doc
+              .font(
+                style?.bold ? BSIC_BRAND.fonts.titre : BSIC_BRAND.fonts.body,
+              )
               .fillColor(style?.color ?? BSIC_BRAND.colors.bleuNuitDark)
               .text(value, cx + 4, currentY + cellPaddingV, {
                 width: col.width - 8,
                 align: col.align ?? 'left',
               });
+            doc.font(BSIC_BRAND.fonts.body);
           }
           cx += col.width;
         }

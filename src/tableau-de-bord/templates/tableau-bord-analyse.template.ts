@@ -140,6 +140,44 @@ function formaterPeriodeGrande(moisDebut: string, moisFin: string): string {
   return `${nomD} ${String(ad)} - ${nomF} ${String(af)}`;
 }
 
+/**
+ * Cibles réglementaires / D2 (SOUS-LOT 4.2). Hardcodées pour l'instant
+ * (backlog `dim_cibles`, cf. CONTEXTE_REPRISE). Alignées sur cibles-d2
+ * du frontend + composition Comité de CONTEXTE_REPRISE.md.
+ */
+const CIBLE_COEF_EXPLOITATION_MAX = 65; // % — cible BCEAO
+const CIBLE_PNB_ANNUEL_M = 1570; // M FCFA — cible D2
+
+/**
+ * Composition du Comité Budgétaire (SOUS-LOT 5). Noms issus de la
+ * source de vérité projet (CONTEXTE_REPRISE.md), pas du brief qui
+ * comportait des noms divergents. Configurable — backlog config admin.
+ */
+const MEMBRES_COMITE = [
+  'M. Souleymane DIORI — Président',
+  'Mme Halima OUSMANE — Membre',
+  'M. Ibrahima MAHAMADOU — Membre',
+  'M. Ousmane MAMANE — Secrétaire',
+];
+const DG_SIGNATAIRE = { nom: 'M. Issoufou BARRY', titre: 'Directeur Général' };
+
+/** Couleur d'exécution selon proximité à 100 % (compte de résultat). */
+function execColor(taux: number | null): string {
+  if (taux === null) return COULEURS_NIVEAU.MANQUANT;
+  if (taux >= 90 && taux <= 110) return COULEURS_NIVEAU.NORMAL;
+  if ((taux >= 80 && taux < 90) || (taux > 110 && taux <= 120))
+    return COULEURS_NIVEAU.ATTENTION;
+  return COULEURS_NIVEAU.CRITIQUE;
+}
+
+/** Nombre de mois (inclusif) entre deux `YYYY-MM`. */
+function nbMoisPeriode(moisDebut: string, moisFin: string): number {
+  const [ad, md] = moisDebut.split('-').map(Number);
+  const [af, mf] = moisFin.split('-').map(Number);
+  if (!ad || !md || !af || !mf) return 1;
+  return Math.max(1, (af - ad) * 12 + (mf - md) + 1);
+}
+
 // ─── Point d'entrée principal ──────────────────────────────────────
 
 export function buildTableauBordAnalysePdf(
@@ -158,11 +196,17 @@ export function buildTableauBordAnalysePdf(
   // Page — top 10 écarts (tableau)
   doc.addPage();
   renderPage3Top10(doc, data, pdfBuilder);
+  // Page — compte de résultat structuré (SOUS-LOT 4)
+  doc.addPage();
+  renderPageCompteResultat(doc, data, pdfBuilder);
   // Page — analyse MIZNAS AI (optionnelle)
   if (data.analyseIa) {
     doc.addPage();
     renderPage4AnalyseIa(doc, data.analyseIa, pdfBuilder);
   }
+  // Page — approbations Comité (SOUS-LOT 5) — toujours en dernier.
+  doc.addPage();
+  renderPageSignatures(doc, data, pdfBuilder);
 }
 
 // ─── Page de garde (SOUS-LOT 2.1) ──────────────────────────────────
@@ -1022,4 +1066,342 @@ function renderPage4AnalyseIa(
       disclaimerY,
       { width: widthDispo, align: 'center' },
     );
+}
+
+// ─── Page — Compte de résultat structuré (SOUS-LOT 4) ──────────────
+
+function renderPageCompteResultat(
+  doc: PDFKit.PDFDocument,
+  data: TableauBordAnalyseData,
+  pdfBuilder: PdfBuilderService,
+): void {
+  const left = doc.page.margins.left;
+  const t = data.ecarts.totaux;
+
+  doc.x = left;
+  doc.y = doc.page.margins.top;
+  pdfBuilder.drawColoredBanner(doc, 'Compte de résultat');
+
+  const pctStr = (n: number | null): string =>
+    n === null ? '—' : `${n.toFixed(1)} %`;
+
+  // Lignes du tableau (avec métadonnées de style).
+  interface CRLigne {
+    ind: string;
+    budget: string;
+    realise: string;
+    exec: string;
+    taux: number | null;
+    total: boolean;
+  }
+  const conforme =
+    t.coefExploitationRealise !== null &&
+    t.coefExploitationRealise <= CIBLE_COEF_EXPLOITATION_MAX;
+  const lignes: CRLigne[] = [
+    {
+      ind: 'TOTAL PRODUITS (cl. 7)',
+      budget: formatMontant(t.produits.budget),
+      realise: formatMontant(t.produits.realise),
+      exec: pctStr(t.produits.tauxExecution),
+      taux: t.produits.tauxExecution,
+      total: false,
+    },
+    {
+      ind: 'TOTAL CHARGES (cl. 6)',
+      budget: formatMontant(t.charges.budget),
+      realise: formatMontant(t.charges.realise),
+      exec: pctStr(t.charges.tauxExecution),
+      taux: t.charges.tauxExecution,
+      total: false,
+    },
+    {
+      ind: 'SOLDE',
+      budget: formatMontant(t.solde.budget),
+      realise: formatMontant(t.solde.realise),
+      exec: pctStr(t.solde.tauxExecution),
+      taux: t.solde.tauxExecution,
+      total: true,
+    },
+    {
+      ind: 'PNB UEMOA',
+      budget: formatMontant(t.pnb.budget),
+      realise: formatMontant(t.pnb.realise),
+      exec: pctStr(t.pnb.tauxExecution),
+      taux: t.pnb.tauxExecution,
+      total: true,
+    },
+    {
+      ind: "Coef. d'exploitation",
+      budget: pctStr(t.coefExploitationBudget),
+      realise: pctStr(t.coefExploitationRealise),
+      exec: t.coefExploitationRealise === null ? '—' : conforme ? 'OK' : 'NON',
+      taux: null,
+      total: true,
+    },
+  ];
+
+  const rows = lignes.map((l) => [l.ind, l.budget, l.realise, l.exec]);
+  pdfBuilder.drawTable(
+    doc,
+    [
+      { header: 'Indicateur', width: 205 },
+      { header: 'Budget (FCFA)', width: 110, align: 'right' },
+      { header: 'Réalisé (FCFA)', width: 110, align: 'right' },
+      { header: 'Exéc.', width: 70, align: 'center' },
+    ],
+    rows,
+    {
+      cellStyle: (ri, ci) => {
+        const l = lignes[ri];
+        const isCoef = ri === lignes.length - 1;
+        const style: {
+          bg?: string;
+          color?: string;
+          bold?: boolean;
+        } = {};
+        if (l.total) style.bold = true;
+        if (ci === 3) {
+          style.color = isCoef
+            ? conforme
+              ? COULEURS_NIVEAU.NORMAL
+              : COULEURS_NIVEAU.CRITIQUE
+            : execColor(l.taux);
+        }
+        return style.bold || style.color ? style : undefined;
+      },
+    },
+  );
+
+  // ─── Bloc conformité BCEAO (SOUS-LOT 4.2) ───
+  doc.moveDown(1);
+  const widthDispo = doc.page.width - left - doc.page.margins.right;
+  pdfBuilder.drawColoredBanner(doc, 'Indicateurs réglementaires BCEAO', {
+    height: 22,
+  });
+
+  const nbMois = nbMoisPeriode(
+    data.ecarts.filtres.moisDebut,
+    data.ecarts.filtres.moisFin,
+  );
+  const ciblePnbPeriodeM = (CIBLE_PNB_ANNUEL_M / 12) * nbMois;
+  const pnbRealiseM = t.pnb.realise / 1e6;
+  const pctCiblePnb =
+    ciblePnbPeriodeM > 0
+      ? Math.round((pnbRealiseM / ciblePnbPeriodeM) * 1000) / 10
+      : 0;
+  const pnbConforme = pctCiblePnb >= 95;
+
+  // Coefficient d'exploitation.
+  drawConformiteLigne(
+    doc,
+    pdfBuilder,
+    left,
+    widthDispo,
+    "Coefficient d'exploitation",
+    t.coefExploitationRealise === null
+      ? '—'
+      : `${t.coefExploitationRealise.toFixed(1)} %`,
+    `Cible BCEAO : <= ${String(CIBLE_COEF_EXPLOITATION_MAX)} %`,
+    conforme ? 'CONFORME' : 'NON CONFORME',
+    conforme ? COULEURS_NIVEAU.NORMAL : COULEURS_NIVEAU.CRITIQUE,
+  );
+  // PNB vs cible D2.
+  drawConformiteLigne(
+    doc,
+    pdfBuilder,
+    left,
+    widthDispo,
+    'PNB (Produit Net Bancaire)',
+    `${formatFcfaCompact(t.pnb.realise)} FCFA`,
+    `Cible D2 : ${String(CIBLE_PNB_ANNUEL_M)} M / an  (période : ${ciblePnbPeriodeM.toFixed(
+      1,
+    )} M sur ${String(nbMois)} mois)`,
+    pnbConforme ? 'ATTEINTE' : `SOUS-RÉALISATION (${String(pctCiblePnb)} %)`,
+    pnbConforme ? COULEURS_NIVEAU.NORMAL : COULEURS_NIVEAU.ATTENTION,
+  );
+}
+
+/** Une ligne de conformité BCEAO : libellé + valeur + cible + badge statut. */
+function drawConformiteLigne(
+  doc: PDFKit.PDFDocument,
+  pdfBuilder: PdfBuilderService,
+  left: number,
+  width: number,
+  libelle: string,
+  valeur: string,
+  cible: string,
+  statut: string,
+  couleur: string,
+): void {
+  const y = doc.y;
+  doc
+    .fillColor(BSIC_BRAND.colors.bleuNuitDark)
+    .font(BSIC_BRAND.fonts.titre)
+    .fontSize(BSIC_BRAND.fontSizes.body)
+    .text(`${libelle} : ${valeur}`, left, y, {
+      width: width - 130,
+      lineBreak: false,
+    });
+  pdfBuilder.drawBadge(doc, left + width - 120, y - 2, statut, couleur, {
+    width: 120,
+    fontSize: 8,
+  });
+  doc
+    .fillColor(BSIC_BRAND.colors.grisFonce)
+    .font(BSIC_BRAND.fonts.italic)
+    .fontSize(BSIC_BRAND.fontSizes.bodySmall)
+    .text(cible, left, y + 15, { width: width - 130, lineBreak: false });
+  doc.y = y + 34;
+  doc.x = left;
+}
+
+// ─── Page — Approbations Comité (SOUS-LOT 5) ───────────────────────
+
+function renderPageSignatures(
+  doc: PDFKit.PDFDocument,
+  data: TableauBordAnalyseData,
+  pdfBuilder: PdfBuilderService,
+): void {
+  const left = doc.page.margins.left;
+  const width = doc.page.width - left - doc.page.margins.right;
+
+  doc.x = left;
+  doc.y = doc.page.margins.top;
+  pdfBuilder.drawColoredBanner(doc, 'Approbations', {
+    bg: BSIC_BRAND.colors.or,
+    textColor: BSIC_BRAND.colors.bleuNuitDark,
+  });
+
+  // Bloc 1 — Préparé par.
+  drawSignatureBox(doc, left, doc.y, width, 78, 'Préparé par', [
+    'Nom : Direction Finance',
+    'Date : ______________________',
+    '',
+    'Signature : _______________________________',
+  ]);
+
+  // Bloc 2 — Validé par le Comité Budgétaire (checkboxes membres).
+  const membreLines = [
+    'Date de la réunion : ______________________',
+    '',
+    'Membres présents :',
+    ...MEMBRES_COMITE.map((m) => `[  ]  ${m}`),
+  ];
+  drawSignatureBox(
+    doc,
+    left,
+    doc.y,
+    width,
+    52 + MEMBRES_COMITE.length * 15,
+    'Validé par le Comité Budgétaire',
+    membreLines,
+  );
+
+  // Bloc 3 — Approuvé pour publication (DG) + cachet 5x5 cm.
+  drawSignatureBox(
+    doc,
+    left,
+    doc.y,
+    width,
+    170,
+    'Approuvé pour publication',
+    [
+      DG_SIGNATAIRE.nom,
+      DG_SIGNATAIRE.titre,
+      'Date : ______________________',
+      '',
+      'Signature : _______________________________',
+      '',
+      'Cachet officiel :',
+    ],
+    { cachet: true },
+  );
+
+  // ─── Mentions réglementaires (SOUS-LOT 5.2) ───
+  const mentionsY = doc.page.height - doc.page.margins.bottom - 44;
+  const dateArrete = formaterDateFr(data.metadata.generatedAt);
+  doc
+    .fillColor(BSIC_BRAND.colors.grisFonce)
+    .font(BSIC_BRAND.fonts.italic)
+    .fontSize(BSIC_BRAND.fontSizes.bodySmall - 1)
+    .text(
+      'Document établi conformément aux instructions BCEAO ' +
+        'n° XXX/XX/XXXX (référence à confirmer).',
+      left,
+      mentionsY,
+      { width, align: 'center', lineBreak: false },
+    )
+    .text(
+      `Version : ${data.metadata.codeVersion} (statut : GELÉ)  ·  ` +
+        `Date d'arrêté du réalisé : ${dateArrete}`,
+      left,
+      mentionsY + 12,
+      { width, align: 'center', lineBreak: false },
+    );
+}
+
+/** Encadré de signature : en-tête gris + lignes de contenu. */
+function drawSignatureBox(
+  doc: PDFKit.PDFDocument,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  titre: string,
+  lignes: string[],
+  opts: { cachet?: boolean } = {},
+): void {
+  // Cadre + en-tête.
+  doc
+    .save()
+    .lineWidth(1)
+    .strokeColor(BSIC_BRAND.colors.bleuNuit)
+    .fillColor('#FFFFFF')
+    .rect(x, y, width, height)
+    .fillAndStroke()
+    .restore();
+  doc
+    .save()
+    .fillColor(BSIC_BRAND.colors.bleuNuit)
+    .rect(x, y, width, 20)
+    .fill()
+    .restore();
+  doc
+    .fillColor('#FFFFFF')
+    .font(BSIC_BRAND.fonts.titre)
+    .fontSize(BSIC_BRAND.fontSizes.bodySmall)
+    .text(titre.toUpperCase(), x + 10, y + 6, {
+      width: width - 20,
+      lineBreak: false,
+    });
+
+  // Contenu.
+  let ly = y + 30;
+  for (const l of lignes) {
+    if (l.length > 0) {
+      doc
+        .fillColor(BSIC_BRAND.colors.bleuNuitDark)
+        .font(BSIC_BRAND.fonts.body)
+        .fontSize(BSIC_BRAND.fontSizes.bodySmall)
+        .text(l, x + 12, ly, { width: width - 24, lineBreak: false });
+    }
+    ly += 15;
+  }
+
+  // Cadre cachet 5x5 cm (~142pt) si demandé.
+  if (opts.cachet) {
+    const size = 100;
+    doc
+      .save()
+      .lineWidth(0.7)
+      .dash(3, { space: 2 })
+      .strokeColor(BSIC_BRAND.colors.grisFonce)
+      .rect(x + width - size - 16, y + height - size - 12, size, size)
+      .stroke()
+      .undash()
+      .restore();
+  }
+
+  doc.y = y + height + 12;
+  doc.x = x;
 }
