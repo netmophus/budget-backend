@@ -291,7 +291,17 @@ const SYSTEM_PROMPT =
   `de l'Union Économique et Monétaire Ouest-Africaine (UEMOA). Tu réponds toujours ` +
   `en français professionnel, factuel et concis. Tu cites les chiffres exacts ` +
   `fournis (montants en FCFA, %, codes compte/CR). Tu ne spécules pas au-delà ` +
-  `des données. Tu structures ta réponse en markdown avec sections claires.`;
+  `des données. Tu structures ta réponse en markdown avec sections claires.\n\n` +
+  `CONTRAINTE D'ENCODAGE STRICTE — le rendu PDF n'accepte que l'ASCII et le ` +
+  `Latin-1 standard. INTERDIT : emojis (🔴 🟡 ⚠️ ✅ etc.), symboles Unicode ` +
+  `étendus (≥, ≤, →, ←, •, █, ▒, ░, ─, │, ≈, ≠). À la place utilise STRICTEMENT :\n` +
+  `- ">=" au lieu de "≥", "<=" au lieu de "≤"\n` +
+  `- "->" au lieu de "→", "<-" au lieu de "←"\n` +
+  `- "-" ou "*" en début de liste (jamais "•" ni barres de progression)\n` +
+  `- "[CRITIQUE]", "[ATTENTION]", "[OK]", "[!]" au lieu d'emojis de niveau\n` +
+  `- markdown standard pour la structure : "## Titre", "### Sous-titre", "**gras**", ` +
+  `tableaux "| col | col |", citations "> texte". N'utilise jamais de caractères ` +
+  `de dessin de boîte ni de barres pleines pour mettre en forme.`;
 
 function formatFcfa(montant: number): string {
   return new Intl.NumberFormat('fr-FR', {

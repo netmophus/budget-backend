@@ -66,13 +66,22 @@ export class ExportPdfService {
 
     buildTableauBordAnalysePdf(doc, data, this.pdfBuilder);
 
-    // Footer paginé — appel obligatoire AVANT doc.end() sinon
-    // bufferedPageRange() retourne 0 (cf. doctring Lot 7.6.bis).
-    const dateFr = formaterDateCourte(data.metadata.generatedAt);
-    this.pdfBuilder.applyFooterToAllPages(doc, {
-      left: 'Confidentiel BSIC NIGER — Document MIZNAS',
-      center: `Généré le ${dateFr}`,
+    // En-tête + pied chartés (SOUS-LOT 2.2) — appels obligatoires AVANT
+    // doc.end() sinon bufferedPageRange() retourne 0 (cf. Lot 7.6.bis).
+    // La page de garde (page 1) est exclue des deux bandeaux.
+    const periode = `${ecarts.filtres.moisDebut} -> ${ecarts.filtres.moisFin}`;
+    this.pdfBuilder.applyChartedHeaderToAllPagesExceptFirst(doc, {
+      titre: 'ANALYSE BUDGÉTAIRE',
+      periode,
     });
+    this.pdfBuilder.applyChartedFooterToAllPages(
+      doc,
+      {
+        left: 'CONFIDENTIEL - BSIC NIGER',
+        center: 'Document MIZNAS',
+      },
+      { skipFirstPage: true },
+    );
 
     // Capture du Buffer via stream pdfkit.
     return new Promise<Buffer>((resolve, reject) => {
@@ -85,14 +94,4 @@ export class ExportPdfService {
       doc.end();
     });
   }
-}
-
-function formaterDateCourte(iso: string): string {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return iso;
-  const pad = (n: number): string => String(n).padStart(2, '0');
-  return (
-    `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${String(d.getFullYear())} ` +
-    `${pad(d.getHours())}:${pad(d.getMinutes())}`
-  );
 }

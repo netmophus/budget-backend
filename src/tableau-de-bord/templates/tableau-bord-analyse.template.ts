@@ -55,13 +55,17 @@ export interface TableauBordAnalyseData {
   analyseIa?: AnalyseAiSnapshot;
 }
 
-/** Couleurs niveaux d'alerte — alignées sur le frontend (Lot 8.5.C). */
+/**
+ * Couleurs niveaux d'alerte (SOUS-LOT 2.3 — palette charte refonte
+ * Comité). CRITIQUE rouge, ATTENTION orange, NORMAL vert, SANS_BUDGET
+ * orange clair, MANQUANT gris.
+ */
 const COULEURS_NIVEAU: Record<NiveauAlerte, string> = {
   CRITIQUE: '#DC2626',
-  ATTENTION: '#BA7517',
-  NORMAL: '#0F6E56',
-  MANQUANT: '#5F6B7A',
-  SANS_BUDGET: '#C2410C',
+  ATTENTION: '#F59E0B',
+  NORMAL: '#10B981',
+  SANS_BUDGET: '#FB923C',
+  MANQUANT: '#94A3B8',
 };
 
 const LIBELLES_NIVEAU: Record<NiveauAlerte, string> = {
@@ -105,6 +109,75 @@ function formaterDateFr(iso: string): string {
   );
 }
 
+/** Mois en toutes lettres (majuscules) pour la page de garde. */
+const MOIS_PLEIN = [
+  'JANVIER',
+  'FÉVRIER',
+  'MARS',
+  'AVRIL',
+  'MAI',
+  'JUIN',
+  'JUILLET',
+  'AOÛT',
+  'SEPTEMBRE',
+  'OCTOBRE',
+  'NOVEMBRE',
+  'DÉCEMBRE',
+];
+
+/**
+ * Période « en grand » pour la page de garde, depuis deux `YYYY-MM`.
+ * Mono-mois -> "JANVIER 2027" ; même année -> "JANVIER - MARS 2027" ;
+ * sinon "DÉCEMBRE 2026 - FÉVRIER 2027".
+ */
+function formaterPeriodeGrande(moisDebut: string, moisFin: string): string {
+  const [ad, md] = moisDebut.split('-').map(Number);
+  const [af, mf] = moisFin.split('-').map(Number);
+  const nomD = MOIS_PLEIN[(md ?? 1) - 1] ?? moisDebut;
+  const nomF = MOIS_PLEIN[(mf ?? 1) - 1] ?? moisFin;
+  if (moisDebut === moisFin) return `${nomD} ${String(ad)}`;
+  if (ad === af) return `${nomD} - ${nomF} ${String(af)}`;
+  return `${nomD} ${String(ad)} - ${nomF} ${String(af)}`;
+}
+
+/**
+ * Cibles réglementaires / D2 (SOUS-LOT 4.2). Hardcodées pour l'instant
+ * (backlog `dim_cibles`, cf. CONTEXTE_REPRISE). Alignées sur cibles-d2
+ * du frontend + composition Comité de CONTEXTE_REPRISE.md.
+ */
+const CIBLE_COEF_EXPLOITATION_MAX = 65; // % — cible BCEAO
+const CIBLE_PNB_ANNUEL_M = 1570; // M FCFA — cible D2
+
+/**
+ * Composition du Comité Budgétaire (SOUS-LOT 5). Noms issus de la
+ * source de vérité projet (CONTEXTE_REPRISE.md), pas du brief qui
+ * comportait des noms divergents. Configurable — backlog config admin.
+ */
+const MEMBRES_COMITE = [
+  'M. Souleymane DIORI — Président',
+  'Mme Halima OUSMANE — Membre',
+  'M. Ibrahima MAHAMADOU — Membre',
+  'M. Ousmane MAMANE — Secrétaire',
+];
+const DG_SIGNATAIRE = { nom: 'M. Issoufou BARRY', titre: 'Directeur Général' };
+
+/** Couleur d'exécution selon proximité à 100 % (compte de résultat). */
+function execColor(taux: number | null): string {
+  if (taux === null) return COULEURS_NIVEAU.MANQUANT;
+  if (taux >= 90 && taux <= 110) return COULEURS_NIVEAU.NORMAL;
+  if ((taux >= 80 && taux < 90) || (taux > 110 && taux <= 120))
+    return COULEURS_NIVEAU.ATTENTION;
+  return COULEURS_NIVEAU.CRITIQUE;
+}
+
+/** Nombre de mois (inclusif) entre deux `YYYY-MM`. */
+function nbMoisPeriode(moisDebut: string, moisFin: string): number {
+  const [ad, md] = moisDebut.split('-').map(Number);
+  const [af, mf] = moisFin.split('-').map(Number);
+  if (!ad || !md || !af || !mf) return 1;
+  return Math.max(1, (af - ad) * 12 + (mf - md) + 1);
+}
+
 // ─── Point d'entrée principal ──────────────────────────────────────
 
 export function buildTableauBordAnalysePdf(
@@ -112,22 +185,63 @@ export function buildTableauBordAnalysePdf(
   data: TableauBordAnalyseData,
   pdfBuilder: PdfBuilderService,
 ): void {
-  // Page 1 — en-tête + métadonnées + KPI
-  renderPage1HeaderEtKpi(doc, data, pdfBuilder);
-  // Page 2 — bar chart mensuel + donut niveaux
+  // Page de garde institutionnelle (SOUS-LOT 2.1).
+  renderCoverPage(doc, data, pdfBuilder);
+  // Page — en-tête + métadonnées + KPI
   doc.addPage();
-  renderPage2Graphiques(doc, data);
-  // Page 3 — top 10 écarts (tableau)
+  renderPage1HeaderEtKpi(doc, data, pdfBuilder);
+  // Page — bar chart mensuel + donut niveaux
+  doc.addPage();
+  renderPage2Graphiques(doc, data, pdfBuilder);
+  // Page — top 10 écarts (tableau)
   doc.addPage();
   renderPage3Top10(doc, data, pdfBuilder);
-  // Page 4 — analyse MIZNAS AI (optionnelle)
+  // Page — compte de résultat structuré (SOUS-LOT 4)
+  doc.addPage();
+  renderPageCompteResultat(doc, data, pdfBuilder);
+  // Page — analyse MIZNAS AI (optionnelle)
   if (data.analyseIa) {
     doc.addPage();
-    renderPage4AnalyseIa(doc, data.analyseIa);
+    renderPage4AnalyseIa(doc, data.analyseIa, pdfBuilder);
   }
+  // Page — approbations Comité (SOUS-LOT 5) — toujours en dernier.
+  doc.addPage();
+  renderPageSignatures(doc, data, pdfBuilder);
 }
 
-// ─── Page 1 — Header + KPI ─────────────────────────────────────────
+// ─── Page de garde (SOUS-LOT 2.1) ──────────────────────────────────
+
+function renderCoverPage(
+  doc: PDFKit.PDFDocument,
+  data: TableauBordAnalyseData,
+  pdfBuilder: PdfBuilderService,
+): void {
+  const f = data.ecarts.filtres;
+  pdfBuilder.drawCoverPage(doc, {
+    title: 'ANALYSE BUDGÉTAIRE',
+    subtitle: 'BUDGET vs RÉALISÉ',
+    periodeGrande: formaterPeriodeGrande(f.moisDebut, f.moisFin),
+    destinataire:
+      "À l'attention de Monsieur le Directeur Général et du Comité Budgétaire",
+    metaRows: [
+      { label: 'Version', value: data.metadata.codeVersion },
+      { label: 'Scénario', value: data.metadata.codeScenario },
+      { label: 'Édité le', value: formaterDateFr(data.metadata.generatedAt) },
+      { label: 'Par', value: data.metadata.userEmail },
+    ],
+    confidentialMention:
+      'Document CONFIDENTIEL - BSIC NIGER S.A. - Usage interne réservé au ' +
+      'Comité Budgétaire. Généré par MIZNAS.',
+  });
+}
+
+// ─── Page 2 — Indicateurs clés V2 + Alertes (SOUS-LOT 3.1 / 3.2) ────
+
+function tauxColor(taux: number): string {
+  if (taux >= 90) return COULEURS_NIVEAU.NORMAL;
+  if (taux >= 70) return COULEURS_NIVEAU.ATTENTION;
+  return COULEURS_NIVEAU.CRITIQUE;
+}
 
 function renderPage1HeaderEtKpi(
   doc: PDFKit.PDFDocument,
@@ -137,76 +251,81 @@ function renderPage1HeaderEtKpi(
   const widthDispo =
     doc.page.width - doc.page.margins.left - doc.page.margins.right;
   const left = doc.page.margins.left;
-  let y = doc.page.margins.top;
+  const k = data.ecarts.kpi;
+  const t = data.ecarts.totaux;
 
-  // Titre principal
-  doc
-    .fillColor(BSIC_BRAND.colors.bleuNuit)
-    .font(BSIC_BRAND.fonts.titre)
-    .fontSize(BSIC_BRAND.fontSizes.section + 4)
-    .text('ANALYSE BUDGET vs RÉALISÉ', left, y, {
-      width: widthDispo,
-      align: 'center',
-      lineBreak: false,
-    });
-  y += 28;
+  // Bandeau de section.
+  doc.x = left;
+  doc.y = doc.page.margins.top;
+  pdfBuilder.drawColoredBanner(doc, 'Indicateurs clés');
+  let y = doc.y;
 
-  // Sous-titre période
+  // 2 grandes cards : PNB + Coefficient d'exploitation.
+  const bigW = (widthDispo - 12) / 2;
+  const bigH = 92;
+  const tauxPnb =
+    t.pnb.budget && t.pnb.budget !== 0
+      ? Math.round((t.pnb.realise / t.pnb.budget) * 100)
+      : 0;
+  drawBigKpiCard(
+    doc,
+    pdfBuilder,
+    left,
+    y,
+    bigW,
+    bigH,
+    'PNB (Produit Net Bancaire)',
+    [
+      { label: 'Budget', value: `${formatFcfaCompact(t.pnb.budget)} FCFA` },
+      { label: 'Réalisé', value: `${formatFcfaCompact(t.pnb.realise)} FCFA` },
+    ],
+    { text: `Exécution ${String(tauxPnb)} %`, color: tauxColor(tauxPnb) },
+  );
+  const ceR = t.coefExploitationRealise;
+  const conforme = ceR !== null && ceR <= 65;
+  drawBigKpiCard(
+    doc,
+    pdfBuilder,
+    left + bigW + 12,
+    y,
+    bigW,
+    bigH,
+    "Coefficient d'exploitation",
+    [
+      {
+        label: 'Budget',
+        value:
+          t.coefExploitationBudget === null
+            ? '—'
+            : `${t.coefExploitationBudget.toFixed(1)} %`,
+      },
+      {
+        label: 'Réalisé',
+        value: ceR === null ? '—' : `${ceR.toFixed(1)} %`,
+      },
+    ],
+    ceR === null
+      ? { text: 'N/A', color: COULEURS_NIVEAU.MANQUANT }
+      : {
+          text: conforme ? 'CONFORME' : 'NON CONFORME',
+          color: conforme ? COULEURS_NIVEAU.NORMAL : COULEURS_NIVEAU.CRITIQUE,
+        },
+  );
+  y += bigH + 4;
   doc
     .fillColor(BSIC_BRAND.colors.grisFonce)
-    .font(BSIC_BRAND.fonts.body)
-    .fontSize(BSIC_BRAND.fontSizes.body + 1)
-    .text(
-      `Période : ${data.ecarts.filtres.moisDebut} → ${data.ecarts.filtres.moisFin}`,
-      left,
-      y,
-      { width: widthDispo, align: 'center', lineBreak: false },
-    );
-  y += 22;
-
-  // Encadré metadata (drawInfoBox helper Lot 7.6)
-  doc.y = y;
-  pdfBuilder.drawInfoBox(doc, left, y, widthDispo, [
-    { label: 'Version', value: data.metadata.codeVersion },
-    { label: 'Scénario', value: data.metadata.codeScenario },
-    {
-      label: 'Centres de responsabilité',
-      value:
-        data.metadata.crsLibelles.length === 0
-          ? 'Tous les CR du périmètre utilisateur'
-          : data.metadata.crsLibelles.join(', '),
-    },
-    {
-      label: 'Seuil ATTENTION',
-      value: `≥ ${String(data.ecarts.filtres.seuilEcartPctAttention ?? 5)} %`,
-    },
-    {
-      label: 'Seuil CRITIQUE',
-      value: `≥ ${String(data.ecarts.filtres.seuilEcartPctCritique ?? 10)} %`,
-    },
-    {
-      label: 'Généré le',
-      value: formaterDateFr(data.metadata.generatedAt),
-    },
-    { label: 'Par', value: data.metadata.userEmail },
-  ]);
-  y += 7 * 18 + 20 + 14; // padding + nb rows*18 + après encadré
-
-  // Section KPI
-  doc
-    .fillColor(BSIC_BRAND.colors.bleuNuit)
-    .font(BSIC_BRAND.fonts.titre)
-    .fontSize(BSIC_BRAND.fontSizes.section)
-    .text('INDICATEURS CLÉS', left, y, {
+    .font(BSIC_BRAND.fonts.italic)
+    .fontSize(BSIC_BRAND.fontSizes.bodySmall - 1)
+    .text("Cible BCEAO : coefficient d'exploitation <= 65 %", left, y, {
       width: widthDispo,
+      align: 'right',
       lineBreak: false,
     });
-  y += 24;
+  y += 18;
 
-  // 4 cards 2x2
+  // 4 petites cards 2x2.
   const cardW = (widthDispo - 12) / 2;
-  const cardH = 70;
-  const k = data.ecarts.kpi;
+  const cardH = 62;
   drawKpiCard(
     doc,
     left,
@@ -248,9 +367,9 @@ function renderPage1HeaderEtKpi(
     formatMontant(k.ecartTotalAbs),
     BSIC_BRAND.colors.bleuNuit,
   );
-  y += cardH + 18;
+  y += cardH + 14;
 
-  // Décomposition défavorable / favorable sous les KPI
+  // Décomposition favorable / défavorable.
   doc
     .fillColor(BSIC_BRAND.colors.grisFonce)
     .font(BSIC_BRAND.fonts.body)
@@ -264,30 +383,145 @@ function renderPage1HeaderEtKpi(
       y,
       { width: widthDispo, align: 'center', lineBreak: false },
     );
+  y += 24;
 
-  // Compte de résultat — PNB / coefficient d'exploitation (PR3).
-  y += 16;
-  const t = data.ecarts.totaux;
-  const ceB =
-    t.coefExploitationBudget === null
-      ? '—'
-      : `${t.coefExploitationBudget.toFixed(1)} %`;
-  const ceR =
-    t.coefExploitationRealise === null
-      ? '—'
-      : `${t.coefExploitationRealise.toFixed(1)} %`;
+  // Bloc « Alertes prioritaires » (SOUS-LOT 3.2).
+  doc.x = left;
+  doc.y = y;
+  pdfBuilder.ensureSpaceOrNewPage(doc, 170);
+  renderAlertesPrioritaires(doc, data, pdfBuilder);
+}
+
+interface BigKpiLigne {
+  label: string;
+  value: string;
+}
+
+function drawBigKpiCard(
+  doc: PDFKit.PDFDocument,
+  pdfBuilder: PdfBuilderService,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  titre: string,
+  lignes: BigKpiLigne[],
+  badge: { text: string; color: string },
+): void {
+  doc
+    .save()
+    .lineWidth(0.8)
+    .strokeColor('#CBD2D9')
+    .fillColor('#FFFFFF')
+    .rect(x, y, w, h)
+    .fillAndStroke()
+    .restore();
+  doc
+    .save()
+    .fillColor(BSIC_BRAND.colors.bleuNuit)
+    .rect(x, y, w, 5)
+    .fill()
+    .restore();
   doc
     .fillColor(BSIC_BRAND.colors.bleuNuit)
     .font(BSIC_BRAND.fonts.titre)
-    .fontSize(BSIC_BRAND.fontSizes.bodySmall)
-    .text(
-      `Compte de résultat — PNB Budget : ${formatMontant(t.pnb.budget)} FCFA  ·  ` +
-        `PNB Réalisé : ${formatMontant(t.pnb.realise)} FCFA  ·  ` +
-        `Coef. exploitation B/R : ${ceB} / ${ceR}`,
+    .fontSize(BSIC_BRAND.fontSizes.body)
+    .text(titre, x + 12, y + 14, { width: w - 24, lineBreak: false });
+  let ly = y + 36;
+  for (const l of lignes) {
+    doc
+      .fillColor(BSIC_BRAND.colors.grisFonce)
+      .font(BSIC_BRAND.fonts.body)
+      .fontSize(BSIC_BRAND.fontSizes.bodySmall)
+      .text(l.label, x + 12, ly + 2, { width: 70, lineBreak: false });
+    doc
+      .fillColor(BSIC_BRAND.colors.bleuNuitDark)
+      .font(BSIC_BRAND.fonts.titre)
+      .fontSize(BSIC_BRAND.fontSizes.sousSection)
+      .text(l.value, x + 70, ly, {
+        width: w - 82,
+        align: 'right',
+        lineBreak: false,
+      });
+    ly += 19;
+  }
+  pdfBuilder.drawBadge(doc, x + 12, y + h - 20, badge.text, badge.color, {
+    fontSize: 8,
+  });
+}
+
+function renderAlertesPrioritaires(
+  doc: PDFKit.PDFDocument,
+  data: TableauBordAnalyseData,
+  pdfBuilder: PdfBuilderService,
+): void {
+  const left = doc.page.margins.left;
+  const width = doc.page.width - left - doc.page.margins.right;
+  pdfBuilder.drawColoredBanner(doc, 'Alertes prioritaires');
+
+  const groupes: Array<{ niveau: NiveauAlerte; action: string }> = [
+    { niveau: 'CRITIQUE', action: 'Investigation prioritaire requise' },
+    { niveau: 'ATTENTION', action: "Suivre l'évolution" },
+    { niveau: 'SANS_BUDGET', action: 'Compléter le budget ou reforecast' },
+    { niveau: 'MANQUANT', action: 'Fiabiliser la remontée comptable' },
+  ];
+
+  for (const g of groupes) {
+    const items = data.ecarts.lignes.filter((l) => l.niveauAlerte === g.niveau);
+    if (items.length === 0) continue;
+    const y = doc.y;
+    const badgeW = pdfBuilder.drawBadge(
+      doc,
       left,
       y,
-      { width: widthDispo, align: 'center', lineBreak: false },
+      `${LIBELLES_NIVEAU[g.niveau]} (${String(items.length)})`,
+      COULEURS_NIVEAU[g.niveau],
     );
+    doc
+      .fillColor(BSIC_BRAND.colors.grisFonce)
+      .font(BSIC_BRAND.fonts.italic)
+      .fontSize(BSIC_BRAND.fontSizes.bodySmall)
+      .text(`-> ${g.action}`, left + badgeW + 10, y + 4, {
+        width: width - badgeW - 10,
+        lineBreak: false,
+      });
+    doc.y = y + 22;
+
+    for (const it of items.slice(0, 3)) {
+      const pct =
+        it.ecartPct === null
+          ? ''
+          : ` (${it.ecartPct > 0 ? '+' : ''}${it.ecartPct.toFixed(1)} %)`;
+      doc
+        .fillColor(BSIC_BRAND.colors.bleuNuitDark)
+        .font(BSIC_BRAND.fonts.body)
+        .fontSize(BSIC_BRAND.fontSizes.bodySmall)
+        .text(
+          `•  ${it.codeCompte}/${it.codeLigneMetier}  ${it.libelleCompte}${pct}`,
+          left + 14,
+          doc.y,
+          { width: width - 20, lineBreak: false },
+        );
+      doc.moveDown(0.2);
+    }
+    if (items.length > 3) {
+      doc
+        .fillColor(BSIC_BRAND.colors.grisFonce)
+        .font(BSIC_BRAND.fonts.italic)
+        .fontSize(BSIC_BRAND.fontSizes.bodySmall - 1)
+        .text(
+          `   … et ${String(items.length - 3)} autre(s)`,
+          left + 14,
+          doc.y,
+          {
+            width: width - 20,
+            lineBreak: false,
+          },
+        );
+      doc.moveDown(0.2);
+    }
+    doc.moveDown(0.3);
+  }
 }
 
 function drawKpiCard(
@@ -336,22 +570,17 @@ function drawKpiCard(
 function renderPage2Graphiques(
   doc: PDFKit.PDFDocument,
   data: TableauBordAnalyseData,
+  pdfBuilder: PdfBuilderService,
 ): void {
   const widthDispo =
     doc.page.width - doc.page.margins.left - doc.page.margins.right;
   const left = doc.page.margins.left;
-  let y = doc.page.margins.top;
 
-  // Titre section
-  doc
-    .fillColor(BSIC_BRAND.colors.bleuNuit)
-    .font(BSIC_BRAND.fonts.titre)
-    .fontSize(BSIC_BRAND.fontSizes.section)
-    .text('ÉVOLUTION MENSUELLE ET RÉPARTITION', left, y, {
-      width: widthDispo,
-      lineBreak: false,
-    });
-  y += 30;
+  // Bandeau de section (SOUS-LOT 3.5).
+  doc.x = left;
+  doc.y = doc.page.margins.top;
+  pdfBuilder.drawColoredBanner(doc, 'Évolution mensuelle et répartition');
+  let y = doc.y + 4;
 
   // Bar chart mensuel — moitié haute
   const barHeight = 230;
@@ -699,16 +928,11 @@ function renderPage3Top10(
   const widthDispo =
     doc.page.width - doc.page.margins.left - doc.page.margins.right;
   const left = doc.page.margins.left;
-  const y = doc.page.margins.top;
 
-  doc
-    .fillColor(BSIC_BRAND.colors.bleuNuit)
-    .font(BSIC_BRAND.fonts.titre)
-    .fontSize(BSIC_BRAND.fontSizes.section)
-    .text('TOP 10 ÉCARTS LES PLUS SIGNIFICATIFS', left, y, {
-      width: widthDispo,
-      lineBreak: false,
-    });
+  // Bandeau de section (SOUS-LOT 3.5).
+  doc.x = left;
+  doc.y = doc.page.margins.top;
+  pdfBuilder.drawColoredBanner(doc, 'Top 10 des écarts les plus significatifs');
   doc
     .fillColor(BSIC_BRAND.colors.grisFonce)
     .font(BSIC_BRAND.fonts.italic)
@@ -716,9 +940,10 @@ function renderPage3Top10(
     .text(
       'Lignes avec réalisé saisi (MANQUANT exclu), triées par écart absolu décroissant.',
       left,
-      y + 22,
+      doc.y,
       { width: widthDispo, lineBreak: false },
     );
+  doc.moveDown(1);
 
   const top = [...data.ecarts.lignes]
     .filter(
@@ -727,7 +952,6 @@ function renderPage3Top10(
     .sort((a, b) => b.ecartAbs - a.ecartAbs)
     .slice(0, 10);
 
-  doc.y = y + 50;
   doc.x = left;
 
   if (top.length === 0) {
@@ -742,8 +966,12 @@ function renderPage3Top10(
   const rows = top.map((l, i) => [
     String(i + 1),
     l.codeCompte,
-    l.libelleCompte.length > 30
-      ? `${l.libelleCompte.slice(0, 29)}…`
+    // SOUS-LOT 1.4 — colonne Ligne métier pour distinguer un même
+    // compte présent sur plusieurs LM (ex. 7081/LM_PART vs 7081/LM_PME).
+    l.codeLigneMetier,
+    // SOUS-LOT 3 ajust. 2 — libellé élargi (135pt), tronqué 1 ligne.
+    l.libelleCompte.length > 26
+      ? `${l.libelleCompte.slice(0, 25)}...`
       : l.libelleCompte,
     l.codeCr,
     l.libelleMois,
@@ -751,18 +979,26 @@ function renderPage3Top10(
     LIBELLES_NIVEAU[l.niveauAlerte],
   ]);
 
+  // Largeurs (total 495pt) : Libellé élargi à 135pt au détriment de
+  // Compte/LM/CR/Mois (SOUS-LOT 3 ajust. 2).
   pdfBuilder.drawTable(
     doc,
     [
-      { header: '#', width: 24, align: 'center' },
-      { header: 'Compte', width: 56 },
-      { header: 'Libellé', width: 160 },
-      { header: 'CR', width: 90 },
-      { header: 'Mois', width: 70 },
-      { header: 'Écart abs.', width: 90, align: 'right' },
-      { header: 'Niveau', width: 60, align: 'center' },
+      { header: '#', width: 18, align: 'center' },
+      { header: 'Compte', width: 44 },
+      { header: 'Ligne métier', width: 54 },
+      { header: 'Libellé', width: 135 },
+      { header: 'CR', width: 64 },
+      { header: 'Mois', width: 52 },
+      { header: 'Écart abs.', width: 86, align: 'right' },
+      { header: 'Niveau', width: 42, align: 'center' },
     ],
     rows,
+    {
+      // SOUS-LOT 3.4 — badge coloré sur la colonne Niveau (index 7).
+      cellStyle: (r, c) =>
+        c === 7 ? { bg: COULEURS_NIVEAU[top[r].niveauAlerte] } : undefined,
+    },
   );
 }
 
@@ -771,61 +1007,54 @@ function renderPage3Top10(
 function renderPage4AnalyseIa(
   doc: PDFKit.PDFDocument,
   ia: AnalyseAiSnapshot,
+  pdfBuilder: PdfBuilderService,
 ): void {
   const widthDispo =
     doc.page.width - doc.page.margins.left - doc.page.margins.right;
   const left = doc.page.margins.left;
-  let y = doc.page.margins.top;
 
-  doc
-    .fillColor(BSIC_BRAND.colors.bleuNuit)
-    .font(BSIC_BRAND.fonts.titre)
-    .fontSize(BSIC_BRAND.fontSizes.section)
-    .text('ANALYSE MIZNAS AI', left, y, {
-      width: widthDispo,
-      lineBreak: false,
-    });
-  y += 24;
+  // Bandeau OR — distingue visuellement le contenu généré par l'IA.
+  doc.x = left;
+  doc.y = doc.page.margins.top;
+  pdfBuilder.drawColoredBanner(doc, 'Analyse MIZNAS AI', {
+    bg: BSIC_BRAND.colors.or,
+    textColor: BSIC_BRAND.colors.bleuNuitDark,
+  });
 
-  // Sous-titre métadonnées
-  const generatedAtStr = ia.generatedAt ? formaterDateFr(ia.generatedAt) : '—';
+  // Ligne d'origine discrète (le détail technique va en pied de page —
+  // SOUS-LOT 3 ajust. 3 : métadonnées moins en évidence pour le Comité).
   doc
     .fillColor(BSIC_BRAND.colors.grisFonce)
     .font(BSIC_BRAND.fonts.italic)
     .fontSize(BSIC_BRAND.fontSizes.bodySmall)
     .text(
-      `Modèle : ${ia.model}  ·  Générée le ${generatedAtStr}  ·  ` +
+      `Généré par MIZNAS AI — ${ia.model}${ia.dryRun ? '  (mode test DRY_RUN)' : ''}`,
+      left,
+      doc.y,
+      { width: widthDispo, lineBreak: false },
+    );
+  doc.moveDown(0.6);
+
+  // Contenu markdown étendu (tableaux / citations / code — SOUS-LOT 3.3).
+  doc.x = left;
+  renderMarkdown(doc, ia.analyse, pdfBuilder);
+
+  // Pied de section : métadonnées de génération (discrètes) + disclaimer.
+  const generatedAtStr = ia.generatedAt ? formaterDateFr(ia.generatedAt) : '—';
+  const metaY = doc.page.height - doc.page.margins.bottom - 52;
+  doc
+    .fillColor(BSIC_BRAND.colors.grisFonce)
+    .font(BSIC_BRAND.fonts.body)
+    .fontSize(BSIC_BRAND.fontSizes.bodySmall - 1)
+    .text(
+      `Métadonnées de génération — Modèle : ${ia.model}  ·  Générée le ${generatedAtStr}  ·  ` +
         `Tokens : ${String(ia.tokensInput)} in / ${String(ia.tokensOutput)} out  ·  ` +
         `Durée : ${String(ia.dureeMs)} ms`,
       left,
-      y,
-      { width: widthDispo, lineBreak: false },
+      metaY,
+      { width: widthDispo, align: 'center', lineBreak: false },
     );
-  y += 18;
-
-  // Badge dry-run si pertinent
-  if (ia.dryRun) {
-    doc.save().fillColor('#BA751714').rect(left, y, 110, 18).fill().restore();
-    doc
-      .fillColor('#BA7517')
-      .font(BSIC_BRAND.fonts.titre)
-      .fontSize(BSIC_BRAND.fontSizes.bodySmall)
-      .text('Mode test (DRY_RUN)', left + 6, y + 4, {
-        width: 100,
-        lineBreak: false,
-      });
-    y += 26;
-  } else {
-    y += 6;
-  }
-
-  // Contenu markdown
-  doc.x = left;
-  doc.y = y;
-  renderMarkdown(doc, ia.analyse);
-
-  // Disclaimer en bas de page (positionné à 80pt du bas)
-  const disclaimerY = doc.page.height - doc.page.margins.bottom - 40;
+  const disclaimerY = doc.page.height - doc.page.margins.bottom - 36;
   doc
     .fillColor(BSIC_BRAND.colors.grisFonce)
     .font(BSIC_BRAND.fonts.italic)
@@ -837,4 +1066,342 @@ function renderPage4AnalyseIa(
       disclaimerY,
       { width: widthDispo, align: 'center' },
     );
+}
+
+// ─── Page — Compte de résultat structuré (SOUS-LOT 4) ──────────────
+
+function renderPageCompteResultat(
+  doc: PDFKit.PDFDocument,
+  data: TableauBordAnalyseData,
+  pdfBuilder: PdfBuilderService,
+): void {
+  const left = doc.page.margins.left;
+  const t = data.ecarts.totaux;
+
+  doc.x = left;
+  doc.y = doc.page.margins.top;
+  pdfBuilder.drawColoredBanner(doc, 'Compte de résultat');
+
+  const pctStr = (n: number | null): string =>
+    n === null ? '—' : `${n.toFixed(1)} %`;
+
+  // Lignes du tableau (avec métadonnées de style).
+  interface CRLigne {
+    ind: string;
+    budget: string;
+    realise: string;
+    exec: string;
+    taux: number | null;
+    total: boolean;
+  }
+  const conforme =
+    t.coefExploitationRealise !== null &&
+    t.coefExploitationRealise <= CIBLE_COEF_EXPLOITATION_MAX;
+  const lignes: CRLigne[] = [
+    {
+      ind: 'TOTAL PRODUITS (cl. 7)',
+      budget: formatMontant(t.produits.budget),
+      realise: formatMontant(t.produits.realise),
+      exec: pctStr(t.produits.tauxExecution),
+      taux: t.produits.tauxExecution,
+      total: false,
+    },
+    {
+      ind: 'TOTAL CHARGES (cl. 6)',
+      budget: formatMontant(t.charges.budget),
+      realise: formatMontant(t.charges.realise),
+      exec: pctStr(t.charges.tauxExecution),
+      taux: t.charges.tauxExecution,
+      total: false,
+    },
+    {
+      ind: 'SOLDE',
+      budget: formatMontant(t.solde.budget),
+      realise: formatMontant(t.solde.realise),
+      exec: pctStr(t.solde.tauxExecution),
+      taux: t.solde.tauxExecution,
+      total: true,
+    },
+    {
+      ind: 'PNB UEMOA',
+      budget: formatMontant(t.pnb.budget),
+      realise: formatMontant(t.pnb.realise),
+      exec: pctStr(t.pnb.tauxExecution),
+      taux: t.pnb.tauxExecution,
+      total: true,
+    },
+    {
+      ind: "Coef. d'exploitation",
+      budget: pctStr(t.coefExploitationBudget),
+      realise: pctStr(t.coefExploitationRealise),
+      exec: t.coefExploitationRealise === null ? '—' : conforme ? 'OK' : 'NON',
+      taux: null,
+      total: true,
+    },
+  ];
+
+  const rows = lignes.map((l) => [l.ind, l.budget, l.realise, l.exec]);
+  pdfBuilder.drawTable(
+    doc,
+    [
+      { header: 'Indicateur', width: 205 },
+      { header: 'Budget (FCFA)', width: 110, align: 'right' },
+      { header: 'Réalisé (FCFA)', width: 110, align: 'right' },
+      { header: 'Exéc.', width: 70, align: 'center' },
+    ],
+    rows,
+    {
+      cellStyle: (ri, ci) => {
+        const l = lignes[ri];
+        const isCoef = ri === lignes.length - 1;
+        const style: {
+          bg?: string;
+          color?: string;
+          bold?: boolean;
+        } = {};
+        if (l.total) style.bold = true;
+        if (ci === 3) {
+          style.color = isCoef
+            ? conforme
+              ? COULEURS_NIVEAU.NORMAL
+              : COULEURS_NIVEAU.CRITIQUE
+            : execColor(l.taux);
+        }
+        return style.bold || style.color ? style : undefined;
+      },
+    },
+  );
+
+  // ─── Bloc conformité BCEAO (SOUS-LOT 4.2) ───
+  doc.moveDown(1);
+  const widthDispo = doc.page.width - left - doc.page.margins.right;
+  pdfBuilder.drawColoredBanner(doc, 'Indicateurs réglementaires BCEAO', {
+    height: 22,
+  });
+
+  const nbMois = nbMoisPeriode(
+    data.ecarts.filtres.moisDebut,
+    data.ecarts.filtres.moisFin,
+  );
+  const ciblePnbPeriodeM = (CIBLE_PNB_ANNUEL_M / 12) * nbMois;
+  const pnbRealiseM = t.pnb.realise / 1e6;
+  const pctCiblePnb =
+    ciblePnbPeriodeM > 0
+      ? Math.round((pnbRealiseM / ciblePnbPeriodeM) * 1000) / 10
+      : 0;
+  const pnbConforme = pctCiblePnb >= 95;
+
+  // Coefficient d'exploitation.
+  drawConformiteLigne(
+    doc,
+    pdfBuilder,
+    left,
+    widthDispo,
+    "Coefficient d'exploitation",
+    t.coefExploitationRealise === null
+      ? '—'
+      : `${t.coefExploitationRealise.toFixed(1)} %`,
+    `Cible BCEAO : <= ${String(CIBLE_COEF_EXPLOITATION_MAX)} %`,
+    conforme ? 'CONFORME' : 'NON CONFORME',
+    conforme ? COULEURS_NIVEAU.NORMAL : COULEURS_NIVEAU.CRITIQUE,
+  );
+  // PNB vs cible D2.
+  drawConformiteLigne(
+    doc,
+    pdfBuilder,
+    left,
+    widthDispo,
+    'PNB (Produit Net Bancaire)',
+    `${formatFcfaCompact(t.pnb.realise)} FCFA`,
+    `Cible D2 : ${String(CIBLE_PNB_ANNUEL_M)} M / an  (période : ${ciblePnbPeriodeM.toFixed(
+      1,
+    )} M sur ${String(nbMois)} mois)`,
+    pnbConforme ? 'ATTEINTE' : `SOUS-RÉALISATION (${String(pctCiblePnb)} %)`,
+    pnbConforme ? COULEURS_NIVEAU.NORMAL : COULEURS_NIVEAU.ATTENTION,
+  );
+}
+
+/** Une ligne de conformité BCEAO : libellé + valeur + cible + badge statut. */
+function drawConformiteLigne(
+  doc: PDFKit.PDFDocument,
+  pdfBuilder: PdfBuilderService,
+  left: number,
+  width: number,
+  libelle: string,
+  valeur: string,
+  cible: string,
+  statut: string,
+  couleur: string,
+): void {
+  const y = doc.y;
+  doc
+    .fillColor(BSIC_BRAND.colors.bleuNuitDark)
+    .font(BSIC_BRAND.fonts.titre)
+    .fontSize(BSIC_BRAND.fontSizes.body)
+    .text(`${libelle} : ${valeur}`, left, y, {
+      width: width - 130,
+      lineBreak: false,
+    });
+  pdfBuilder.drawBadge(doc, left + width - 120, y - 2, statut, couleur, {
+    width: 120,
+    fontSize: 8,
+  });
+  doc
+    .fillColor(BSIC_BRAND.colors.grisFonce)
+    .font(BSIC_BRAND.fonts.italic)
+    .fontSize(BSIC_BRAND.fontSizes.bodySmall)
+    .text(cible, left, y + 15, { width: width - 130, lineBreak: false });
+  doc.y = y + 34;
+  doc.x = left;
+}
+
+// ─── Page — Approbations Comité (SOUS-LOT 5) ───────────────────────
+
+function renderPageSignatures(
+  doc: PDFKit.PDFDocument,
+  data: TableauBordAnalyseData,
+  pdfBuilder: PdfBuilderService,
+): void {
+  const left = doc.page.margins.left;
+  const width = doc.page.width - left - doc.page.margins.right;
+
+  doc.x = left;
+  doc.y = doc.page.margins.top;
+  pdfBuilder.drawColoredBanner(doc, 'Approbations', {
+    bg: BSIC_BRAND.colors.or,
+    textColor: BSIC_BRAND.colors.bleuNuitDark,
+  });
+
+  // Bloc 1 — Préparé par.
+  drawSignatureBox(doc, left, doc.y, width, 78, 'Préparé par', [
+    'Nom : Direction Finance',
+    'Date : ______________________',
+    '',
+    'Signature : _______________________________',
+  ]);
+
+  // Bloc 2 — Validé par le Comité Budgétaire (checkboxes membres).
+  const membreLines = [
+    'Date de la réunion : ______________________',
+    '',
+    'Membres présents :',
+    ...MEMBRES_COMITE.map((m) => `[  ]  ${m}`),
+  ];
+  drawSignatureBox(
+    doc,
+    left,
+    doc.y,
+    width,
+    52 + MEMBRES_COMITE.length * 15,
+    'Validé par le Comité Budgétaire',
+    membreLines,
+  );
+
+  // Bloc 3 — Approuvé pour publication (DG) + cachet 5x5 cm.
+  drawSignatureBox(
+    doc,
+    left,
+    doc.y,
+    width,
+    170,
+    'Approuvé pour publication',
+    [
+      DG_SIGNATAIRE.nom,
+      DG_SIGNATAIRE.titre,
+      'Date : ______________________',
+      '',
+      'Signature : _______________________________',
+      '',
+      'Cachet officiel :',
+    ],
+    { cachet: true },
+  );
+
+  // ─── Mentions réglementaires (SOUS-LOT 5.2) ───
+  const mentionsY = doc.page.height - doc.page.margins.bottom - 44;
+  const dateArrete = formaterDateFr(data.metadata.generatedAt);
+  doc
+    .fillColor(BSIC_BRAND.colors.grisFonce)
+    .font(BSIC_BRAND.fonts.italic)
+    .fontSize(BSIC_BRAND.fontSizes.bodySmall - 1)
+    .text(
+      'Document établi conformément aux instructions BCEAO ' +
+        'n° XXX/XX/XXXX (référence à confirmer).',
+      left,
+      mentionsY,
+      { width, align: 'center', lineBreak: false },
+    )
+    .text(
+      `Version : ${data.metadata.codeVersion} (statut : GELÉ)  ·  ` +
+        `Date d'arrêté du réalisé : ${dateArrete}`,
+      left,
+      mentionsY + 12,
+      { width, align: 'center', lineBreak: false },
+    );
+}
+
+/** Encadré de signature : en-tête gris + lignes de contenu. */
+function drawSignatureBox(
+  doc: PDFKit.PDFDocument,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  titre: string,
+  lignes: string[],
+  opts: { cachet?: boolean } = {},
+): void {
+  // Cadre + en-tête.
+  doc
+    .save()
+    .lineWidth(1)
+    .strokeColor(BSIC_BRAND.colors.bleuNuit)
+    .fillColor('#FFFFFF')
+    .rect(x, y, width, height)
+    .fillAndStroke()
+    .restore();
+  doc
+    .save()
+    .fillColor(BSIC_BRAND.colors.bleuNuit)
+    .rect(x, y, width, 20)
+    .fill()
+    .restore();
+  doc
+    .fillColor('#FFFFFF')
+    .font(BSIC_BRAND.fonts.titre)
+    .fontSize(BSIC_BRAND.fontSizes.bodySmall)
+    .text(titre.toUpperCase(), x + 10, y + 6, {
+      width: width - 20,
+      lineBreak: false,
+    });
+
+  // Contenu.
+  let ly = y + 30;
+  for (const l of lignes) {
+    if (l.length > 0) {
+      doc
+        .fillColor(BSIC_BRAND.colors.bleuNuitDark)
+        .font(BSIC_BRAND.fonts.body)
+        .fontSize(BSIC_BRAND.fontSizes.bodySmall)
+        .text(l, x + 12, ly, { width: width - 24, lineBreak: false });
+    }
+    ly += 15;
+  }
+
+  // Cadre cachet 5x5 cm (~142pt) si demandé.
+  if (opts.cachet) {
+    const size = 100;
+    doc
+      .save()
+      .lineWidth(0.7)
+      .dash(3, { space: 2 })
+      .strokeColor(BSIC_BRAND.colors.grisFonce)
+      .rect(x + width - size - 16, y + height - size - 12, size, size)
+      .stroke()
+      .undash()
+      .restore();
+  }
+
+  doc.y = y + height + 12;
+  doc.x = x;
 }
