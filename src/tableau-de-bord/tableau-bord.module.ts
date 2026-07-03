@@ -4,6 +4,7 @@ import { AiModule } from '../ai/ai.module';
 import { AuditModule } from '../audit/audit.module';
 import { AuthModule } from '../auth/auth.module';
 import { BudgetModule } from '../budget/budget.module';
+import { ConfigurationBanqueModule } from '../configuration-banque/configuration-banque.module';
 import { ReportingModule } from '../reporting/reporting.module';
 import { AnalyseEcartsService } from './services/analyse-ecarts.service';
 import { ExportExcelService } from './services/export-excel.service';
@@ -26,6 +27,7 @@ import { TableauBordController } from './tableau-bord.controller';
     AiModule,
     AuditModule,
     ReportingModule, // Lot 8.6.B — pour PdfBuilderService
+    ConfigurationBanqueModule, // Lot B2 — branding banque
   ],
   controllers: [TableauBordController],
   providers: [AnalyseEcartsService, ExportExcelService, ExportPdfService],

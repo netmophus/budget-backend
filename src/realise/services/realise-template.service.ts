@@ -23,6 +23,8 @@
 import { Injectable } from '@nestjs/common';
 import ExcelJS from 'exceljs';
 
+import { ConfigurationBanqueService } from '../../configuration-banque/configuration-banque.service';
+
 const HEADER_DONNEES = [
   'code_cr',
   'code_compte',
@@ -57,7 +59,7 @@ const LIGNES_EXEMPLE: ReadonlyArray<ReadonlyArray<string>> = [
 ];
 
 const NOTICE_LIGNES: ReadonlyArray<string> = [
-  'Template d’import du réalisé MIZNAS — BSIC NIGER',
+  '', // ligne 0 remplacée dynamiquement par « Template … MIZNAS — <banque> »
   '',
   'Onglet « Donnees » :',
   '  • Ligne 1 = en-tête. NE PAS la supprimer ni la renommer.',
@@ -87,7 +89,7 @@ const NOTICE_LIGNES: ReadonlyArray<string> = [
   '  • Codes CR        : page « Centres de responsabilité » du module Référentiels.',
   '  • Codes compte    : page « Plan comptable » du module Référentiels.',
   '  • Codes l. métier : page « Lignes métier » du module Référentiels.',
-  '  • Devise BSIC standard : XOF.',
+  '  • Devise standard : XOF.',
   '',
   'Limites techniques :',
   '  • Format fichier : .xlsx ou .csv.',
@@ -97,18 +99,28 @@ const NOTICE_LIGNES: ReadonlyArray<string> = [
 
 @Injectable()
 export class RealiseTemplateService {
+  constructor(private readonly configBanque: ConfigurationBanqueService) {}
+
   /**
    * Génère le buffer XLSX du template d'import réalisé.
-   * Pas d'I/O DB ni filesystem : 100% in-memory ExcelJS.
+   * Pas d'I/O DB (hors config banque) ni filesystem : in-memory ExcelJS.
    */
   async genererTemplateXlsx(): Promise<Buffer> {
+    // Lot B2 — nom banque depuis la config (fallback BSIC NIGER).
+    const bankNom = (await this.configBanque.getBankBranding()).nom;
     const wb = new ExcelJS.Workbook();
-    wb.creator = 'MIZNAS — BSIC NIGER';
+    wb.creator = `MIZNAS — ${bankNom}`;
     wb.created = new Date();
     wb.title = 'Template import réalisé';
     wb.subject =
       'Modèle de fichier pour importer le réalisé budgétaire mensuel';
-    wb.company = 'BSIC NIGER S.A.';
+    wb.company = `${bankNom} S.A.`;
+
+    // Notice : 1re ligne dynamique (nom banque).
+    const noticeLignes = [
+      `Template d’import du réalisé MIZNAS — ${bankNom}`,
+      ...NOTICE_LIGNES.slice(1),
+    ];
 
     // ─── Onglet 1 : Donnees ────────────────────────────────────────
     const wsData = wb.addWorksheet('Donnees');
@@ -147,7 +159,7 @@ export class RealiseTemplateService {
     // ─── Onglet 2 : Notice ─────────────────────────────────────────
     const wsNotice = wb.addWorksheet('Notice');
     wsNotice.columns = [{ key: 'texte', width: 100 }];
-    for (const ligne of NOTICE_LIGNES) {
+    for (const ligne of noticeLignes) {
       const row = wsNotice.addRow([ligne]);
       // Ligne 1 = titre : gras, taille 13.
       if (row.number === 1) {

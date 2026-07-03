@@ -20,11 +20,15 @@
  * `pdfBuilder.applyFooterToAllPages()`.
  */
 import {
-  BSIC_BRAND,
+  BRAND,
   formatMontant,
   type PdfBuilderService,
   type PdfTableColumn,
 } from '../generators/pdf-builder.service';
+import {
+  DEFAULT_BANK_BRANDING,
+  type BankBranding,
+} from '../../configuration-banque/bank-branding';
 import type {
   R04AuditEntry,
   R04Donnees,
@@ -167,20 +171,21 @@ function drawPage1Garde(
   doc: PDFKit.PDFDocument,
   d: R04Donnees,
   pdf: PdfBuilderService,
+  bank: BankBranding,
 ): void {
   const pageW = doc.page.width;
-  const left = BSIC_BRAND.marges.gauche;
-  const right = pageW - BSIC_BRAND.marges.droite;
+  const left = BRAND.marges.gauche;
+  const right = pageW - BRAND.marges.droite;
   const width = right - left;
 
   // Logo placeholder centré en haut
-  pdf.drawLogoPlaceholder(doc, (pageW - 140) / 2, 60, 140, 50);
+  pdf.drawLogoPlaceholder(doc, (pageW - 140) / 2, 60, 140, 50, bank);
 
   // Gros titre
   doc
-    .fillColor(BSIC_BRAND.colors.bleuNuit)
-    .font(BSIC_BRAND.fonts.titre)
-    .fontSize(BSIC_BRAND.fontSizes.titreGarde)
+    .fillColor(BRAND.colors.bleuNuit)
+    .font(BRAND.fonts.titre)
+    .fontSize(BRAND.fontSizes.titreGarde)
     .text(
       `BUDGET ${d.version.exercice_fiscal} — SNAPSHOT OFFICIEL`,
       left,
@@ -190,15 +195,13 @@ function drawPage1Garde(
 
   // Sous-titre
   doc
-    .fillColor(BSIC_BRAND.colors.grisFonce)
-    .font(BSIC_BRAND.fonts.body)
-    .fontSize(BSIC_BRAND.fontSizes.sousTitreGarde)
-    .text(
-      'BSIC NIGER S.A. — Banque Sahélo-Saharienne pour l’Investissement et le Commerce',
-      left,
-      doc.y + 8,
-      { width, align: 'center' },
-    );
+    .fillColor(BRAND.colors.grisFonce)
+    .font(BRAND.fonts.body)
+    .fontSize(BRAND.fontSizes.sousTitreGarde)
+    .text(`${bank.nom} S.A. — ${bank.nomComplet}`, left, doc.y + 8, {
+      width,
+      align: 'center',
+    });
 
   // Encadré métadonnées
   pdf.drawInfoBox(doc, left + 40, 270, width - 80, [
@@ -230,17 +233,17 @@ function drawPage1Garde(
   const today = new Date(d.version.date_gel ?? Date.now());
   const refDoc = `${d.version.code_version}_R04_BCEAO_${today.getFullYear()}${String(today.getMonth() + 1).padStart(2, '0')}${String(today.getDate()).padStart(2, '0')}`;
   doc
-    .fillColor(BSIC_BRAND.colors.rouge)
-    .font(BSIC_BRAND.fonts.titre)
-    .fontSize(BSIC_BRAND.fontSizes.body)
+    .fillColor(BRAND.colors.rouge)
+    .font(BRAND.fonts.titre)
+    .fontSize(BRAND.fontSizes.body)
     .text('CONFIDENTIEL — Usage réglementaire BCEAO', left, 700, {
       width,
       align: 'center',
     });
   doc
-    .fillColor(BSIC_BRAND.colors.grisFonce)
-    .font(BSIC_BRAND.fonts.body)
-    .fontSize(BSIC_BRAND.fontSizes.metaSmall)
+    .fillColor(BRAND.colors.grisFonce)
+    .font(BRAND.fonts.body)
+    .fontSize(BRAND.fontSizes.metaSmall)
     .text(`Référence document : ${refDoc}`, left, doc.y + 6, {
       width,
       align: 'center',
@@ -272,7 +275,7 @@ function drawPage2Audit(
   if (rows.length === 0) {
     rows.push(['—', '—', 'Aucune action workflow tracée', '(audit incomplet)']);
   }
-  doc.x = BSIC_BRAND.marges.gauche;
+  doc.x = BRAND.marges.gauche;
   pdf.drawTable(doc, cols, rows, { rowHeight: 30 });
 
   // **Lot 7.6.bis Palier 5 fix défaut B** : cachet "BUDGET GELÉ BCEAO"
@@ -301,8 +304,8 @@ function drawPage3Resume(
   );
 
   // 3 cards côte à côte
-  const left = BSIC_BRAND.marges.gauche;
-  const right = doc.page.width - BSIC_BRAND.marges.droite;
+  const left = BRAND.marges.gauche;
+  const right = doc.page.width - BRAND.marges.droite;
   const cardW = (right - left - 20) / 3;
   const cardH = 90;
   const y = doc.y + 10;
@@ -316,7 +319,7 @@ function drawPage3Resume(
     cardH,
     'PRODUITS (Classe 7)',
     `${fmtMillions(d.totaux.total_produits)} M FCFA`,
-    BSIC_BRAND.colors.vert,
+    BRAND.colors.vert,
   );
   drawKpiCard(
     doc,
@@ -326,7 +329,7 @@ function drawPage3Resume(
     cardH,
     'CHARGES (Classe 6)',
     `${fmtMillions(d.totaux.total_charges)} M FCFA`,
-    BSIC_BRAND.colors.orange,
+    BRAND.colors.orange,
   );
   drawKpiCard(
     doc,
@@ -336,7 +339,7 @@ function drawPage3Resume(
     cardH,
     'SOLDE',
     `${solde >= 0 ? '+' : ''}${fmtMillions(solde)} M FCFA`,
-    solde >= 0 ? BSIC_BRAND.colors.vert : BSIC_BRAND.colors.rouge,
+    solde >= 0 ? BRAND.colors.vert : BRAND.colors.rouge,
   );
 
   // Tableau Périmètre — pagination intelligente (Lot 7.6.bis #4) :
@@ -347,9 +350,9 @@ function drawPage3Resume(
   doc.x = left;
   pdf.ensureSpaceOrNewPage(doc, 130);
   doc
-    .fillColor(BSIC_BRAND.colors.bleuNuitDark)
-    .font(BSIC_BRAND.fonts.titre)
-    .fontSize(BSIC_BRAND.fontSizes.sousSection)
+    .fillColor(BRAND.colors.bleuNuitDark)
+    .font(BRAND.fonts.titre)
+    .fontSize(BRAND.fontSizes.sousSection)
     .text('Périmètre du budget');
   doc.moveDown(0.4);
   pdf.drawTable(
@@ -385,13 +388,13 @@ function drawKpiCard(
     .roundedRect(x, y, w, h, 8)
     .fillAndStroke();
   doc
-    .fillColor(BSIC_BRAND.colors.grisFonce)
-    .font(BSIC_BRAND.fonts.body)
-    .fontSize(BSIC_BRAND.fontSizes.bodySmall)
+    .fillColor(BRAND.colors.grisFonce)
+    .font(BRAND.fonts.body)
+    .fontSize(BRAND.fontSizes.bodySmall)
     .text(label, x + 10, y + 15, { width: w - 20, align: 'left' });
   doc
     .fillColor(color)
-    .font(BSIC_BRAND.fonts.titre)
+    .font(BRAND.fonts.titre)
     // Lot 7.6.bis — fontSize(18) volontaire : taille KPI card 'metric' non standard du token registre.
     .fontSize(18)
     .text(value, x + 10, y + 40, { width: w - 20, align: 'left' });
@@ -412,11 +415,11 @@ function drawCompteResultat(
   );
 
   // A. PRODUITS
-  doc.x = BSIC_BRAND.marges.gauche;
+  doc.x = BRAND.marges.gauche;
   doc
-    .fillColor(BSIC_BRAND.colors.vert)
-    .font(BSIC_BRAND.fonts.titre)
-    .fontSize(BSIC_BRAND.fontSizes.sousSection)
+    .fillColor(BRAND.colors.vert)
+    .font(BRAND.fonts.titre)
+    .fontSize(BRAND.fontSizes.sousSection)
     .text('A. PRODUITS (Classe 7)');
   doc.moveDown(0.4);
 
@@ -456,11 +459,11 @@ function drawCompteResultat(
     doc,
     `III. COMPTE DE RÉSULTAT PRÉVISIONNEL ${d.version.exercice_fiscal} (suite)`,
   );
-  doc.x = BSIC_BRAND.marges.gauche;
+  doc.x = BRAND.marges.gauche;
   doc
-    .fillColor(BSIC_BRAND.colors.orange)
-    .font(BSIC_BRAND.fonts.titre)
-    .fontSize(BSIC_BRAND.fontSizes.sousSection)
+    .fillColor(BRAND.colors.orange)
+    .font(BRAND.fonts.titre)
+    .fontSize(BRAND.fontSizes.sousSection)
     .text('B. CHARGES (Classe 6)');
   doc.moveDown(0.4);
 
@@ -565,10 +568,10 @@ function drawVentilationCr(
     '100,0 %',
   ]);
 
-  doc.x = BSIC_BRAND.marges.gauche;
+  doc.x = BRAND.marges.gauche;
   pdf.drawTable(doc, cols, rows, {
     rowHeight: 18,
-    fontSize: BSIC_BRAND.fontSizes.tableSmall,
+    fontSize: BRAND.fontSizes.tableSmall,
   });
 }
 
@@ -598,7 +601,7 @@ function drawDetailComptes(
     fmtMillions(c.montant_total),
   ]);
 
-  doc.x = BSIC_BRAND.marges.gauche;
+  doc.x = BRAND.marges.gauche;
   pdf.drawTable(doc, cols, rows, { rowHeight: 18, fontSize: 8 });
 }
 
@@ -618,7 +621,7 @@ function drawAuditTrail(
     "VI. JOURNAL D'AUDIT — TRAÇABILITÉ DES TRANSITIONS",
   );
 
-  const left = BSIC_BRAND.marges.gauche;
+  const left = BRAND.marges.gauche;
   doc.x = left;
   for (const a of d.auditTrail) {
     drawAuditEntry(doc, a);
@@ -626,17 +629,17 @@ function drawAuditTrail(
   }
   if (d.auditTrail.length === 0) {
     doc
-      .fillColor(BSIC_BRAND.colors.grisFonce)
-      .font(BSIC_BRAND.fonts.italic)
-      .fontSize(BSIC_BRAND.fontSizes.body)
+      .fillColor(BRAND.colors.grisFonce)
+      .font(BRAND.fonts.italic)
+      .fontSize(BRAND.fontSizes.body)
       .text('Aucune action workflow tracée pour ce cycle de publication.');
   }
 
   doc.moveDown(1);
   doc
-    .fillColor(BSIC_BRAND.colors.grisFonce)
-    .font(BSIC_BRAND.fonts.italic)
-    .fontSize(BSIC_BRAND.fontSizes.italicNote)
+    .fillColor(BRAND.colors.grisFonce)
+    .font(BRAND.fonts.italic)
+    .fontSize(BRAND.fontSizes.italicNote)
     .text(
       'Ces enregistrements sont immuables et conservés 10 ans conformément aux exigences BCEAO.',
       { align: 'left' },
@@ -645,14 +648,14 @@ function drawAuditTrail(
 
 function drawAuditEntry(doc: PDFKit.PDFDocument, a: R04AuditEntry): void {
   doc
-    .fillColor(BSIC_BRAND.colors.bleuNuit)
-    .font(BSIC_BRAND.fonts.titre)
-    .fontSize(BSIC_BRAND.fontSizes.body)
+    .fillColor(BRAND.colors.bleuNuit)
+    .font(BRAND.fonts.titre)
+    .fontSize(BRAND.fontSizes.body)
     .text(`[${fmtDateFrShort(a.date_action)}] ${a.type_action}`);
   doc
-    .fillColor(BSIC_BRAND.colors.bleuNuitDark)
-    .font(BSIC_BRAND.fonts.body)
-    .fontSize(BSIC_BRAND.fontSizes.bodySmall);
+    .fillColor(BRAND.colors.bleuNuitDark)
+    .font(BRAND.fonts.body)
+    .fontSize(BRAND.fontSizes.bodySmall);
   doc.text(`  Acteur     : ${a.utilisateur}`);
   doc.text(`  Référence  : audit_log #${a.id}`);
   doc.text(`  Commentaire : ${a.commentaire ?? '—'}`);
@@ -686,22 +689,22 @@ function drawTextesReglementaires(
 
   for (const [ref, libelle] of textes) {
     doc
-      .fillColor(BSIC_BRAND.colors.bleuNuit)
-      .font(BSIC_BRAND.fonts.titre)
-      .fontSize(BSIC_BRAND.fontSizes.body)
+      .fillColor(BRAND.colors.bleuNuit)
+      .font(BRAND.fonts.titre)
+      .fontSize(BRAND.fontSizes.body)
       .text(`• ${ref}`, { continued: true })
-      .fillColor(BSIC_BRAND.colors.bleuNuitDark)
-      .font(BSIC_BRAND.fonts.body)
-      .fontSize(BSIC_BRAND.fontSizes.body)
+      .fillColor(BRAND.colors.bleuNuitDark)
+      .font(BRAND.fonts.body)
+      .fontSize(BRAND.fontSizes.body)
       .text(` — ${libelle}`);
     doc.moveDown(0.3);
   }
 
   doc.moveDown(0.8);
   doc
-    .fillColor(BSIC_BRAND.colors.grisFonce)
-    .font(BSIC_BRAND.fonts.italic)
-    .fontSize(BSIC_BRAND.fontSizes.body)
+    .fillColor(BRAND.colors.grisFonce)
+    .font(BRAND.fonts.italic)
+    .fontSize(BRAND.fontSizes.body)
     .text(
       "Le présent budget a été élaboré conformément au Plan Comptable Bancaire UMOA Révisé et respecte les principes de séparation des tâches, de traçabilité et de conservation décennale exigés par la BCEAO. L'ensemble des actions de saisie, validation et publication ont été enregistrées dans le journal d'audit MIZNAS et sont consultables par les organes de contrôle interne (Audit, Risques, Conformité).",
       { align: 'justify', lineGap: 3 },
@@ -718,8 +721,8 @@ function drawSignatures(
   doc.addPage();
   pdf.drawSectionTitle(doc, 'VIII. SIGNATURES');
 
-  const left = BSIC_BRAND.marges.gauche;
-  const right = doc.page.width - BSIC_BRAND.marges.droite;
+  const left = BRAND.marges.gauche;
+  const right = doc.page.width - BRAND.marges.droite;
   const blocW = (right - left - 30) / 2;
   const y = doc.y + 20;
 
@@ -753,7 +756,7 @@ function drawSignatures(
   doc
     .save()
     .lineWidth(0.5)
-    .strokeColor(BSIC_BRAND.colors.grisFonce)
+    .strokeColor(BRAND.colors.grisFonce)
     .moveTo(left, footerY)
     .lineTo(right, footerY)
     .stroke()
@@ -762,9 +765,9 @@ function drawSignatures(
   const today = new Date(d.version.date_gel ?? Date.now());
   const refDoc = `${d.version.code_version}_R04_BCEAO_${today.getFullYear()}${String(today.getMonth() + 1).padStart(2, '0')}${String(today.getDate()).padStart(2, '0')}`;
   doc
-    .fillColor(BSIC_BRAND.colors.grisFonce)
-    .font(BSIC_BRAND.fonts.italic)
-    .fontSize(BSIC_BRAND.fontSizes.metaSmall)
+    .fillColor(BRAND.colors.grisFonce)
+    .font(BRAND.fonts.italic)
+    .fontSize(BRAND.fontSizes.metaSmall)
     .text(
       `Document généré automatiquement par MIZNAS le ${fmtDateFrLong(d.version.date_gel)}`,
       left,
@@ -796,36 +799,36 @@ function drawSignatureBlock(
   auditId: string | undefined,
 ): void {
   doc
-    .fillColor(BSIC_BRAND.colors.bleuNuit)
-    .font(BSIC_BRAND.fonts.titre)
-    .fontSize(BSIC_BRAND.fontSizes.sousSection)
+    .fillColor(BRAND.colors.bleuNuit)
+    .font(BRAND.fonts.titre)
+    .fontSize(BRAND.fontSizes.sousSection)
     .text(role, x, y, { width: w });
   doc.moveDown(2.5);
   // Nom complet en gras (ou email seul si JOIN user a renvoyé null).
   doc
-    .fillColor(BSIC_BRAND.colors.bleuNuitDark)
-    .font(BSIC_BRAND.fonts.titre)
-    .fontSize(BSIC_BRAND.fontSizes.body)
+    .fillColor(BRAND.colors.bleuNuitDark)
+    .font(BRAND.fonts.titre)
+    .fontSize(BRAND.fontSizes.body)
     .text(nomComplet ?? email ?? '—', x, doc.y, { width: w });
   // Email en sous-texte gris (seulement si on a affiché un nom au-dessus).
   if (nomComplet && email) {
     doc
-      .fillColor(BSIC_BRAND.colors.grisFonce)
-      .font(BSIC_BRAND.fonts.body)
-      .fontSize(BSIC_BRAND.fontSizes.metaSmall)
+      .fillColor(BRAND.colors.grisFonce)
+      .font(BRAND.fonts.body)
+      .fontSize(BRAND.fontSizes.metaSmall)
       .text(email, x, doc.y, { width: w });
   }
   doc
-    .fillColor(BSIC_BRAND.colors.grisFonce)
-    .font(BSIC_BRAND.fonts.body)
-    .fontSize(BSIC_BRAND.fontSizes.bodySmall)
+    .fillColor(BRAND.colors.grisFonce)
+    .font(BRAND.fonts.body)
+    .fontSize(BRAND.fontSizes.bodySmall)
     .text(dateLabel, x, doc.y + 4, { width: w });
   doc.text(fmtDateFrLong(date), x, doc.y, { width: w });
   doc.moveDown(1);
   doc
-    .fillColor(BSIC_BRAND.colors.or)
-    .font(BSIC_BRAND.fonts.italic)
-    .fontSize(BSIC_BRAND.fontSizes.italicNote)
+    .fillColor(BRAND.colors.or)
+    .font(BRAND.fonts.italic)
+    .fontSize(BRAND.fontSizes.italicNote)
     .text(`[Cachet électronique : audit_log #${auditId ?? '—'}]`, x, doc.y, {
       width: w,
     });
@@ -837,8 +840,9 @@ export function buildR04Pdf(
   doc: PDFKit.PDFDocument,
   donnees: R04Donnees,
   pdf: PdfBuilderService,
+  bank: BankBranding = DEFAULT_BANK_BRANDING,
 ): void {
-  drawPage1Garde(doc, donnees, pdf);
+  drawPage1Garde(doc, donnees, pdf, bank);
   drawPage2Audit(doc, donnees, pdf);
   drawPage3Resume(doc, donnees, pdf);
   drawCompteResultat(doc, donnees, pdf);

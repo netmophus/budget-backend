@@ -35,6 +35,7 @@ import {
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
 
+import { ConfigurationBanqueService } from '../../configuration-banque/configuration-banque.service';
 import { PdfBuilderService } from '../generators/pdf-builder.service';
 import { buildR3Pdf } from '../templates/r3-bordereau-validation.template';
 import { buildR5Pdf } from '../templates/r5-bordereau-rejet.template';
@@ -88,6 +89,7 @@ export class BordereauService {
   constructor(
     @InjectDataSource() private readonly dataSource: DataSource,
     private readonly pdfBuilder: PdfBuilderService,
+    private readonly configBanque: ConfigurationBanqueService,
   ) {}
 
   /**
@@ -135,11 +137,13 @@ export class BordereauService {
    */
   async genererBordereauValidation(documentId: string): Promise<Buffer> {
     const data = await this.extractDataR3(documentId);
+    const bank = await this.configBanque.getBankBranding();
     const doc = this.pdfBuilder.createDocument({
       title: `R3 Bordereau Validation — ${data.document.codeDocument}`,
+      author: `MIZNAS — ${bank.nom}`,
       subject: `Bordereau de validation MIZNAS pour ${data.document.codeDocument}`,
     });
-    buildR3Pdf(doc, data, this.pdfBuilder);
+    buildR3Pdf(doc, data, this.pdfBuilder, bank);
     return this.streamToBuffer(doc);
   }
 
@@ -149,11 +153,13 @@ export class BordereauService {
    */
   async genererBordereauRejet(documentId: string): Promise<Buffer> {
     const data = await this.extractDataR5(documentId);
+    const bank = await this.configBanque.getBankBranding();
     const doc = this.pdfBuilder.createDocument({
       title: `R5 Bordereau Rejet — ${data.document.codeDocument}`,
+      author: `MIZNAS — ${bank.nom}`,
       subject: `Bordereau de rejet MIZNAS pour ${data.document.codeDocument}`,
     });
-    buildR5Pdf(doc, data, this.pdfBuilder);
+    buildR5Pdf(doc, data, this.pdfBuilder, bank);
     return this.streamToBuffer(doc);
   }
 

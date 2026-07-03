@@ -6,6 +6,12 @@ import { AuditService } from '../audit/audit.service';
 import type { AuthUser } from '../auth/decorators/current-user.decorator';
 import { ConfigurationBanqueMembreComite } from './entities/configuration-banque-membre-comite.entity';
 import { ConfigurationBanque } from './entities/configuration-banque.entity';
+import {
+  DEFAULT_BANK_BRANDING,
+  DEFAULT_MEMBRES_COMITE,
+  type BankBranding,
+  type MembreComitePdf,
+} from './bank-branding';
 import type {
   ConfigurationBanquePubliqueDto,
   ConfigurationBanqueResponseDto,
@@ -119,6 +125,43 @@ export class ConfigurationBanqueService {
     });
 
     return this.getConfiguration();
+  }
+
+  // ─── Vue « rendu » (Lot B2) — branding + membres, avec fallback ──
+
+  /**
+   * Branding pour les générateurs PDF/Excel. Retourne les valeurs de la
+   * config (id=1) ou le repli BSIC NIGER si indisponible (jamais throw —
+   * un rendu ne doit pas échouer sur l'absence de config).
+   */
+  async getBankBranding(): Promise<BankBranding> {
+    const c = await this.configRepo.findOne({ where: { id: CONFIG_ID } });
+    if (!c) return DEFAULT_BANK_BRANDING;
+    return {
+      nom: c.nom,
+      sigle: c.sigle,
+      nomComplet: c.nomCommercialComplet ?? DEFAULT_BANK_BRANDING.nomComplet,
+      adresse: c.siegeSocial ?? DEFAULT_BANK_BRANDING.adresse,
+      villeSiege: c.villeSiege ?? DEFAULT_BANK_BRANDING.villeSiege,
+      pays: c.pays ?? DEFAULT_BANK_BRANDING.pays,
+      couleurPrimaire: c.couleurPrimaire,
+      couleurPrimaireDark: c.couleurPrimaireDark,
+      couleurSecondaire: c.couleurSecondaire,
+      logoRef: c.logoRef,
+      refReglementaireBceao: c.refReglementaireBceao,
+    };
+  }
+
+  /** Membres actifs du Comité pour la page Approbations (fallback BSIC). */
+  async getMembresComitePdf(): Promise<MembreComitePdf[]> {
+    const membres = await this.getMembres(true);
+    if (membres.length === 0) return DEFAULT_MEMBRES_COMITE;
+    return membres.map((m) => ({
+      nomPrenom: m.nomPrenom,
+      titre: m.titre,
+      fonction: m.fonction,
+      ordreAffichage: m.ordreAffichage,
+    }));
   }
 
   // ─── Membres du Comité ─────────────────────────────────────────

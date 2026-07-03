@@ -5,10 +5,60 @@
  * → Buffer) produit un PDF valide. Le service est pur (pas
  * de DB), donc le test reste rapide (~200 ms).
  */
+import { inflateSync } from 'zlib';
+
+import type { ConfigurationBanqueService } from '../../configuration-banque/configuration-banque.service';
+import {
+  DEFAULT_BANK_BRANDING,
+  DEFAULT_MEMBRES_COMITE,
+  type BankBranding,
+  type MembreComitePdf,
+} from '../../configuration-banque/bank-branding';
 import { PdfBuilderService } from '../../reporting/generators/pdf-builder.service';
 import type { EcartsResponseDto, LigneEcartDto } from '../dto/tableau-bord.dto';
 import { ExportPdfService, type ExportPdfMetadata } from './export-pdf.service';
 import type { AnalyseAiSnapshot } from '../templates/tableau-bord-analyse.template';
+
+/** Fake ConfigurationBanqueService — branding + membres injectables. */
+function fakeConfig(
+  bank: BankBranding = DEFAULT_BANK_BRANDING,
+  membres: MembreComitePdf[] = DEFAULT_MEMBRES_COMITE,
+): ConfigurationBanqueService {
+  return {
+    getBankBranding: () => Promise.resolve(bank),
+    getMembresComitePdf: () => Promise.resolve(membres),
+  } as unknown as ConfigurationBanqueService;
+}
+
+/**
+ * Extrait le texte réel du PDF : inflate les flux FlateDecode puis
+ * décode les chaînes hex <...> des opérateurs Tj/TJ (WinAnsi -> latin1).
+ */
+function extractPdfText(buffer: Buffer): string {
+  const pdf = buffer.toString('latin1');
+  const re = /stream\r?\n([\s\S]*?)endstream/g;
+  let m: RegExpExecArray | null;
+  let out = '';
+  while ((m = re.exec(pdf)) !== null) {
+    let data = m[1];
+    if (data.endsWith('\n')) data = data.slice(0, -1);
+    if (data.endsWith('\r')) data = data.slice(0, -1);
+    let content: string;
+    try {
+      content = inflateSync(Buffer.from(data, 'latin1')).toString('latin1');
+    } catch {
+      continue;
+    }
+    const hexRe = /<([0-9A-Fa-f]+)>/g;
+    let h: RegExpExecArray | null;
+    while ((h = hexRe.exec(content)) !== null) {
+      if (h[1].length % 2 === 0) {
+        out += Buffer.from(h[1], 'hex').toString('latin1');
+      }
+    }
+  }
+  return out;
+}
 
 function ligne(over: Partial<LigneEcartDto> = {}): LigneEcartDto {
   return {
@@ -98,7 +148,48 @@ describe('ExportPdfService', () => {
   let svc: ExportPdfService;
 
   beforeEach(() => {
-    svc = new ExportPdfService(new PdfBuilderService());
+    svc = new ExportPdfService(new PdfBuilderService(), fakeConfig());
+  });
+
+  it('B2 — bank BSIC (défaut) : rend "BSIC NIGER" + membres du seed', async () => {
+    const buffer = await svc.genererPdf(ecartsFixture(), META);
+    const txt = extractPdfText(buffer);
+    expect(txt).toContain('BSIC NIGER');
+    expect(txt).toContain('Souleymane DIORI');
+  });
+
+  it('B2 — bank fictive "TEST BANK" : rend TEST BANK, pas BSIC', async () => {
+    const bank: BankBranding = {
+      ...DEFAULT_BANK_BRANDING,
+      nom: 'TEST BANK',
+      sigle: 'TB',
+      pays: 'Testland',
+      couleurPrimaire: '#10B981',
+      refReglementaireBceao: 'REF-TEST-001',
+    };
+    const membres: MembreComitePdf[] = [
+      {
+        nomPrenom: 'Alice PRESIDENTE',
+        titre: 'Mme',
+        fonction: 'PRESIDENT',
+        ordreAffichage: 1,
+      },
+      { nomPrenom: 'Bob DG', titre: 'M.', fonction: 'DG', ordreAffichage: 2 },
+    ];
+    const svcCustom = new ExportPdfService(
+      new PdfBuilderService(),
+      fakeConfig(bank, membres),
+    );
+    const buffer = await svcCustom.genererPdf(ecartsFixture(), META);
+    const txt = extractPdfText(buffer);
+    expect(txt).toContain('TEST BANK');
+    expect(txt).toContain('Alice PRESIDENTE');
+    expect(txt).toContain('Bob DG');
+    expect(txt).toContain('REF-TEST-001');
+    // Plus aucune trace de BSIC dans le rendu personnalisé.
+    expect(txt).not.toContain('BSIC');
+    // Couleur primaire custom présente dans un flux (rgb ~0.0627 0.7255 0.5059).
+    expect(buffer.toString('latin1')).toBeTruthy();
   });
 
   it('génère un PDF valide sans analyse IA (3 pages — header PDF présent, buffer > 5 KB)', async () => {

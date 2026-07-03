@@ -14,6 +14,11 @@
 import { Injectable } from '@nestjs/common';
 import PDFDocument from 'pdfkit';
 
+import {
+  DEFAULT_BANK_BRANDING,
+  type BankBranding,
+} from '../../configuration-banque/bank-branding';
+
 /**
  * Formate un nombre en string avec espace ASCII (U+0020) comme
  * séparateur de milliers.
@@ -50,7 +55,7 @@ export function formatMontantSigne(n: number | null | undefined): string {
  * rapports MIZNAS. Source : Charte v1 + maquette R04 validée Lot 7.6
  * + hiérarchie typographique + espacement vertical Lot 7.6.bis.
  */
-export const BSIC_BRAND = {
+export const BRAND = {
   colors: {
     bleuNuit: '#1B2A4E',
     bleuNuitDark: '#0F1B33',
@@ -97,7 +102,7 @@ export const BSIC_BRAND = {
   },
   /**
    * Espacement vertical standard (Lot 7.6.bis bonus). Utilisé via
-   * `doc.moveDown(BSIC_BRAND.espacement.apresSection / 12)` (12 = base
+   * `doc.moveDown(BRAND.espacement.apresSection / 12)` (12 = base
    * d'une ligne pdfkit ≈ fontSize 10).
    */
   espacement: {
@@ -162,14 +167,14 @@ export class PdfBuilderService {
     return new PDFDocument({
       size: 'A4',
       margins: {
-        top: BSIC_BRAND.marges.haut,
-        bottom: BSIC_BRAND.marges.bas,
-        left: BSIC_BRAND.marges.gauche,
-        right: BSIC_BRAND.marges.droite,
+        top: BRAND.marges.haut,
+        bottom: BRAND.marges.bas,
+        left: BRAND.marges.gauche,
+        right: BRAND.marges.droite,
       },
       info: {
         Title: meta.title,
-        Author: meta.author ?? 'MIZNAS — BSIC NIGER',
+        Author: meta.author ?? 'MIZNAS',
         Subject: meta.subject ?? meta.title,
         Producer: 'MIZNAS / pdfkit',
         Creator: 'MIZNAS',
@@ -191,31 +196,40 @@ export class PdfBuilderService {
     y: number,
     width = 150,
     height = 70,
+    bank: BankBranding = DEFAULT_BANK_BRANDING,
   ): void {
     doc
       .save()
-      // Fond bleu nuit
+      // Fond couleur primaire
       .rect(x, y, width, height)
-      .fillColor(BSIC_BRAND.colors.bleuNuit)
+      .fillColor(bank.couleurPrimaire)
       .fill();
-    // Bordure or fine
+    // Bordure couleur secondaire fine
     doc
       .rect(x, y, width, height)
       .lineWidth(1.5)
-      .strokeColor(BSIC_BRAND.colors.or)
+      .strokeColor(bank.couleurSecondaire)
       .stroke();
-    // "BSIC" bold blanc
+    // Sigle bold blanc
     doc
-      .font(BSIC_BRAND.fonts.titre)
+      .font(BRAND.fonts.titre)
       .fontSize(20)
       .fillColor('#FFFFFF')
-      .text('BSIC', x, y + 14, { width, align: 'center', lineBreak: false });
-    // "NIGER" or
+      .text(bank.sigle, x, y + 14, {
+        width,
+        align: 'center',
+        lineBreak: false,
+      });
+    // Pays (couleur secondaire)
     doc
-      .font(BSIC_BRAND.fonts.body)
+      .font(BRAND.fonts.body)
       .fontSize(11)
-      .fillColor(BSIC_BRAND.colors.or)
-      .text('NIGER', x, y + 42, { width, align: 'center', lineBreak: false });
+      .fillColor(bank.couleurSecondaire)
+      .text(bank.pays.toUpperCase(), x, y + 42, {
+        width,
+        align: 'center',
+        lineBreak: false,
+      });
     doc.restore();
   }
 
@@ -237,21 +251,21 @@ export class PdfBuilderService {
     doc
       .save()
       .lineWidth(1.2)
-      .strokeColor(BSIC_BRAND.colors.bleuNuit)
-      .fillColor(BSIC_BRAND.colors.grisClair)
+      .strokeColor(BRAND.colors.bleuNuit)
+      .fillColor(BRAND.colors.grisClair)
       .rect(x, y, width, height)
       .fillAndStroke();
 
     let cursorY = y + padding;
     for (const r of rows) {
       doc
-        .fillColor(BSIC_BRAND.colors.grisFonce)
-        .font(BSIC_BRAND.fonts.body)
+        .fillColor(BRAND.colors.grisFonce)
+        .font(BRAND.fonts.body)
         .fontSize(9)
         .text(r.label, x + padding, cursorY, { width: width * 0.45 });
       doc
-        .fillColor(BSIC_BRAND.colors.bleuNuitDark)
-        .font(BSIC_BRAND.fonts.titre)
+        .fillColor(BRAND.colors.bleuNuitDark)
+        .font(BRAND.fonts.titre)
         .fontSize(10)
         .text(r.value, x + width * 0.45, cursorY, {
           width: width * 0.55 - padding,
@@ -285,18 +299,18 @@ export class PdfBuilderService {
     doc
       .rect(x, y, width, height)
       .lineWidth(2)
-      .strokeColor(BSIC_BRAND.colors.rouge)
+      .strokeColor(BRAND.colors.rouge)
       .stroke();
     // Bordure intérieure rouge fine (effet cachet officiel)
     doc
       .rect(x + 4, y + 4, width - 8, height - 8)
       .lineWidth(0.5)
-      .strokeColor(BSIC_BRAND.colors.rouge)
+      .strokeColor(BRAND.colors.rouge)
       .stroke();
     // Titre principal
     doc
-      .fillColor(BSIC_BRAND.colors.rouge)
-      .font(BSIC_BRAND.fonts.titre)
+      .fillColor(BRAND.colors.rouge)
+      .font(BRAND.fonts.titre)
       .fontSize(13)
       .text('BUDGET GELÉ BCEAO', x, y + 18, {
         width,
@@ -305,9 +319,9 @@ export class PdfBuilderService {
       });
     // Sous-titre conservation
     doc
-      .font(BSIC_BRAND.fonts.body)
+      .font(BRAND.fonts.body)
       .fontSize(9)
-      .fillColor(BSIC_BRAND.colors.rouge)
+      .fillColor(BRAND.colors.rouge)
       .text('Conservation 10 ans', x, y + 40, {
         width,
         align: 'center',
@@ -315,9 +329,9 @@ export class PdfBuilderService {
       });
     // Référence audit_log
     doc
-      .font(BSIC_BRAND.fonts.body)
+      .font(BRAND.fonts.body)
       .fontSize(8)
-      .fillColor(BSIC_BRAND.colors.grisFonce)
+      .fillColor(BRAND.colors.grisFonce)
       .text(`Réf. audit ${referenceAudit}`, x, y + 62, {
         width,
         align: 'center',
@@ -325,9 +339,9 @@ export class PdfBuilderService {
       });
     // Mention cachet électronique
     doc
-      .font(BSIC_BRAND.fonts.italic)
+      .font(BRAND.fonts.italic)
       .fontSize(7)
-      .fillColor(BSIC_BRAND.colors.grisFonce)
+      .fillColor(BRAND.colors.grisFonce)
       .text('Cachet électronique MIZNAS', x, y + 78, {
         width,
         align: 'center',
@@ -366,8 +380,8 @@ export class PdfBuilderService {
     rows: string[][],
     options: PdfTableOptions = {},
   ): number {
-    const headerBg = options.headerBg ?? BSIC_BRAND.colors.bleuNuit;
-    const headerColor = options.headerColor ?? BSIC_BRAND.colors.blanc;
+    const headerBg = options.headerBg ?? BRAND.colors.bleuNuit;
+    const headerColor = options.headerColor ?? BRAND.colors.blanc;
     const minRowHeight = options.rowHeight ?? 22;
     const fontSize = options.fontSize ?? 9;
     const totalWidth = columns.reduce((s, c) => s + c.width, 0);
@@ -406,7 +420,7 @@ export class PdfBuilderService {
         // suivra, puis prendre le max comme hauteur de ligne. Évite
         // que la ligne suivante recouvre une cellule au texte wrappé
         // (ex: commentaire E1 du tableau de traçabilité, 3 lignes).
-        doc.font(BSIC_BRAND.fonts.body).fontSize(fontSize);
+        doc.font(BRAND.fonts.body).fontSize(fontSize);
         const cellHeights = columns.map((col, j) => {
           const text = row[j] ?? '';
           return doc.heightOfString(text, {
@@ -444,7 +458,7 @@ export class PdfBuilderService {
         if (i % 2 === 1) {
           doc
             .save()
-            .fillColor(BSIC_BRAND.colors.grisClair)
+            .fillColor(BRAND.colors.grisClair)
             .rect(x0, currentY, totalWidth, actualRowHeight)
             .fill()
             .restore();
@@ -454,7 +468,7 @@ export class PdfBuilderService {
         // pagination verticale est inhibée par l'override de marges,
         // donc seul le wrap horizontal s'applique → comportement
         // souhaité (cellule à 3 lignes dans la même ligne tableau).
-        doc.font(BSIC_BRAND.fonts.body).fontSize(fontSize);
+        doc.font(BRAND.fonts.body).fontSize(fontSize);
         let cx = x0;
         for (let j = 0; j < columns.length; j++) {
           const col = columns[j];
@@ -480,15 +494,13 @@ export class PdfBuilderService {
               });
           } else {
             doc
-              .font(
-                style?.bold ? BSIC_BRAND.fonts.titre : BSIC_BRAND.fonts.body,
-              )
-              .fillColor(style?.color ?? BSIC_BRAND.colors.bleuNuitDark)
+              .font(style?.bold ? BRAND.fonts.titre : BRAND.fonts.body)
+              .fillColor(style?.color ?? BRAND.colors.bleuNuitDark)
               .text(value, cx + 4, currentY + cellPaddingV, {
                 width: col.width - 8,
                 align: col.align ?? 'left',
               });
-            doc.font(BSIC_BRAND.fonts.body);
+            doc.font(BRAND.fonts.body);
           }
           cx += col.width;
         }
@@ -520,7 +532,7 @@ export class PdfBuilderService {
     totalWidth: number,
   ): void {
     doc.save().fillColor(headerBg).rect(x0, y, totalWidth, rowHeight).fill();
-    doc.fillColor(headerColor).font(BSIC_BRAND.fonts.titre).fontSize(fontSize);
+    doc.fillColor(headerColor).font(BRAND.fonts.titre).fontSize(fontSize);
     let cx = x0;
     for (const col of columns) {
       doc.text(col.header, cx + 4, y + 6, {
@@ -604,8 +616,8 @@ export class PdfBuilderService {
     },
   ): void {
     const pageWidth = doc.page.width;
-    const left = BSIC_BRAND.marges.gauche;
-    const right = pageWidth - BSIC_BRAND.marges.droite;
+    const left = BRAND.marges.gauche;
+    const right = pageWidth - BRAND.marges.droite;
     const width = right - left;
     const footerY = doc.page.height - 35;
 
@@ -622,14 +634,14 @@ export class PdfBuilderService {
     doc
       .save()
       .lineWidth(0.5)
-      .strokeColor(BSIC_BRAND.colors.or)
+      .strokeColor(BRAND.colors.or)
       .moveTo(left, footerY - 6)
       .lineTo(right, footerY - 6)
       .stroke();
     doc
-      .fillColor(BSIC_BRAND.colors.grisFonce)
-      .font(BSIC_BRAND.fonts.body)
-      .fontSize(BSIC_BRAND.fontSizes.footer);
+      .fillColor(BRAND.colors.grisFonce)
+      .font(BRAND.fonts.body)
+      .fontSize(BRAND.fontSizes.footer);
     doc.text(parts.left, left, footerY, {
       width: width / 3,
       align: 'left',
@@ -684,8 +696,8 @@ export class PdfBuilderService {
     parts: { left: string; center: string; right: string },
   ): void {
     const pageWidth = doc.page.width;
-    const left = BSIC_BRAND.marges.gauche;
-    const right = pageWidth - BSIC_BRAND.marges.droite;
+    const left = BRAND.marges.gauche;
+    const right = pageWidth - BRAND.marges.droite;
     const width = right - left;
     const headerY = 22;
 
@@ -698,9 +710,9 @@ export class PdfBuilderService {
 
     doc
       .save()
-      .fillColor(BSIC_BRAND.colors.grisFonce)
-      .font(BSIC_BRAND.fonts.body)
-      .fontSize(BSIC_BRAND.fontSizes.header);
+      .fillColor(BRAND.colors.grisFonce)
+      .font(BRAND.fonts.body)
+      .fontSize(BRAND.fontSizes.header);
     doc.text(parts.left, left, headerY, {
       width: width / 3,
       align: 'left',
@@ -719,7 +731,7 @@ export class PdfBuilderService {
     // Filet or fin en dessous du header (séparateur visuel).
     doc
       .lineWidth(0.5)
-      .strokeColor(BSIC_BRAND.colors.or)
+      .strokeColor(BRAND.colors.or)
       .moveTo(left, headerY + 12)
       .lineTo(right, headerY + 12)
       .stroke();
@@ -740,7 +752,7 @@ export class PdfBuilderService {
    */
   ensureSpaceOrNewPage(doc: PDFKit.PDFDocument, requiredHeight: number): void {
     const currentY = doc.y;
-    const pageBottom = doc.page.height - BSIC_BRAND.marges.bas;
+    const pageBottom = doc.page.height - BRAND.marges.bas;
     const available = pageBottom - currentY;
     if (available < requiredHeight) {
       doc.addPage();
@@ -753,17 +765,17 @@ export class PdfBuilderService {
    */
   drawSectionTitle(doc: PDFKit.PDFDocument, title: string): number {
     doc
-      .fillColor(BSIC_BRAND.colors.bleuNuit)
-      .font(BSIC_BRAND.fonts.titre)
-      .fontSize(BSIC_BRAND.fontSizes.section)
+      .fillColor(BRAND.colors.bleuNuit)
+      .font(BRAND.fonts.titre)
+      .fontSize(BRAND.fontSizes.section)
       .text(title);
     const y = doc.y + 2;
     doc
       .save()
       .lineWidth(1.5)
-      .strokeColor(BSIC_BRAND.colors.or)
-      .moveTo(BSIC_BRAND.marges.gauche, y)
-      .lineTo(BSIC_BRAND.marges.gauche + 60, y)
+      .strokeColor(BRAND.colors.or)
+      .moveTo(BRAND.marges.gauche, y)
+      .lineTo(BRAND.marges.gauche + 60, y)
       .stroke()
       .restore();
     doc.moveDown(0.6);
@@ -786,45 +798,48 @@ export class PdfBuilderService {
       destinataire: string;
       metaRows: Array<{ label: string; value: string }>;
       confidentialMention: string;
+      /** Lot B2 — branding banque (défaut BSIC NIGER). */
+      bank?: BankBranding;
     },
   ): void {
     const pageW = doc.page.width;
-    const left = BSIC_BRAND.marges.gauche;
-    const widthDispo = pageW - left - BSIC_BRAND.marges.droite;
+    const left = BRAND.marges.gauche;
+    const widthDispo = pageW - left - BRAND.marges.droite;
+    const bank = opts.bank ?? DEFAULT_BANK_BRANDING;
 
-    // Bandeau supérieur bleu nuit + filet or.
+    // Bandeau supérieur (couleur primaire) + filet secondaire.
     doc
       .save()
-      .fillColor(BSIC_BRAND.colors.bleuNuit)
+      .fillColor(bank.couleurPrimaire)
       .rect(0, 0, pageW, 90)
       .fill()
       .restore();
     doc
       .save()
       .lineWidth(2)
-      .strokeColor(BSIC_BRAND.colors.or)
+      .strokeColor(bank.couleurSecondaire)
       .moveTo(0, 90)
       .lineTo(pageW, 90)
       .stroke()
       .restore();
 
     // Logo centré sous le bandeau.
-    this.drawLogoPlaceholder(doc, (pageW - 150) / 2, 130, 150, 70);
+    this.drawLogoPlaceholder(doc, (pageW - 150) / 2, 130, 150, 70, bank);
 
     // Titre principal.
     doc
-      .fillColor(BSIC_BRAND.colors.bleuNuit)
-      .font(BSIC_BRAND.fonts.titre)
+      .fillColor(bank.couleurPrimaire)
+      .font(BRAND.fonts.titre)
       .fontSize(30)
       .text(opts.title, left, 245, {
         width: widthDispo,
         align: 'center',
         lineBreak: false,
       });
-    // Sous-titre or.
+    // Sous-titre (couleur secondaire).
     doc
-      .fillColor(BSIC_BRAND.colors.or)
-      .font(BSIC_BRAND.fonts.titre)
+      .fillColor(bank.couleurSecondaire)
+      .font(BRAND.fonts.titre)
       .fontSize(16)
       .text(opts.subtitle, left, 288, {
         width: widthDispo,
@@ -832,11 +847,11 @@ export class PdfBuilderService {
         lineBreak: false,
       });
 
-    // Séparateur or court centré.
+    // Séparateur court centré (couleur secondaire).
     doc
       .save()
       .lineWidth(1.5)
-      .strokeColor(BSIC_BRAND.colors.or)
+      .strokeColor(bank.couleurSecondaire)
       .moveTo(pageW / 2 - 45, 324)
       .lineTo(pageW / 2 + 45, 324)
       .stroke()
@@ -844,8 +859,8 @@ export class PdfBuilderService {
 
     // Période en grand (SOUS-LOT 3 ajust. 1 — aération renforcée).
     doc
-      .fillColor(BSIC_BRAND.colors.bleuNuitDark)
-      .font(BSIC_BRAND.fonts.titre)
+      .fillColor(bank.couleurPrimaireDark)
+      .font(BRAND.fonts.titre)
       .fontSize(22)
       .text(opts.periodeGrande, left, 350, {
         width: widthDispo,
@@ -855,9 +870,9 @@ export class PdfBuilderService {
 
     // Destinataire (ligne centrée) — grand écart après la période.
     doc
-      .fillColor(BSIC_BRAND.colors.grisFonce)
-      .font(BSIC_BRAND.fonts.italic)
-      .fontSize(BSIC_BRAND.fontSizes.body)
+      .fillColor(BRAND.colors.grisFonce)
+      .font(BRAND.fonts.italic)
+      .fontSize(BRAND.fontSizes.body)
       .text(opts.destinataire, left, 420, {
         width: widthDispo,
         align: 'center',
@@ -869,8 +884,8 @@ export class PdfBuilderService {
 
     // Mention de confidentialité en bas.
     doc
-      .fillColor(BSIC_BRAND.colors.grisFonce)
-      .font(BSIC_BRAND.fonts.italic)
+      .fillColor(BRAND.colors.grisFonce)
+      .font(BRAND.fonts.italic)
       .fontSize(8)
       .text(opts.confidentialMention, left, doc.page.height - 90, {
         width: widthDispo,
@@ -886,18 +901,20 @@ export class PdfBuilderService {
   applyChartedHeaderToAllPagesExceptFirst(
     doc: PDFKit.PDFDocument,
     parts: { titre: string; periode: string },
+    bank: BankBranding = DEFAULT_BANK_BRANDING,
   ): void {
     const range = doc.bufferedPageRange();
     const total = range.count;
     for (let i = 1; i < total; i++) {
       doc.switchToPage(range.start + i);
-      this.drawChartedHeaderOnCurrentPage(doc, parts);
+      this.drawChartedHeaderOnCurrentPage(doc, parts, bank);
     }
   }
 
   private drawChartedHeaderOnCurrentPage(
     doc: PDFKit.PDFDocument,
     parts: { titre: string; periode: string },
+    bank: BankBranding,
   ): void {
     const pageW = doc.page.width;
     const h = 30;
@@ -906,32 +923,32 @@ export class PdfBuilderService {
 
     doc
       .save()
-      .fillColor(BSIC_BRAND.colors.bleuNuit)
+      .fillColor(bank.couleurPrimaire)
       .rect(0, 0, pageW, h)
       .fill()
       .restore();
     doc
       .save()
       .lineWidth(1)
-      .strokeColor(BSIC_BRAND.colors.or)
+      .strokeColor(bank.couleurSecondaire)
       .moveTo(0, h)
       .lineTo(pageW, h)
       .stroke()
       .restore();
 
-    const left = BSIC_BRAND.marges.gauche;
-    const width = pageW - left - BSIC_BRAND.marges.droite;
+    const left = BRAND.marges.gauche;
+    const width = pageW - left - BRAND.marges.droite;
     doc
       .fillColor('#FFFFFF')
-      .font(BSIC_BRAND.fonts.titre)
+      .font(BRAND.fonts.titre)
       .fontSize(9)
-      .text('BSIC NIGER', left, 10, {
+      .text(bank.nom, left, 10, {
         width: width / 3,
         align: 'left',
         lineBreak: false,
       });
     doc
-      .font(BSIC_BRAND.fonts.body)
+      .font(BRAND.fonts.body)
       .fontSize(9)
       .text(parts.titre, left + width / 3, 10, {
         width: width / 3,
@@ -955,6 +972,7 @@ export class PdfBuilderService {
     doc: PDFKit.PDFDocument,
     parts: { left: string; center: string },
     options: { skipFirstPage?: boolean } = {},
+    bank: BankBranding = DEFAULT_BANK_BRANDING,
   ): void {
     const range = doc.bufferedPageRange();
     const total = range.count;
@@ -966,6 +984,7 @@ export class PdfBuilderService {
         center: parts.center,
         pageNumber: i + 1,
         totalPages: total,
+        bank,
       });
     }
   }
@@ -977,6 +996,7 @@ export class PdfBuilderService {
       center: string;
       pageNumber: number;
       totalPages: number;
+      bank: BankBranding;
     },
   ): void {
     const pageW = doc.page.width;
@@ -987,23 +1007,23 @@ export class PdfBuilderService {
 
     doc
       .save()
-      .fillColor(BSIC_BRAND.colors.bleuNuit)
+      .fillColor(parts.bank.couleurPrimaire)
       .rect(0, bandY, pageW, h)
       .fill()
       .restore();
     doc
       .save()
       .lineWidth(1)
-      .strokeColor(BSIC_BRAND.colors.or)
+      .strokeColor(parts.bank.couleurSecondaire)
       .moveTo(0, bandY)
       .lineTo(pageW, bandY)
       .stroke()
       .restore();
 
-    const left = BSIC_BRAND.marges.gauche;
-    const width = pageW - left - BSIC_BRAND.marges.droite;
+    const left = BRAND.marges.gauche;
+    const width = pageW - left - BRAND.marges.droite;
     const ty = bandY + 8;
-    doc.fillColor('#FFFFFF').font(BSIC_BRAND.fonts.body).fontSize(7);
+    doc.fillColor('#FFFFFF').font(BRAND.fonts.body).fontSize(7);
     doc.text(parts.left, left, ty, {
       width: width / 3,
       align: 'left',
@@ -1036,11 +1056,11 @@ export class PdfBuilderService {
     title: string,
     opts: { bg?: string; height?: number; textColor?: string } = {},
   ): number {
-    const bg = opts.bg ?? BSIC_BRAND.colors.bleuNuit;
+    const bg = opts.bg ?? BRAND.colors.bleuNuit;
     const textColor = opts.textColor ?? '#FFFFFF';
     const h = opts.height ?? 26;
-    const left = BSIC_BRAND.marges.gauche;
-    const width = doc.page.width - left - BSIC_BRAND.marges.droite;
+    const left = BRAND.marges.gauche;
+    const width = doc.page.width - left - BRAND.marges.droite;
     const y = doc.y;
 
     doc.save().fillColor(bg).rect(left, y, width, h).fill().restore();
@@ -1048,15 +1068,15 @@ export class PdfBuilderService {
     doc
       .save()
       .lineWidth(1)
-      .strokeColor(BSIC_BRAND.colors.or)
+      .strokeColor(BRAND.colors.or)
       .moveTo(left, y + h)
       .lineTo(left + width, y + h)
       .stroke()
       .restore();
     doc
       .fillColor(textColor)
-      .font(BSIC_BRAND.fonts.titre)
-      .fontSize(BSIC_BRAND.fontSizes.sousSection)
+      .font(BRAND.fonts.titre)
+      .fontSize(BRAND.fontSizes.sousSection)
       .text(title.toUpperCase(), left + 10, y + h / 2 - 6, {
         width: width - 20,
         lineBreak: false,
@@ -1082,13 +1102,12 @@ export class PdfBuilderService {
     const fontSize = opts.fontSize ?? 8;
     const w =
       opts.width ??
-      doc.font(BSIC_BRAND.fonts.titre).fontSize(fontSize).widthOfString(text) +
-        14;
+      doc.font(BRAND.fonts.titre).fontSize(fontSize).widthOfString(text) + 14;
     const h = fontSize + 8;
     doc.save().fillColor(bg).roundedRect(x, y, w, h, 3).fill().restore();
     doc
       .fillColor(opts.textColor ?? '#FFFFFF')
-      .font(BSIC_BRAND.fonts.titre)
+      .font(BRAND.fonts.titre)
       .fontSize(fontSize)
       .text(text, x, y + 4, { width: w, align: 'center', lineBreak: false });
     return w;

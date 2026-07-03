@@ -23,9 +23,13 @@ import type {
   BordereauVisaEntry,
 } from '../services/bordereau.service';
 import {
-  BSIC_BRAND,
+  BRAND,
   type PdfBuilderService,
 } from '../generators/pdf-builder.service';
+import {
+  DEFAULT_BANK_BRANDING,
+  type BankBranding,
+} from '../../configuration-banque/bank-branding';
 
 function formatDateFr(iso: string | null | undefined): string {
   if (!iso) return '—';
@@ -47,28 +51,28 @@ export function buildR3Pdf(
   doc: PDFKit.PDFDocument,
   data: BordereauR3Data,
   pdf: PdfBuilderService,
+  bank: BankBranding = DEFAULT_BANK_BRANDING,
 ): void {
   const { document, visasValidants } = data;
   const pageWidth = doc.page.width;
-  const contentX = BSIC_BRAND.marges.gauche;
-  const contentWidth =
-    pageWidth - BSIC_BRAND.marges.gauche - BSIC_BRAND.marges.droite;
+  const contentX = BRAND.marges.gauche;
+  const contentWidth = pageWidth - BRAND.marges.gauche - BRAND.marges.droite;
 
   // ─── 1. Logo + en-tête institutionnel ────────────────────────────
-  pdf.drawLogoPlaceholder(doc, contentX, BSIC_BRAND.marges.haut, 100, 50);
+  pdf.drawLogoPlaceholder(doc, contentX, BRAND.marges.haut, 100, 50, bank);
 
   doc
-    .font(BSIC_BRAND.fonts.body)
-    .fontSize(BSIC_BRAND.fontSizes.bodySmall)
-    .fillColor(BSIC_BRAND.colors.grisFonce)
+    .font(BRAND.fonts.body)
+    .fontSize(BRAND.fontSizes.bodySmall)
+    .fillColor(BRAND.colors.grisFonce)
     .text(
-      'BSIC NIGER S.A.\nBoulevard de la Liberté, BP 12 080, Niamey\nDirection Générale',
+      `${bank.nom} S.A.\n${bank.adresse}, ${bank.villeSiege}\nDirection Générale`,
       contentX + 110,
-      BSIC_BRAND.marges.haut + 5,
+      BRAND.marges.haut + 5,
       { width: contentWidth - 110 },
     );
 
-  doc.y = BSIC_BRAND.marges.haut + 60;
+  doc.y = BRAND.marges.haut + 60;
   doc.moveDown(1.5);
 
   // ─── 2. Titre encadré "BORDEREAU DE VALIDATION" ─────────────────
@@ -78,13 +82,13 @@ export function buildR3Pdf(
     .save()
     .rect(contentX, titleY, contentWidth, titleHeight)
     .lineWidth(2)
-    .strokeColor(BSIC_BRAND.colors.vert)
-    .fillColor(BSIC_BRAND.colors.grisClair)
+    .strokeColor(BRAND.colors.vert)
+    .fillColor(BRAND.colors.grisClair)
     .fillAndStroke();
   doc
-    .font(BSIC_BRAND.fonts.titre)
+    .font(BRAND.fonts.titre)
     .fontSize(18)
-    .fillColor(BSIC_BRAND.colors.bleuNuit)
+    .fillColor(BRAND.colors.bleuNuit)
     .text('BORDEREAU DE VALIDATION', contentX, titleY + 11, {
       width: contentWidth,
       align: 'center',
@@ -116,9 +120,9 @@ export function buildR3Pdf(
 
   // ─── 4. Tableau consolidé des viseurs ───────────────────────────
   doc
-    .font(BSIC_BRAND.fonts.titre)
-    .fontSize(BSIC_BRAND.fontSizes.section)
-    .fillColor(BSIC_BRAND.colors.bleuNuit)
+    .font(BRAND.fonts.titre)
+    .fontSize(BRAND.fontSizes.section)
+    .fillColor(BRAND.colors.bleuNuit)
     .text('Visas recueillis', contentX, doc.y);
   doc.moveDown(0.5);
 
@@ -145,13 +149,13 @@ export function buildR3Pdf(
 
   // ─── 5. Bloc certification ──────────────────────────────────────
   doc
-    .font(BSIC_BRAND.fonts.italic)
-    .fontSize(BSIC_BRAND.fontSizes.body)
-    .fillColor(BSIC_BRAND.colors.grisFonce)
+    .font(BRAND.fonts.italic)
+    .fontSize(BRAND.fontSizes.body)
+    .fillColor(BRAND.colors.grisFonce)
     .text(
       'Le présent bordereau atteste que le document susvisé a recueilli ' +
         'les visas requis ci-dessus, conformément à la procédure de ' +
-        "validation interne BSIC NIGER. Il fait foi pour l'audit BCEAO " +
+        `validation interne ${bank.nom}. Il fait foi pour l'audit BCEAO ` +
         '(conservation 10 ans).',
       contentX,
       doc.y,
@@ -167,11 +171,11 @@ export function buildR3Pdf(
   // BCEAO" relève des documents finaux (R04, documents signés), pas des
   // bordereaux dérivés. Le cachet `drawBceaoStamp` reste légitime sur R04.
   doc
-    .font(BSIC_BRAND.fonts.body)
-    .fontSize(BSIC_BRAND.fontSizes.body)
-    .fillColor(BSIC_BRAND.colors.bleuNuitDark)
+    .font(BRAND.fonts.body)
+    .fontSize(BRAND.fontSizes.body)
+    .fillColor(BRAND.colors.bleuNuitDark)
     .text(
-      `Niamey, le ${formatDateFr(new Date().toISOString())}`,
+      `${bank.villeSiege}, le ${formatDateFr(new Date().toISOString())}`,
       contentX,
       doc.y,
       { width: contentWidth, align: 'left' },
@@ -180,9 +184,9 @@ export function buildR3Pdf(
 
   // Mention de génération (avant le footer technique)
   doc
-    .font(BSIC_BRAND.fonts.italic)
-    .fontSize(BSIC_BRAND.fontSizes.bodySmall)
-    .fillColor(BSIC_BRAND.colors.grisFonce)
+    .font(BRAND.fonts.italic)
+    .fontSize(BRAND.fontSizes.bodySmall)
+    .fillColor(BRAND.colors.grisFonce)
     .text(
       `Bordereau généré automatiquement par MIZNAS le ${formatDateFr(new Date().toISOString())}.`,
       contentX,
@@ -192,7 +196,7 @@ export function buildR3Pdf(
 
   // ─── 7. Footer (pattern R04 : left + center + page X/Y auto) ────
   pdf.applyFooterToAllPages(doc, {
-    left: `BSIC NIGER S.A. — R3 Bordereau Validation — ${document.codeDocument}`,
+    left: `${bank.nom} S.A. — R3 Bordereau Validation — ${document.codeDocument}`,
     center: 'CONFIDENTIEL',
   });
 }

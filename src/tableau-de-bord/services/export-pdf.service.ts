@@ -15,6 +15,7 @@
  */
 import { Injectable } from '@nestjs/common';
 
+import { ConfigurationBanqueService } from '../../configuration-banque/configuration-banque.service';
 import { PdfBuilderService } from '../../reporting/generators/pdf-builder.service';
 import type { EcartsResponseDto } from '../dto/tableau-bord.dto';
 import {
@@ -32,7 +33,10 @@ export interface ExportPdfMetadata {
 
 @Injectable()
 export class ExportPdfService {
-  constructor(private readonly pdfBuilder: PdfBuilderService) {}
+  constructor(
+    private readonly pdfBuilder: PdfBuilderService,
+    private readonly configBanque: ConfigurationBanqueService,
+  ) {}
 
   /**
    * Génère le PDF. Le caller fournit déjà la EcartsResponseDto pour
@@ -47,8 +51,13 @@ export class ExportPdfService {
     metadata: ExportPdfMetadata,
     analyseIa?: AnalyseAiSnapshot,
   ): Promise<Buffer> {
+    // Lot B2 — branding + membres depuis la config banque (fallback BSIC).
+    const bank = await this.configBanque.getBankBranding();
+    const membres = await this.configBanque.getMembresComitePdf();
+
     const doc = this.pdfBuilder.createDocument({
-      title: 'Analyse Budget vs Réalisé — MIZNAS',
+      title: `Analyse Budget vs Réalisé — ${bank.nom}`,
+      author: `MIZNAS — ${bank.nom}`,
       subject: `Analyse ${metadata.codeVersion} — ${ecarts.filtres.moisDebut} → ${ecarts.filtres.moisFin}`,
     });
 
@@ -62,6 +71,8 @@ export class ExportPdfService {
         generatedAt: new Date().toISOString(),
       },
       analyseIa,
+      bank,
+      membres,
     };
 
     buildTableauBordAnalysePdf(doc, data, this.pdfBuilder);
@@ -70,17 +81,19 @@ export class ExportPdfService {
     // doc.end() sinon bufferedPageRange() retourne 0 (cf. Lot 7.6.bis).
     // La page de garde (page 1) est exclue des deux bandeaux.
     const periode = `${ecarts.filtres.moisDebut} -> ${ecarts.filtres.moisFin}`;
-    this.pdfBuilder.applyChartedHeaderToAllPagesExceptFirst(doc, {
-      titre: 'ANALYSE BUDGÉTAIRE',
-      periode,
-    });
+    this.pdfBuilder.applyChartedHeaderToAllPagesExceptFirst(
+      doc,
+      { titre: 'ANALYSE BUDGÉTAIRE', periode },
+      bank,
+    );
     this.pdfBuilder.applyChartedFooterToAllPages(
       doc,
       {
-        left: 'CONFIDENTIEL - BSIC NIGER',
+        left: `CONFIDENTIEL - ${bank.nom}`,
         center: 'Document MIZNAS',
       },
       { skipFirstPage: true },
+      bank,
     );
 
     // Capture du Buffer via stream pdfkit.
