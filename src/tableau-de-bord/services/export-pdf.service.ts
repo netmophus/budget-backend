@@ -51,9 +51,8 @@ export class ExportPdfService {
     metadata: ExportPdfMetadata,
     analyseIa?: AnalyseAiSnapshot,
   ): Promise<Buffer> {
-    // Lot B2 — branding + membres depuis la config banque (fallback BSIC).
+    // Lot B2 — branding depuis la config banque (fallback BSIC).
     const bank = await this.configBanque.getBankBranding();
-    const membres = await this.configBanque.getMembresComitePdf();
 
     const doc = this.pdfBuilder.createDocument({
       title: `Analyse Budget vs Réalisé — ${bank.nom}`,
@@ -72,16 +71,16 @@ export class ExportPdfService {
       },
       analyseIa,
       bank,
-      membres,
     };
 
     buildTableauBordAnalysePdf(doc, data, this.pdfBuilder);
 
-    // En-tête + pied chartés (SOUS-LOT 2.2) — appels obligatoires AVANT
-    // doc.end() sinon bufferedPageRange() retourne 0 (cf. Lot 7.6.bis).
-    // La page de garde (page 1) est exclue des deux bandeaux.
+    // En-tête + pied chartés — appels obligatoires AVANT doc.end() sinon
+    // bufferedPageRange() retourne 0 (cf. Lot 7.6.bis). Lot PDF-V2 : plus
+    // de page de garde, donc bandeaux sur TOUTES les pages (page 1 incluse
+    // = « bandeau discret » demandé en tête du dashboard).
     const periode = `${ecarts.filtres.moisDebut} -> ${ecarts.filtres.moisFin}`;
-    this.pdfBuilder.applyChartedHeaderToAllPagesExceptFirst(
+    this.pdfBuilder.applyChartedHeaderToAllPages(
       doc,
       { titre: 'ANALYSE BUDGÉTAIRE', periode },
       bank,
@@ -92,7 +91,7 @@ export class ExportPdfService {
         left: `CONFIDENTIEL - ${bank.nom}`,
         center: 'Document MIZNAS',
       },
-      { skipFirstPage: true },
+      {},
       bank,
     );
 

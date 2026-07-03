@@ -144,6 +144,13 @@ const META: ExportPdfMetadata = {
   userEmail: 'admin@miznas.local',
 };
 
+/** Compte les pages d'un PDF (objets /Type /Page, hors /Pages). */
+function countPages(buffer: Buffer): number {
+  const pdf = buffer.toString('latin1');
+  const matches = pdf.match(/\/Type\s*\/Page(?![s])/g);
+  return matches ? matches.length : 0;
+}
+
 describe('ExportPdfService', () => {
   let svc: ExportPdfService;
 
@@ -151,11 +158,30 @@ describe('ExportPdfService', () => {
     svc = new ExportPdfService(new PdfBuilderService(), fakeConfig());
   });
 
-  it('B2 — bank BSIC (défaut) : rend "BSIC NIGER" + membres du seed', async () => {
+  it('B2 — bank BSIC (défaut) : rend "BSIC NIGER" dans les bandeaux', async () => {
     const buffer = await svc.genererPdf(ecartsFixture(), META);
     const txt = extractPdfText(buffer);
     expect(txt).toContain('BSIC NIGER');
-    expect(txt).toContain('Souleymane DIORI');
+  });
+
+  it('PDF-V2 — 3 pages sans IA, 4 avec IA (ni garde ni approbations)', async () => {
+    const sansIa = await svc.genererPdf(ecartsFixture(), META);
+    expect(countPages(sansIa)).toBe(3);
+    const txt = extractPdfText(sansIa);
+    // Plus de page de garde (destinataire) ni d'approbations Comité.
+    expect(txt).not.toContain('Approbations');
+    expect(txt).not.toContain('Comité Budgétaire');
+    expect(txt).not.toContain('Souleymane DIORI');
+
+    const avecIa = await svc.genererPdf(ecartsFixture(), META, {
+      analyse: '## Diagnostic\nExecution maitrisee.\n',
+      model: 'test',
+      tokensInput: 10,
+      tokensOutput: 20,
+      dureeMs: 5,
+      dryRun: true,
+    });
+    expect(countPages(avecIa)).toBe(4);
   });
 
   it('B2 — bank fictive "TEST BANK" : rend TEST BANK, pas BSIC', async () => {
@@ -167,28 +193,16 @@ describe('ExportPdfService', () => {
       couleurPrimaire: '#10B981',
       refReglementaireBceao: 'REF-TEST-001',
     };
-    const membres: MembreComitePdf[] = [
-      {
-        nomPrenom: 'Alice PRESIDENTE',
-        titre: 'Mme',
-        fonction: 'PRESIDENT',
-        ordreAffichage: 1,
-      },
-      { nomPrenom: 'Bob DG', titre: 'M.', fonction: 'DG', ordreAffichage: 2 },
-    ];
     const svcCustom = new ExportPdfService(
       new PdfBuilderService(),
-      fakeConfig(bank, membres),
+      fakeConfig(bank),
     );
     const buffer = await svcCustom.genererPdf(ecartsFixture(), META);
     const txt = extractPdfText(buffer);
     expect(txt).toContain('TEST BANK');
-    expect(txt).toContain('Alice PRESIDENTE');
-    expect(txt).toContain('Bob DG');
-    expect(txt).toContain('REF-TEST-001');
     // Plus aucune trace de BSIC dans le rendu personnalisé.
     expect(txt).not.toContain('BSIC');
-    // Couleur primaire custom présente dans un flux (rgb ~0.0627 0.7255 0.5059).
+    // Couleur primaire custom présente dans le document.
     expect(buffer.toString('latin1')).toBeTruthy();
   });
 
