@@ -16,6 +16,7 @@ import { PasswordExpiredGuard } from './auth/guards/password-expired.guard';
 import { PermissionsGuard } from './auth/guards/permissions.guard';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 import { DelegationsModule } from './delegations/delegations.module';
+import { ConfigurationBanqueModule } from './configuration-banque/configuration-banque.module';
 import { DocumentsOfficielsModule } from './documents-officiels/documents-officiels.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { ParametreSystemeModule } from './parametre-systeme/parametre-systeme.module';
@@ -148,6 +149,7 @@ import { UsersModule } from './users/users.module';
     // Lot 5.1 — réalisé budgétaire
     RealiseModule,
     ParametreSystemeModule,
+    ConfigurationBanqueModule,
     // Lot 5.2 — tableau de bord budget vs réalisé
     TableauBordModule,
     // Lot 5.3 — reforecast trimestriel
