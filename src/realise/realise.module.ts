@@ -5,6 +5,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { AuditModule } from '../audit/audit.module';
 import { AuthModule } from '../auth/auth.module';
 import { BudgetModule } from '../budget/budget.module';
+import { ConfigurationBanqueModule } from '../configuration-banque/configuration-banque.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { ParametreSystemeModule } from '../parametre-systeme/parametre-systeme.module';
 import { TableauBordModule } from '../tableau-de-bord/tableau-bord.module';
@@ -38,6 +39,7 @@ import { RealiseTemplateService } from './services/realise-template.service';
     BudgetModule, // pour PerimetreService
     TableauBordModule, // pour AnalyseEcartsService (Lot 8.5.E)
     NotificationsModule, // pour NotificationsService (Lot 8.5.E)
+    ConfigurationBanqueModule, // Lot B2 — branding template réalisé
     ParametreSystemeModule, // pour le toggle mode_saisie_realise (Palier 1)
   ],
   controllers: [RealiseController],

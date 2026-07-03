@@ -21,9 +21,13 @@ import type {
   BordereauVisaEntry,
 } from '../services/bordereau.service';
 import {
-  BSIC_BRAND,
+  BRAND,
   type PdfBuilderService,
 } from '../generators/pdf-builder.service';
+import {
+  DEFAULT_BANK_BRANDING,
+  type BankBranding,
+} from '../../configuration-banque/bank-branding';
 
 function formatDateFr(iso: string | null | undefined): string {
   if (!iso) return '—';
@@ -45,28 +49,28 @@ export function buildR5Pdf(
   doc: PDFKit.PDFDocument,
   data: BordereauR5Data,
   pdf: PdfBuilderService,
+  bank: BankBranding = DEFAULT_BANK_BRANDING,
 ): void {
   const { document, visaRejete } = data;
   const pageWidth = doc.page.width;
-  const contentX = BSIC_BRAND.marges.gauche;
-  const contentWidth =
-    pageWidth - BSIC_BRAND.marges.gauche - BSIC_BRAND.marges.droite;
+  const contentX = BRAND.marges.gauche;
+  const contentWidth = pageWidth - BRAND.marges.gauche - BRAND.marges.droite;
 
   // ─── 1. Logo + en-tête institutionnel ────────────────────────────
-  pdf.drawLogoPlaceholder(doc, contentX, BSIC_BRAND.marges.haut, 100, 50);
+  pdf.drawLogoPlaceholder(doc, contentX, BRAND.marges.haut, 100, 50, bank);
 
   doc
-    .font(BSIC_BRAND.fonts.body)
-    .fontSize(BSIC_BRAND.fontSizes.bodySmall)
-    .fillColor(BSIC_BRAND.colors.grisFonce)
+    .font(BRAND.fonts.body)
+    .fontSize(BRAND.fontSizes.bodySmall)
+    .fillColor(BRAND.colors.grisFonce)
     .text(
-      'BSIC NIGER S.A.\nBoulevard de la Liberté, BP 12 080, Niamey\nDirection Générale',
+      `${bank.nom} S.A.\n${bank.adresse}, ${bank.villeSiege}\nDirection Générale`,
       contentX + 110,
-      BSIC_BRAND.marges.haut + 5,
+      BRAND.marges.haut + 5,
       { width: contentWidth - 110 },
     );
 
-  doc.y = BSIC_BRAND.marges.haut + 60;
+  doc.y = BRAND.marges.haut + 60;
   doc.moveDown(1.5);
 
   // ─── 2. Titre encadré "BORDEREAU DE REJET" (ROUGE distinctif) ───
@@ -76,13 +80,13 @@ export function buildR5Pdf(
     .save()
     .rect(contentX, titleY, contentWidth, titleHeight)
     .lineWidth(2)
-    .strokeColor(BSIC_BRAND.colors.rouge)
+    .strokeColor(BRAND.colors.rouge)
     .fillColor('#FCEEEE')
     .fillAndStroke();
   doc
-    .font(BSIC_BRAND.fonts.titre)
+    .font(BRAND.fonts.titre)
     .fontSize(18)
-    .fillColor(BSIC_BRAND.colors.rouge)
+    .fillColor(BRAND.colors.rouge)
     .text('BORDEREAU DE REJET', contentX, titleY + 11, {
       width: contentWidth,
       align: 'center',
@@ -115,9 +119,9 @@ export function buildR5Pdf(
 
   // ─── 4. Bloc rejet — fond rouge clair distinctif ────────────────
   doc
-    .font(BSIC_BRAND.fonts.titre)
-    .fontSize(BSIC_BRAND.fontSizes.section)
-    .fillColor(BSIC_BRAND.colors.rouge)
+    .font(BRAND.fonts.titre)
+    .fontSize(BRAND.fontSizes.section)
+    .fillColor(BRAND.colors.rouge)
     .text('Détail du rejet', contentX, doc.y);
   doc.moveDown(0.5);
 
@@ -127,7 +131,7 @@ export function buildR5Pdf(
     .save()
     .rect(contentX, blocY, contentWidth, blocHeight)
     .lineWidth(1.2)
-    .strokeColor(BSIC_BRAND.colors.rouge)
+    .strokeColor(BRAND.colors.rouge)
     .fillColor('#FCEEEE')
     .fillAndStroke();
   doc.restore();
@@ -149,14 +153,14 @@ export function buildR5Pdf(
   ];
   for (const r of rows) {
     doc
-      .font(BSIC_BRAND.fonts.titre)
-      .fontSize(BSIC_BRAND.fontSizes.body)
-      .fillColor(BSIC_BRAND.colors.rouge)
+      .font(BRAND.fonts.titre)
+      .fontSize(BRAND.fontSizes.body)
+      .fillColor(BRAND.colors.rouge)
       .text(r.label, labelX, blocCursor, { width: 130, lineBreak: false });
     doc
-      .font(BSIC_BRAND.fonts.body)
-      .fontSize(BSIC_BRAND.fontSizes.body)
-      .fillColor(BSIC_BRAND.colors.bleuNuitDark)
+      .font(BRAND.fonts.body)
+      .fontSize(BRAND.fontSizes.body)
+      .fillColor(BRAND.colors.bleuNuitDark)
       .text(r.value, valueX, blocCursor, { width: valueWidth });
     blocCursor += lineHeight;
   }
@@ -164,9 +168,9 @@ export function buildR5Pdf(
 
   // ─── 5. Bloc instructions ───────────────────────────────────────
   doc
-    .font(BSIC_BRAND.fonts.italic)
-    .fontSize(BSIC_BRAND.fontSizes.body)
-    .fillColor(BSIC_BRAND.colors.grisFonce)
+    .font(BRAND.fonts.italic)
+    .fontSize(BRAND.fontSizes.body)
+    .fillColor(BRAND.colors.grisFonce)
     .text(
       "Le document susvisé fait l'objet d'un rejet et devra être révisé " +
         'par son émetteur avant une nouvelle soumission au workflow de ' +
@@ -186,11 +190,11 @@ export function buildR5Pdf(
   // BCEAO" relève des documents finaux (R04, documents signés), pas des
   // bordereaux dérivés. Le cachet `drawBceaoStamp` reste légitime sur R04.
   doc
-    .font(BSIC_BRAND.fonts.body)
-    .fontSize(BSIC_BRAND.fontSizes.body)
-    .fillColor(BSIC_BRAND.colors.bleuNuitDark)
+    .font(BRAND.fonts.body)
+    .fontSize(BRAND.fontSizes.body)
+    .fillColor(BRAND.colors.bleuNuitDark)
     .text(
-      `Niamey, le ${formatDateFr(new Date().toISOString())}`,
+      `${bank.villeSiege}, le ${formatDateFr(new Date().toISOString())}`,
       contentX,
       doc.y,
       { width: contentWidth, align: 'left' },
@@ -199,9 +203,9 @@ export function buildR5Pdf(
 
   // Mention de génération
   doc
-    .font(BSIC_BRAND.fonts.italic)
-    .fontSize(BSIC_BRAND.fontSizes.bodySmall)
-    .fillColor(BSIC_BRAND.colors.grisFonce)
+    .font(BRAND.fonts.italic)
+    .fontSize(BRAND.fontSizes.bodySmall)
+    .fillColor(BRAND.colors.grisFonce)
     .text(
       `Bordereau généré automatiquement par MIZNAS le ${formatDateFr(new Date().toISOString())}.`,
       contentX,
@@ -211,7 +215,7 @@ export function buildR5Pdf(
 
   // ─── 7. Footer ──────────────────────────────────────────────────
   pdf.applyFooterToAllPages(doc, {
-    left: `BSIC NIGER S.A. — R5 Bordereau Rejet — ${document.codeDocument}`,
+    left: `${bank.nom} S.A. — R5 Bordereau Rejet — ${document.codeDocument}`,
     center: 'CONFIDENTIEL',
   });
 }

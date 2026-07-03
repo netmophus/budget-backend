@@ -15,7 +15,7 @@
 import type PDFKit from 'pdfkit';
 
 import {
-  BSIC_BRAND,
+  BRAND,
   type PdfBuilderService,
 } from '../../reporting/generators/pdf-builder.service';
 
@@ -120,8 +120,8 @@ function rendreLigneInline(
     const isLast = i === parts.length - 1;
     if (p.startsWith('**') && p.endsWith('**')) {
       doc
-        .fillColor(BSIC_BRAND.colors.bleuNuitDark)
-        .font(BSIC_BRAND.fonts.titre)
+        .fillColor(BRAND.colors.bleuNuitDark)
+        .font(BRAND.fonts.titre)
         .text(p.slice(2, -2), { continued: !isLast });
     } else if (p.startsWith('`') && p.endsWith('`')) {
       // Code inline : Courier + couleur terracotta (pas de fond inline
@@ -132,8 +132,8 @@ function rendreLigneInline(
         .text(p.slice(1, -1), { continued: !isLast });
     } else {
       doc
-        .fillColor(BSIC_BRAND.colors.bleuNuitDark)
-        .font(BSIC_BRAND.fonts.body)
+        .fillColor(BRAND.colors.bleuNuitDark)
+        .font(BRAND.fonts.body)
         .text(p, { continued: !isLast });
     }
   }
@@ -153,7 +153,7 @@ function splitTableRow(ligne: string): string[] {
 function renderCodeBlock(doc: PDFKit.PDFDocument, lignes: string[]): void {
   const left = doc.page.margins.left;
   const width = doc.page.width - left - doc.page.margins.right;
-  const fs = BSIC_BRAND.fontSizes.bodySmall;
+  const fs = BRAND.fontSizes.bodySmall;
   const lineH = fs + 3;
   const h = lignes.length * lineH + 8;
   const y = doc.y;
@@ -176,20 +176,15 @@ function renderCodeBlock(doc: PDFKit.PDFDocument, lignes: string[]): void {
 function renderBlockquote(doc: PDFKit.PDFDocument, texte: string): void {
   const left = doc.page.margins.left;
   const width = doc.page.width - left - doc.page.margins.right;
-  const fs = BSIC_BRAND.fontSizes.body;
-  doc.font(BSIC_BRAND.fonts.italic).fontSize(fs);
+  const fs = BRAND.fontSizes.body;
+  doc.font(BRAND.fonts.italic).fontSize(fs);
   const h = doc.heightOfString(texte, { width: width - 24 }) + 10;
   const y = doc.y;
   doc.save().fillColor('#F4F6F8').rect(left, y, width, h).fill().restore();
+  doc.save().fillColor(BRAND.colors.or).rect(left, y, 3, h).fill().restore();
   doc
-    .save()
-    .fillColor(BSIC_BRAND.colors.or)
-    .rect(left, y, 3, h)
-    .fill()
-    .restore();
-  doc
-    .fillColor(BSIC_BRAND.colors.grisFonce)
-    .font(BSIC_BRAND.fonts.italic)
+    .fillColor(BRAND.colors.grisFonce)
+    .font(BRAND.fonts.italic)
     .fontSize(fs)
     .text(texte, left + 12, y + 5, { width: width - 24 });
   doc.y = y + h + 4;
@@ -214,11 +209,11 @@ function renderMarkdownTable(
   doc.x = left;
   if (pdfBuilder) {
     pdfBuilder.drawTable(doc, columns, rows, {
-      fontSize: BSIC_BRAND.fontSizes.bodySmall,
+      fontSize: BRAND.fontSizes.bodySmall,
     });
   } else {
     // Fallback sans pdfBuilder : rendu texte tabulé simple.
-    doc.font(BSIC_BRAND.fonts.body).fontSize(BSIC_BRAND.fontSizes.bodySmall);
+    doc.font(BRAND.fonts.body).fontSize(BRAND.fontSizes.bodySmall);
     doc.text(
       [header.join('  |  '), ...rows.map((r) => r.join('  |  '))].join('\n'),
       left,
@@ -298,9 +293,9 @@ export function renderMarkdown(
         pdfBuilder.drawColoredBanner(doc, h1[1]);
       } else {
         doc
-          .fillColor(BSIC_BRAND.colors.bleuNuit)
-          .font(BSIC_BRAND.fonts.titre)
-          .fontSize(BSIC_BRAND.fontSizes.section)
+          .fillColor(BRAND.colors.bleuNuit)
+          .font(BRAND.fonts.titre)
+          .fontSize(BRAND.fontSizes.section)
           .text(h1[1], { width: widthDispo });
         doc.moveDown(0.2);
       }
@@ -312,9 +307,9 @@ export function renderMarkdown(
     if (h2) {
       doc.moveDown(0.4);
       doc
-        .fillColor(BSIC_BRAND.colors.bleuNuit)
-        .font(BSIC_BRAND.fonts.titre)
-        .fontSize(BSIC_BRAND.fontSizes.sousSection + 1)
+        .fillColor(BRAND.colors.bleuNuit)
+        .font(BRAND.fonts.titre)
+        .fontSize(BRAND.fontSizes.sousSection + 1)
         .text(h2[1], { width: widthDispo });
       doc.moveDown(0.2);
       continue;
@@ -325,9 +320,9 @@ export function renderMarkdown(
     if (h3) {
       doc.moveDown(0.3);
       doc
-        .fillColor(BSIC_BRAND.colors.bleuNuitDark)
-        .font(BSIC_BRAND.fonts.titre)
-        .fontSize(BSIC_BRAND.fontSizes.body + 1)
+        .fillColor(BRAND.colors.bleuNuitDark)
+        .font(BRAND.fonts.titre)
+        .fontSize(BRAND.fontSizes.body + 1)
         .text(h3[1], { width: widthDispo });
       doc.moveDown(0.15);
       continue;
@@ -344,10 +339,10 @@ export function renderMarkdown(
     const bullet = /^[-*]\s+(.+)$/.exec(ligne);
     if (bullet) {
       const startX = doc.x;
-      doc.fillColor(BSIC_BRAND.colors.bleuNuitDark).text('•  ', {
+      doc.fillColor(BRAND.colors.bleuNuitDark).text('•  ', {
         continued: true,
       });
-      rendreLigneInline(doc, bullet[1], BSIC_BRAND.fontSizes.body);
+      rendreLigneInline(doc, bullet[1], BRAND.fontSizes.body);
       doc.x = startX;
       continue;
     }
@@ -356,15 +351,15 @@ export function renderMarkdown(
     const numLi = /^(\d+)\.\s+(.+)$/.exec(ligne);
     if (numLi) {
       const startX = doc.x;
-      doc.fillColor(BSIC_BRAND.colors.bleuNuitDark).text(`${numLi[1]}.  `, {
+      doc.fillColor(BRAND.colors.bleuNuitDark).text(`${numLi[1]}.  `, {
         continued: true,
       });
-      rendreLigneInline(doc, numLi[2], BSIC_BRAND.fontSizes.body);
+      rendreLigneInline(doc, numLi[2], BRAND.fontSizes.body);
       doc.x = startX;
       continue;
     }
 
     // Paragraphe normal — gras + code inline.
-    rendreLigneInline(doc, ligne, BSIC_BRAND.fontSizes.body);
+    rendreLigneInline(doc, ligne, BRAND.fontSizes.body);
   }
 }

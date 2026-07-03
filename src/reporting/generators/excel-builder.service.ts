@@ -9,7 +9,7 @@
 import { Injectable } from '@nestjs/common';
 import ExcelJS from 'exceljs';
 
-import { BSIC_BRAND } from './pdf-builder.service';
+import { BRAND } from './pdf-builder.service';
 
 /** Couleurs ARGB (ExcelJS) dérivées de la charte BSIC. */
 export const BSIC_EXCEL_COLORS = {
@@ -27,13 +27,19 @@ export class ExcelBuilderService {
    * Crée un workbook MIZNAS pré-configuré (creator + props).
    * Le caller ajoute ensuite ses worksheets via `wb.addWorksheet()`.
    */
-  createWorkbook(meta: { title: string; subject?: string }): ExcelJS.Workbook {
+  createWorkbook(meta: {
+    title: string;
+    subject?: string;
+    /** Lot B2 — nom banque (creator/company). Défaut BSIC NIGER. */
+    bankNom?: string;
+  }): ExcelJS.Workbook {
+    const nom = meta.bankNom ?? 'BSIC NIGER';
     const wb = new ExcelJS.Workbook();
-    wb.creator = 'MIZNAS — BSIC NIGER';
+    wb.creator = `MIZNAS — ${nom}`;
     wb.created = new Date();
     wb.title = meta.title;
     wb.subject = meta.subject ?? meta.title;
-    wb.company = 'BSIC NIGER S.A.';
+    wb.company = `${nom} S.A.`;
     return wb;
   }
 
@@ -48,7 +54,7 @@ export class ExcelBuilderService {
   ): void {
     row.eachCell((cell) => {
       cell.font = {
-        name: BSIC_BRAND.fonts.titre,
+        name: BRAND.fonts.titre,
         bold: true,
         color: { argb: options.color ?? BSIC_EXCEL_COLORS.blanc },
         size: 11,
@@ -87,7 +93,7 @@ export class ExcelBuilderService {
     const color = options.color;
     row.eachCell((cell) => {
       cell.font = {
-        name: BSIC_BRAND.fonts.body,
+        name: BRAND.fonts.body,
         bold: options.bold ?? true,
         color: color ? { argb: color } : undefined,
         size: 11,

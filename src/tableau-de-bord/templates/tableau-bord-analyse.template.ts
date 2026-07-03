@@ -15,10 +15,16 @@
  * dépendance image (cohérent avec R04).
  */
 import {
-  BSIC_BRAND,
+  BRAND,
   formatMontant,
   type PdfBuilderService,
 } from '../../reporting/generators/pdf-builder.service';
+import {
+  DEFAULT_BANK_BRANDING,
+  DEFAULT_MEMBRES_COMITE,
+  type BankBranding,
+  type MembreComitePdf,
+} from '../../configuration-banque/bank-branding';
 import type {
   EcartsResponseDto,
   LigneEcartDto,
@@ -53,6 +59,21 @@ export interface TableauBordAnalyseData {
     generatedAt: string;
   };
   analyseIa?: AnalyseAiSnapshot;
+  /** Lot B2 — branding banque + membres Comité (défaut BSIC NIGER). */
+  bank?: BankBranding;
+  membres?: MembreComitePdf[];
+}
+
+/** Branding résolu (config ou repli BSIC NIGER). */
+function bankOf(data: TableauBordAnalyseData): BankBranding {
+  return data.bank ?? DEFAULT_BANK_BRANDING;
+}
+
+/** Membres résolus (config ou repli BSIC NIGER). */
+function membresOf(data: TableauBordAnalyseData): MembreComitePdf[] {
+  return data.membres && data.membres.length > 0
+    ? data.membres
+    : DEFAULT_MEMBRES_COMITE;
 }
 
 /**
@@ -148,18 +169,16 @@ function formaterPeriodeGrande(moisDebut: string, moisFin: string): string {
 const CIBLE_COEF_EXPLOITATION_MAX = 65; // % — cible BCEAO
 const CIBLE_PNB_ANNUEL_M = 1570; // M FCFA — cible D2
 
-/**
- * Composition du Comité Budgétaire (SOUS-LOT 5). Noms issus de la
- * source de vérité projet (CONTEXTE_REPRISE.md), pas du brief qui
- * comportait des noms divergents. Configurable — backlog config admin.
- */
-const MEMBRES_COMITE = [
-  'M. Souleymane DIORI — Président',
-  'Mme Halima OUSMANE — Membre',
-  'M. Ibrahima MAHAMADOU — Membre',
-  'M. Ousmane MAMANE — Secrétaire',
-];
-const DG_SIGNATAIRE = { nom: 'M. Issoufou BARRY', titre: 'Directeur Général' };
+/** Formate un membre du Comité pour la page Approbations (Lot B2). */
+function formatMembreComite(m: MembreComitePdf): string {
+  const label =
+    m.fonction === 'PRESIDENT'
+      ? 'Président'
+      : m.fonction === 'SECRETAIRE'
+        ? 'Secrétaire'
+        : 'Membre';
+  return `${m.titre ? `${m.titre} ` : ''}${m.nomPrenom} — ${label}`;
+}
 
 /** Couleur d'exécution selon proximité à 100 % (compte de résultat). */
 function execColor(taux: number | null): string {
@@ -202,7 +221,7 @@ export function buildTableauBordAnalysePdf(
   // Page — analyse MIZNAS AI (optionnelle)
   if (data.analyseIa) {
     doc.addPage();
-    renderPage4AnalyseIa(doc, data.analyseIa, pdfBuilder);
+    renderPage4AnalyseIa(doc, data.analyseIa, pdfBuilder, bankOf(data));
   }
   // Page — approbations Comité (SOUS-LOT 5) — toujours en dernier.
   doc.addPage();
@@ -217,6 +236,7 @@ function renderCoverPage(
   pdfBuilder: PdfBuilderService,
 ): void {
   const f = data.ecarts.filtres;
+  const bank = bankOf(data);
   pdfBuilder.drawCoverPage(doc, {
     title: 'ANALYSE BUDGÉTAIRE',
     subtitle: 'BUDGET vs RÉALISÉ',
@@ -230,8 +250,9 @@ function renderCoverPage(
       { label: 'Par', value: data.metadata.userEmail },
     ],
     confidentialMention:
-      'Document CONFIDENTIEL - BSIC NIGER S.A. - Usage interne réservé au ' +
+      `Document CONFIDENTIEL - ${bank.nom} - Usage interne réservé au ` +
       'Comité Budgétaire. Généré par MIZNAS.',
+    bank,
   });
 }
 
@@ -257,7 +278,9 @@ function renderPage1HeaderEtKpi(
   // Bandeau de section.
   doc.x = left;
   doc.y = doc.page.margins.top;
-  pdfBuilder.drawColoredBanner(doc, 'Indicateurs clés');
+  pdfBuilder.drawColoredBanner(doc, 'Indicateurs clés', {
+    bg: bankOf(data).couleurPrimaire,
+  });
   let y = doc.y;
 
   // 2 grandes cards : PNB + Coefficient d'exploitation.
@@ -313,9 +336,9 @@ function renderPage1HeaderEtKpi(
   );
   y += bigH + 4;
   doc
-    .fillColor(BSIC_BRAND.colors.grisFonce)
-    .font(BSIC_BRAND.fonts.italic)
-    .fontSize(BSIC_BRAND.fontSizes.bodySmall - 1)
+    .fillColor(BRAND.colors.grisFonce)
+    .font(BRAND.fonts.italic)
+    .fontSize(BRAND.fontSizes.bodySmall - 1)
     .text("Cible BCEAO : coefficient d'exploitation <= 65 %", left, y, {
       width: widthDispo,
       align: 'right',
@@ -334,7 +357,7 @@ function renderPage1HeaderEtKpi(
     cardH,
     'Lignes avec écart',
     String(k.nbEcartsTotal),
-    BSIC_BRAND.colors.bleuNuit,
+    BRAND.colors.bleuNuit,
   );
   drawKpiCard(
     doc,
@@ -365,15 +388,15 @@ function renderPage1HeaderEtKpi(
     cardH,
     'Écart total absolu (FCFA)',
     formatMontant(k.ecartTotalAbs),
-    BSIC_BRAND.colors.bleuNuit,
+    BRAND.colors.bleuNuit,
   );
   y += cardH + 14;
 
   // Décomposition favorable / défavorable.
   doc
-    .fillColor(BSIC_BRAND.colors.grisFonce)
-    .font(BSIC_BRAND.fonts.body)
-    .fontSize(BSIC_BRAND.fontSizes.bodySmall)
+    .fillColor(BRAND.colors.grisFonce)
+    .font(BRAND.fonts.body)
+    .fontSize(BRAND.fontSizes.bodySmall)
     .text(
       `Dont défavorable : ${formatMontant(k.ecartTotalDefavorable)} FCFA  ·  ` +
         `Dont favorable : ${formatMontant(k.ecartTotalFavorable)} FCFA  ·  ` +
@@ -416,28 +439,23 @@ function drawBigKpiCard(
     .rect(x, y, w, h)
     .fillAndStroke()
     .restore();
+  doc.save().fillColor(BRAND.colors.bleuNuit).rect(x, y, w, 5).fill().restore();
   doc
-    .save()
-    .fillColor(BSIC_BRAND.colors.bleuNuit)
-    .rect(x, y, w, 5)
-    .fill()
-    .restore();
-  doc
-    .fillColor(BSIC_BRAND.colors.bleuNuit)
-    .font(BSIC_BRAND.fonts.titre)
-    .fontSize(BSIC_BRAND.fontSizes.body)
+    .fillColor(BRAND.colors.bleuNuit)
+    .font(BRAND.fonts.titre)
+    .fontSize(BRAND.fontSizes.body)
     .text(titre, x + 12, y + 14, { width: w - 24, lineBreak: false });
   let ly = y + 36;
   for (const l of lignes) {
     doc
-      .fillColor(BSIC_BRAND.colors.grisFonce)
-      .font(BSIC_BRAND.fonts.body)
-      .fontSize(BSIC_BRAND.fontSizes.bodySmall)
+      .fillColor(BRAND.colors.grisFonce)
+      .font(BRAND.fonts.body)
+      .fontSize(BRAND.fontSizes.bodySmall)
       .text(l.label, x + 12, ly + 2, { width: 70, lineBreak: false });
     doc
-      .fillColor(BSIC_BRAND.colors.bleuNuitDark)
-      .font(BSIC_BRAND.fonts.titre)
-      .fontSize(BSIC_BRAND.fontSizes.sousSection)
+      .fillColor(BRAND.colors.bleuNuitDark)
+      .font(BRAND.fonts.titre)
+      .fontSize(BRAND.fontSizes.sousSection)
       .text(l.value, x + 70, ly, {
         width: w - 82,
         align: 'right',
@@ -457,7 +475,9 @@ function renderAlertesPrioritaires(
 ): void {
   const left = doc.page.margins.left;
   const width = doc.page.width - left - doc.page.margins.right;
-  pdfBuilder.drawColoredBanner(doc, 'Alertes prioritaires');
+  pdfBuilder.drawColoredBanner(doc, 'Alertes prioritaires', {
+    bg: bankOf(data).couleurPrimaire,
+  });
 
   const groupes: Array<{ niveau: NiveauAlerte; action: string }> = [
     { niveau: 'CRITIQUE', action: 'Investigation prioritaire requise' },
@@ -478,9 +498,9 @@ function renderAlertesPrioritaires(
       COULEURS_NIVEAU[g.niveau],
     );
     doc
-      .fillColor(BSIC_BRAND.colors.grisFonce)
-      .font(BSIC_BRAND.fonts.italic)
-      .fontSize(BSIC_BRAND.fontSizes.bodySmall)
+      .fillColor(BRAND.colors.grisFonce)
+      .font(BRAND.fonts.italic)
+      .fontSize(BRAND.fontSizes.bodySmall)
       .text(`-> ${g.action}`, left + badgeW + 10, y + 4, {
         width: width - badgeW - 10,
         lineBreak: false,
@@ -493,9 +513,9 @@ function renderAlertesPrioritaires(
           ? ''
           : ` (${it.ecartPct > 0 ? '+' : ''}${it.ecartPct.toFixed(1)} %)`;
       doc
-        .fillColor(BSIC_BRAND.colors.bleuNuitDark)
-        .font(BSIC_BRAND.fonts.body)
-        .fontSize(BSIC_BRAND.fontSizes.bodySmall)
+        .fillColor(BRAND.colors.bleuNuitDark)
+        .font(BRAND.fonts.body)
+        .fontSize(BRAND.fontSizes.bodySmall)
         .text(
           `•  ${it.codeCompte}/${it.codeLigneMetier}  ${it.libelleCompte}${pct}`,
           left + 14,
@@ -506,9 +526,9 @@ function renderAlertesPrioritaires(
     }
     if (items.length > 3) {
       doc
-        .fillColor(BSIC_BRAND.colors.grisFonce)
-        .font(BSIC_BRAND.fonts.italic)
-        .fontSize(BSIC_BRAND.fontSizes.bodySmall - 1)
+        .fillColor(BRAND.colors.grisFonce)
+        .font(BRAND.fonts.italic)
+        .fontSize(BRAND.fontSizes.bodySmall - 1)
         .text(
           `   … et ${String(items.length - 3)} autre(s)`,
           left + 14,
@@ -538,17 +558,17 @@ function drawKpiCard(
   // Cadre
   doc
     .lineWidth(0.7)
-    .strokeColor(BSIC_BRAND.colors.grisFonce)
-    .fillColor(BSIC_BRAND.colors.blanc)
+    .strokeColor(BRAND.colors.grisFonce)
+    .fillColor(BRAND.colors.blanc)
     .rect(x, y, width, height)
     .fillAndStroke();
   // Barre verticale gauche couleur accent
   doc.fillColor(couleurAccent).rect(x, y, 4, height).fill();
   // Label
   doc
-    .fillColor(BSIC_BRAND.colors.grisFonce)
-    .font(BSIC_BRAND.fonts.body)
-    .fontSize(BSIC_BRAND.fontSizes.bodySmall)
+    .fillColor(BRAND.colors.grisFonce)
+    .font(BRAND.fonts.body)
+    .fontSize(BRAND.fontSizes.bodySmall)
     .text(label.toUpperCase(), x + 12, y + 10, {
       width: width - 16,
       lineBreak: false,
@@ -556,8 +576,8 @@ function drawKpiCard(
   // Valeur
   doc
     .fillColor(couleurAccent)
-    .font(BSIC_BRAND.fonts.titre)
-    .fontSize(BSIC_BRAND.fontSizes.section + 6)
+    .font(BRAND.fonts.titre)
+    .fontSize(BRAND.fontSizes.section + 6)
     .text(valeur, x + 12, y + 30, {
       width: width - 16,
       lineBreak: false,
@@ -579,7 +599,9 @@ function renderPage2Graphiques(
   // Bandeau de section (SOUS-LOT 3.5).
   doc.x = left;
   doc.y = doc.page.margins.top;
-  pdfBuilder.drawColoredBanner(doc, 'Évolution mensuelle et répartition');
+  pdfBuilder.drawColoredBanner(doc, 'Évolution mensuelle et répartition', {
+    bg: bankOf(data).couleurPrimaire,
+  });
   let y = doc.y + 4;
 
   // Bar chart mensuel — moitié haute
@@ -636,30 +658,30 @@ function drawBarChartMensuel(
   const data = aggregerParMois(lignes);
   // Titre + légende
   doc
-    .fillColor(BSIC_BRAND.colors.bleuNuitDark)
-    .font(BSIC_BRAND.fonts.titre)
-    .fontSize(BSIC_BRAND.fontSizes.body)
+    .fillColor(BRAND.colors.bleuNuitDark)
+    .font(BRAND.fonts.titre)
+    .fontSize(BRAND.fontSizes.body)
     .text('Budget vs Réalisé par mois', x, y, { lineBreak: false });
   // Légende (carrés colorés + texte)
   doc
     .save()
-    .fillColor(BSIC_BRAND.colors.bleuNuit)
+    .fillColor(BRAND.colors.bleuNuit)
     .rect(x + width - 150, y + 2, 8, 8)
     .fill()
     .restore();
   doc
-    .fillColor(BSIC_BRAND.colors.grisFonce)
-    .font(BSIC_BRAND.fonts.body)
-    .fontSize(BSIC_BRAND.fontSizes.bodySmall)
+    .fillColor(BRAND.colors.grisFonce)
+    .font(BRAND.fonts.body)
+    .fontSize(BRAND.fontSizes.bodySmall)
     .text('Budget', x + width - 138, y + 2, { lineBreak: false });
   doc
     .save()
-    .fillColor(BSIC_BRAND.colors.or)
+    .fillColor(BRAND.colors.or)
     .rect(x + width - 90, y + 2, 8, 8)
     .fill()
     .restore();
   doc
-    .fillColor(BSIC_BRAND.colors.grisFonce)
+    .fillColor(BRAND.colors.grisFonce)
     .text('Réalisé', x + width - 78, y + 2, { lineBreak: false });
 
   const chartY = y + 22;
@@ -669,9 +691,9 @@ function drawBarChartMensuel(
 
   if (data.length === 0) {
     doc
-      .fillColor(BSIC_BRAND.colors.grisFonce)
-      .font(BSIC_BRAND.fonts.italic)
-      .fontSize(BSIC_BRAND.fontSizes.bodySmall)
+      .fillColor(BRAND.colors.grisFonce)
+      .font(BRAND.fonts.italic)
+      .fontSize(BRAND.fontSizes.bodySmall)
       .text(
         'Aucune ligne à représenter sur la période.',
         x,
@@ -696,9 +718,9 @@ function drawBarChartMensuel(
       .stroke();
     // Label axe Y
     doc
-      .fillColor(BSIC_BRAND.colors.grisFonce)
-      .font(BSIC_BRAND.fonts.body)
-      .fontSize(BSIC_BRAND.fontSizes.bodySmall - 1)
+      .fillColor(BRAND.colors.grisFonce)
+      .font(BRAND.fonts.body)
+      .fontSize(BRAND.fontSizes.bodySmall - 1)
       .text(formatFcfaCompact((i / 4) * niceMax), x, gy - 4, {
         width: 46,
         align: 'right',
@@ -719,13 +741,13 @@ function drawBarChartMensuel(
     const hRealise = (m.realise / niceMax) * chartH;
     doc
       .save()
-      .fillColor(BSIC_BRAND.colors.bleuNuit)
+      .fillColor(BRAND.colors.bleuNuit)
       .rect(groupX, chartY + chartH - hBudget, barWidth, hBudget)
       .fill()
       .restore();
     doc
       .save()
-      .fillColor(BSIC_BRAND.colors.or)
+      .fillColor(BRAND.colors.or)
       .rect(
         groupX + barWidth + 2,
         chartY + chartH - hRealise,
@@ -737,9 +759,9 @@ function drawBarChartMensuel(
     // Label axe X (mois — abrégé)
     const labelMois = m.libelleMois.split(' ')[0]?.slice(0, 3) ?? m.mois;
     doc
-      .fillColor(BSIC_BRAND.colors.grisFonce)
-      .font(BSIC_BRAND.fonts.body)
-      .fontSize(BSIC_BRAND.fontSizes.bodySmall - 1)
+      .fillColor(BRAND.colors.grisFonce)
+      .font(BRAND.fonts.body)
+      .fontSize(BRAND.fontSizes.bodySmall - 1)
       .text(labelMois, chartX + i * groupWidth, chartY + chartH + 4, {
         width: groupWidth,
         align: 'center',
@@ -776,9 +798,9 @@ function drawDonutNiveaux(
 ): void {
   // Titre
   doc
-    .fillColor(BSIC_BRAND.colors.bleuNuitDark)
-    .font(BSIC_BRAND.fonts.titre)
-    .fontSize(BSIC_BRAND.fontSizes.body)
+    .fillColor(BRAND.colors.bleuNuitDark)
+    .font(BRAND.fonts.titre)
+    .fontSize(BRAND.fontSizes.body)
     .text("Répartition par niveau d'alerte", x, y, { lineBreak: false });
 
   const counts: Record<NiveauAlerte, number> = {
@@ -806,9 +828,9 @@ function drawDonutNiveaux(
 
   if (total === 0) {
     doc
-      .fillColor(BSIC_BRAND.colors.grisFonce)
-      .font(BSIC_BRAND.fonts.italic)
-      .fontSize(BSIC_BRAND.fontSizes.bodySmall)
+      .fillColor(BRAND.colors.grisFonce)
+      .font(BRAND.fonts.italic)
+      .fontSize(BRAND.fontSizes.bodySmall)
       .text('Aucune ligne à représenter.', x, donutY + donutH / 2 - 6, {
         width,
         align: 'center',
@@ -838,18 +860,18 @@ function drawDonutNiveaux(
 
   // Total centré
   doc
-    .fillColor(BSIC_BRAND.colors.bleuNuitDark)
-    .font(BSIC_BRAND.fonts.titre)
-    .fontSize(BSIC_BRAND.fontSizes.section)
+    .fillColor(BRAND.colors.bleuNuitDark)
+    .font(BRAND.fonts.titre)
+    .fontSize(BRAND.fontSizes.section)
     .text(String(total), cx - 30, cy - 10, {
       width: 60,
       align: 'center',
       lineBreak: false,
     });
   doc
-    .fillColor(BSIC_BRAND.colors.grisFonce)
-    .font(BSIC_BRAND.fonts.body)
-    .fontSize(BSIC_BRAND.fontSizes.bodySmall)
+    .fillColor(BRAND.colors.grisFonce)
+    .font(BRAND.fonts.body)
+    .fontSize(BRAND.fontSizes.bodySmall)
     .text('lignes', cx - 30, cy + 14, {
       width: 60,
       align: 'center',
@@ -867,9 +889,9 @@ function drawDonutNiveaux(
       .fill()
       .restore();
     doc
-      .fillColor(BSIC_BRAND.colors.bleuNuitDark)
-      .font(BSIC_BRAND.fonts.body)
-      .fontSize(BSIC_BRAND.fontSizes.bodySmall)
+      .fillColor(BRAND.colors.bleuNuitDark)
+      .font(BRAND.fonts.body)
+      .fontSize(BRAND.fontSizes.bodySmall)
       .text(
         `${LIBELLES_NIVEAU[p.niveau]} — ${String(p.count)} (${p.pct.toFixed(1)} %)`,
         legX + 16,
@@ -932,11 +954,15 @@ function renderPage3Top10(
   // Bandeau de section (SOUS-LOT 3.5).
   doc.x = left;
   doc.y = doc.page.margins.top;
-  pdfBuilder.drawColoredBanner(doc, 'Top 10 des écarts les plus significatifs');
+  pdfBuilder.drawColoredBanner(
+    doc,
+    'Top 10 des écarts les plus significatifs',
+    { bg: bankOf(data).couleurPrimaire },
+  );
   doc
-    .fillColor(BSIC_BRAND.colors.grisFonce)
-    .font(BSIC_BRAND.fonts.italic)
-    .fontSize(BSIC_BRAND.fontSizes.bodySmall)
+    .fillColor(BRAND.colors.grisFonce)
+    .font(BRAND.fonts.italic)
+    .fontSize(BRAND.fontSizes.bodySmall)
     .text(
       'Lignes avec réalisé saisi (MANQUANT exclu), triées par écart absolu décroissant.',
       left,
@@ -956,9 +982,9 @@ function renderPage3Top10(
 
   if (top.length === 0) {
     doc
-      .fillColor(BSIC_BRAND.colors.grisFonce)
-      .font(BSIC_BRAND.fonts.italic)
-      .fontSize(BSIC_BRAND.fontSizes.body)
+      .fillColor(BRAND.colors.grisFonce)
+      .font(BRAND.fonts.italic)
+      .fontSize(BRAND.fontSizes.body)
       .text('Aucune ligne avec écart à représenter.', { width: widthDispo });
     return;
   }
@@ -1008,25 +1034,26 @@ function renderPage4AnalyseIa(
   doc: PDFKit.PDFDocument,
   ia: AnalyseAiSnapshot,
   pdfBuilder: PdfBuilderService,
+  bank: BankBranding,
 ): void {
   const widthDispo =
     doc.page.width - doc.page.margins.left - doc.page.margins.right;
   const left = doc.page.margins.left;
 
-  // Bandeau OR — distingue visuellement le contenu généré par l'IA.
+  // Bandeau secondaire — distingue visuellement le contenu généré par l'IA.
   doc.x = left;
   doc.y = doc.page.margins.top;
   pdfBuilder.drawColoredBanner(doc, 'Analyse MIZNAS AI', {
-    bg: BSIC_BRAND.colors.or,
-    textColor: BSIC_BRAND.colors.bleuNuitDark,
+    bg: bank.couleurSecondaire,
+    textColor: bank.couleurPrimaireDark,
   });
 
   // Ligne d'origine discrète (le détail technique va en pied de page —
   // SOUS-LOT 3 ajust. 3 : métadonnées moins en évidence pour le Comité).
   doc
-    .fillColor(BSIC_BRAND.colors.grisFonce)
-    .font(BSIC_BRAND.fonts.italic)
-    .fontSize(BSIC_BRAND.fontSizes.bodySmall)
+    .fillColor(BRAND.colors.grisFonce)
+    .font(BRAND.fonts.italic)
+    .fontSize(BRAND.fontSizes.bodySmall)
     .text(
       `Généré par MIZNAS AI — ${ia.model}${ia.dryRun ? '  (mode test DRY_RUN)' : ''}`,
       left,
@@ -1043,9 +1070,9 @@ function renderPage4AnalyseIa(
   const generatedAtStr = ia.generatedAt ? formaterDateFr(ia.generatedAt) : '—';
   const metaY = doc.page.height - doc.page.margins.bottom - 52;
   doc
-    .fillColor(BSIC_BRAND.colors.grisFonce)
-    .font(BSIC_BRAND.fonts.body)
-    .fontSize(BSIC_BRAND.fontSizes.bodySmall - 1)
+    .fillColor(BRAND.colors.grisFonce)
+    .font(BRAND.fonts.body)
+    .fontSize(BRAND.fontSizes.bodySmall - 1)
     .text(
       `Métadonnées de génération — Modèle : ${ia.model}  ·  Générée le ${generatedAtStr}  ·  ` +
         `Tokens : ${String(ia.tokensInput)} in / ${String(ia.tokensOutput)} out  ·  ` +
@@ -1056,9 +1083,9 @@ function renderPage4AnalyseIa(
     );
   const disclaimerY = doc.page.height - doc.page.margins.bottom - 36;
   doc
-    .fillColor(BSIC_BRAND.colors.grisFonce)
-    .font(BSIC_BRAND.fonts.italic)
-    .fontSize(BSIC_BRAND.fontSizes.bodySmall - 1)
+    .fillColor(BRAND.colors.grisFonce)
+    .font(BRAND.fonts.italic)
+    .fontSize(BRAND.fontSizes.bodySmall - 1)
     .text(
       'Cette analyse est générée automatiquement et doit être validée par un humain. ' +
         "MIZNAS AI ne remplace pas l'expertise d'un contrôleur de gestion.",
@@ -1080,7 +1107,9 @@ function renderPageCompteResultat(
 
   doc.x = left;
   doc.y = doc.page.margins.top;
-  pdfBuilder.drawColoredBanner(doc, 'Compte de résultat');
+  pdfBuilder.drawColoredBanner(doc, 'Compte de résultat', {
+    bg: bankOf(data).couleurPrimaire,
+  });
 
   const pctStr = (n: number | null): string =>
     n === null ? '—' : `${n.toFixed(1)} %`;
@@ -1177,6 +1206,7 @@ function renderPageCompteResultat(
   const widthDispo = doc.page.width - left - doc.page.margins.right;
   pdfBuilder.drawColoredBanner(doc, 'Indicateurs réglementaires BCEAO', {
     height: 22,
+    bg: bankOf(data).couleurPrimaire,
   });
 
   const nbMois = nbMoisPeriode(
@@ -1235,9 +1265,9 @@ function drawConformiteLigne(
 ): void {
   const y = doc.y;
   doc
-    .fillColor(BSIC_BRAND.colors.bleuNuitDark)
-    .font(BSIC_BRAND.fonts.titre)
-    .fontSize(BSIC_BRAND.fontSizes.body)
+    .fillColor(BRAND.colors.bleuNuitDark)
+    .font(BRAND.fonts.titre)
+    .fontSize(BRAND.fontSizes.body)
     .text(`${libelle} : ${valeur}`, left, y, {
       width: width - 130,
       lineBreak: false,
@@ -1247,9 +1277,9 @@ function drawConformiteLigne(
     fontSize: 8,
   });
   doc
-    .fillColor(BSIC_BRAND.colors.grisFonce)
-    .font(BSIC_BRAND.fonts.italic)
-    .fontSize(BSIC_BRAND.fontSizes.bodySmall)
+    .fillColor(BRAND.colors.grisFonce)
+    .font(BRAND.fonts.italic)
+    .fontSize(BRAND.fontSizes.bodySmall)
     .text(cible, left, y + 15, { width: width - 130, lineBreak: false });
   doc.y = y + 34;
   doc.x = left;
@@ -1264,12 +1294,14 @@ function renderPageSignatures(
 ): void {
   const left = doc.page.margins.left;
   const width = doc.page.width - left - doc.page.margins.right;
+  const bank = bankOf(data);
+  const membres = membresOf(data);
 
   doc.x = left;
   doc.y = doc.page.margins.top;
   pdfBuilder.drawColoredBanner(doc, 'Approbations', {
-    bg: BSIC_BRAND.colors.or,
-    textColor: BSIC_BRAND.colors.bleuNuitDark,
+    bg: bank.couleurSecondaire,
+    textColor: bank.couleurPrimaireDark,
   });
 
   // Bloc 1 — Préparé par.
@@ -1280,24 +1312,29 @@ function renderPageSignatures(
     'Signature : _______________________________',
   ]);
 
-  // Bloc 2 — Validé par le Comité Budgétaire (checkboxes membres).
+  // Bloc 2 — Validé par le Comité Budgétaire (membres hors DG, Lot B2).
+  const membresComite = membres.filter((m) => m.fonction !== 'DG');
   const membreLines = [
     'Date de la réunion : ______________________',
     '',
     'Membres présents :',
-    ...MEMBRES_COMITE.map((m) => `[  ]  ${m}`),
+    ...membresComite.map((m) => `[  ]  ${formatMembreComite(m)}`),
   ];
   drawSignatureBox(
     doc,
     left,
     doc.y,
     width,
-    52 + MEMBRES_COMITE.length * 15,
+    52 + membresComite.length * 15,
     'Validé par le Comité Budgétaire',
     membreLines,
   );
 
-  // Bloc 3 — Approuvé pour publication (DG) + cachet 5x5 cm.
+  // Bloc 3 — Approuvé pour publication (DG issu de la config) + cachet.
+  const dg = membres.find((m) => m.fonction === 'DG');
+  const dgNom = dg
+    ? `${dg.titre ? `${dg.titre} ` : ''}${dg.nomPrenom}`
+    : 'M. Issoufou BARRY';
   drawSignatureBox(
     doc,
     left,
@@ -1306,8 +1343,8 @@ function renderPageSignatures(
     170,
     'Approuvé pour publication',
     [
-      DG_SIGNATAIRE.nom,
-      DG_SIGNATAIRE.titre,
+      dgNom,
+      'Directeur Général',
       'Date : ______________________',
       '',
       'Signature : _______________________________',
@@ -1320,13 +1357,14 @@ function renderPageSignatures(
   // ─── Mentions réglementaires (SOUS-LOT 5.2) ───
   const mentionsY = doc.page.height - doc.page.margins.bottom - 44;
   const dateArrete = formaterDateFr(data.metadata.generatedAt);
+  const refBceao =
+    bank.refReglementaireBceao ?? 'n° XXX/XX/XXXX (référence à confirmer)';
   doc
-    .fillColor(BSIC_BRAND.colors.grisFonce)
-    .font(BSIC_BRAND.fonts.italic)
-    .fontSize(BSIC_BRAND.fontSizes.bodySmall - 1)
+    .fillColor(BRAND.colors.grisFonce)
+    .font(BRAND.fonts.italic)
+    .fontSize(BRAND.fontSizes.bodySmall - 1)
     .text(
-      'Document établi conformément aux instructions BCEAO ' +
-        'n° XXX/XX/XXXX (référence à confirmer).',
+      `Document établi conformément aux instructions BCEAO ${refBceao}.`,
       left,
       mentionsY,
       { width, align: 'center', lineBreak: false },
@@ -1355,21 +1393,21 @@ function drawSignatureBox(
   doc
     .save()
     .lineWidth(1)
-    .strokeColor(BSIC_BRAND.colors.bleuNuit)
+    .strokeColor(BRAND.colors.bleuNuit)
     .fillColor('#FFFFFF')
     .rect(x, y, width, height)
     .fillAndStroke()
     .restore();
   doc
     .save()
-    .fillColor(BSIC_BRAND.colors.bleuNuit)
+    .fillColor(BRAND.colors.bleuNuit)
     .rect(x, y, width, 20)
     .fill()
     .restore();
   doc
     .fillColor('#FFFFFF')
-    .font(BSIC_BRAND.fonts.titre)
-    .fontSize(BSIC_BRAND.fontSizes.bodySmall)
+    .font(BRAND.fonts.titre)
+    .fontSize(BRAND.fontSizes.bodySmall)
     .text(titre.toUpperCase(), x + 10, y + 6, {
       width: width - 20,
       lineBreak: false,
@@ -1380,9 +1418,9 @@ function drawSignatureBox(
   for (const l of lignes) {
     if (l.length > 0) {
       doc
-        .fillColor(BSIC_BRAND.colors.bleuNuitDark)
-        .font(BSIC_BRAND.fonts.body)
-        .fontSize(BSIC_BRAND.fontSizes.bodySmall)
+        .fillColor(BRAND.colors.bleuNuitDark)
+        .font(BRAND.fonts.body)
+        .fontSize(BRAND.fontSizes.bodySmall)
         .text(l, x + 12, ly, { width: width - 24, lineBreak: false });
     }
     ly += 15;
@@ -1395,7 +1433,7 @@ function drawSignatureBox(
       .save()
       .lineWidth(0.7)
       .dash(3, { space: 2 })
-      .strokeColor(BSIC_BRAND.colors.grisFonce)
+      .strokeColor(BRAND.colors.grisFonce)
       .rect(x + width - size - 16, y + height - size - 12, size, size)
       .stroke()
       .undash()

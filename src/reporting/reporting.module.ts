@@ -9,6 +9,7 @@
 import { Module } from '@nestjs/common';
 
 import { AuditModule } from '../audit/audit.module';
+import { ConfigurationBanqueModule } from '../configuration-banque/configuration-banque.module';
 import { ExcelBuilderService } from './generators/excel-builder.service';
 import { PdfBuilderService } from './generators/pdf-builder.service';
 import { ReportingController } from './reporting.controller';
@@ -16,7 +17,7 @@ import { BordereauService } from './services/bordereau.service';
 import { R04BudgetBceaoService } from './services/r04-budget-bceao.service';
 
 @Module({
-  imports: [AuditModule],
+  imports: [AuditModule, ConfigurationBanqueModule],
   controllers: [ReportingController],
   providers: [
     PdfBuilderService,

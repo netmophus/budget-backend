@@ -18,6 +18,8 @@ import { ConflictException, NotFoundException } from '@nestjs/common';
 import { getDataSourceToken } from '@nestjs/typeorm';
 import { Test } from '@nestjs/testing';
 
+import { ConfigurationBanqueService } from '../../configuration-banque/configuration-banque.service';
+import { DEFAULT_BANK_BRANDING } from '../../configuration-banque/bank-branding';
 import { PdfBuilderService } from '../generators/pdf-builder.service';
 import { BordereauService } from '../services/bordereau.service';
 
@@ -68,6 +70,12 @@ describe('BordereauService (Lot 8.4 P1)', () => {
         BordereauService,
         PdfBuilderService,
         { provide: getDataSourceToken(), useValue: dataSource },
+        {
+          provide: ConfigurationBanqueService,
+          useValue: {
+            getBankBranding: () => Promise.resolve(DEFAULT_BANK_BRANDING),
+          },
+        },
       ],
     }).compile();
     service = moduleRef.get(BordereauService);

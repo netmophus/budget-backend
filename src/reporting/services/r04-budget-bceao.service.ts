@@ -23,6 +23,7 @@ import {
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
 
+import { ConfigurationBanqueService } from '../../configuration-banque/configuration-banque.service';
 import { ExcelBuilderService } from '../generators/excel-builder.service';
 import { PdfBuilderService } from '../generators/pdf-builder.service';
 import { buildR04Xlsx } from '../templates/r04-budget-bceao.excel.template';
@@ -111,6 +112,7 @@ export class R04BudgetBceaoService {
     private readonly dataSource: DataSource,
     private readonly pdfBuilder: PdfBuilderService,
     private readonly excelBuilder: ExcelBuilderService,
+    private readonly configBanque: ConfigurationBanqueService,
   ) {}
 
   /**
@@ -155,17 +157,19 @@ export class R04BudgetBceaoService {
    */
   async genererPdfBuffer(versionId: string): Promise<Buffer> {
     const donnees = await this.extractDonnees(versionId);
+    const bank = await this.configBanque.getBankBranding();
 
     const doc = this.pdfBuilder.createDocument({
       title: `${donnees.version.code_version} — Snapshot BCEAO`,
+      author: `MIZNAS — ${bank.nom}`,
       subject: `Rapport R04 — Budget Publié BCEAO ${donnees.version.exercice_fiscal}`,
     });
 
-    buildR04Pdf(doc, donnees, this.pdfBuilder);
+    buildR04Pdf(doc, donnees, this.pdfBuilder, bank);
 
     // Lot 7.6.bis amélioration #2 — header récurrent (pages 2 à fin).
     this.pdfBuilder.applyHeaderToAllPagesExceptFirst(doc, {
-      left: 'BSIC NIGER S.A.',
+      left: `${bank.nom} S.A.`,
       center: `Budget ${donnees.version.exercice_fiscal} — Snapshot BCEAO`,
       right: `R04 — ${donnees.version.code_version}`,
     });
@@ -173,7 +177,7 @@ export class R04BudgetBceaoService {
     this.pdfBuilder.applyFooterToAllPages(
       doc,
       {
-        left: `BSIC NIGER S.A. — Budget ${donnees.version.exercice_fiscal} — ${donnees.version.code_version} — R04 BCEAO`,
+        left: `${bank.nom} S.A. — Budget ${donnees.version.exercice_fiscal} — ${donnees.version.code_version} — R04 BCEAO`,
         center: 'CONFIDENTIEL',
       },
       { skipFirstPage: true },
@@ -195,9 +199,11 @@ export class R04BudgetBceaoService {
    */
   async genererXlsxBuffer(versionId: string): Promise<Buffer> {
     const donnees = await this.extractDonnees(versionId);
+    const bank = await this.configBanque.getBankBranding();
     const wb = this.excelBuilder.createWorkbook({
       title: `${donnees.version.code_version} — Snapshot BCEAO`,
       subject: `Rapport R04 — Budget Publié BCEAO ${donnees.version.exercice_fiscal}`,
+      bankNom: bank.nom,
     });
     buildR04Xlsx(wb, donnees, this.excelBuilder);
     return this.excelBuilder.toBuffer(wb);

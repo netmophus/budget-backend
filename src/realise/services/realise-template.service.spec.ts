@@ -14,7 +14,13 @@
  */
 import ExcelJS from 'exceljs';
 
+import type { ConfigurationBanqueService } from '../../configuration-banque/configuration-banque.service';
+import { DEFAULT_BANK_BRANDING } from '../../configuration-banque/bank-branding';
 import { RealiseTemplateService } from './realise-template.service';
+
+const fakeConfig = {
+  getBankBranding: () => Promise.resolve(DEFAULT_BANK_BRANDING),
+} as unknown as ConfigurationBanqueService;
 
 async function loadWorkbook(buffer: Buffer): Promise<ExcelJS.Workbook> {
   const wb = new ExcelJS.Workbook();
@@ -26,7 +32,7 @@ describe('RealiseTemplateService', () => {
   let svc: RealiseTemplateService;
 
   beforeEach(() => {
-    svc = new RealiseTemplateService();
+    svc = new RealiseTemplateService(fakeConfig);
   });
 
   it('génère un Buffer non vide (>= 1 KB minimum, XLSX zip overhead)', async () => {
