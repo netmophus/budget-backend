@@ -160,7 +160,12 @@ export type TypeAction =
   // RETIRER_PERMISSION = DELETE bridge_role_permission (sous garde-fous)
   // Pas de point-virgule dans ce commentaire (regex CI fragile)
   | 'ATTRIBUER_PERMISSION'
-  | 'RETIRER_PERMISSION';
+  | 'RETIRER_PERMISSION'
+  // Lot B1 configuration banque externalisee (multi-banques)
+  // Code seede en base via migration 1779200000590 (BANQUE.GERER)
+  // Trace toute modif de configuration_banque + membres du Comite
+  // Pas de point-virgule dans ce commentaire (regex CI fragile)
+  | 'CONFIGURATION_BANQUE_MODIFIEE';
 
 export type AuditStatut = 'success' | 'failure';
 
