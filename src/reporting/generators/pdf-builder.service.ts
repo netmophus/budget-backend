@@ -894,18 +894,19 @@ export class PdfBuilderService {
   }
 
   /**
-   * En-tête charté (bandeau bleu nuit + filet or) sur toutes les pages
-   * SAUF la page de garde. « BSIC NIGER » à gauche, titre centré,
-   * période à droite — en blanc sur le bandeau.
+   * En-tête charté (bandeau couleur primaire + filet secondaire) sur
+   * TOUTES les pages. Nom banque à gauche, titre centré, période à
+   * droite — en blanc sur le bandeau. Lot PDF-V2 : couvre la page 1
+   * (plus de page de garde à exclure).
    */
-  applyChartedHeaderToAllPagesExceptFirst(
+  applyChartedHeaderToAllPages(
     doc: PDFKit.PDFDocument,
     parts: { titre: string; periode: string },
     bank: BankBranding = DEFAULT_BANK_BRANDING,
   ): void {
     const range = doc.bufferedPageRange();
     const total = range.count;
-    for (let i = 1; i < total; i++) {
+    for (let i = 0; i < total; i++) {
       doc.switchToPage(range.start + i);
       this.drawChartedHeaderOnCurrentPage(doc, parts, bank);
     }

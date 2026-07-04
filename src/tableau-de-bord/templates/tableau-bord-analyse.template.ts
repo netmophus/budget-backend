@@ -21,9 +21,7 @@ import {
 } from '../../reporting/generators/pdf-builder.service';
 import {
   DEFAULT_BANK_BRANDING,
-  DEFAULT_MEMBRES_COMITE,
   type BankBranding,
-  type MembreComitePdf,
 } from '../../configuration-banque/bank-branding';
 import type {
   EcartsResponseDto,
@@ -59,21 +57,13 @@ export interface TableauBordAnalyseData {
     generatedAt: string;
   };
   analyseIa?: AnalyseAiSnapshot;
-  /** Lot B2 — branding banque + membres Comité (défaut BSIC NIGER). */
+  /** Lot B2 — branding banque (défaut BSIC NIGER). */
   bank?: BankBranding;
-  membres?: MembreComitePdf[];
 }
 
 /** Branding résolu (config ou repli BSIC NIGER). */
 function bankOf(data: TableauBordAnalyseData): BankBranding {
   return data.bank ?? DEFAULT_BANK_BRANDING;
-}
-
-/** Membres résolus (config ou repli BSIC NIGER). */
-function membresOf(data: TableauBordAnalyseData): MembreComitePdf[] {
-  return data.membres && data.membres.length > 0
-    ? data.membres
-    : DEFAULT_MEMBRES_COMITE;
 }
 
 /**
@@ -120,47 +110,6 @@ const MOIS_FR = [
   'Déc',
 ];
 
-function formaterDateFr(iso: string): string {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return iso;
-  const pad = (n: number): string => String(n).padStart(2, '0');
-  return (
-    `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${String(d.getFullYear())} ` +
-    `${pad(d.getHours())}:${pad(d.getMinutes())}`
-  );
-}
-
-/** Mois en toutes lettres (majuscules) pour la page de garde. */
-const MOIS_PLEIN = [
-  'JANVIER',
-  'FÉVRIER',
-  'MARS',
-  'AVRIL',
-  'MAI',
-  'JUIN',
-  'JUILLET',
-  'AOÛT',
-  'SEPTEMBRE',
-  'OCTOBRE',
-  'NOVEMBRE',
-  'DÉCEMBRE',
-];
-
-/**
- * Période « en grand » pour la page de garde, depuis deux `YYYY-MM`.
- * Mono-mois -> "JANVIER 2027" ; même année -> "JANVIER - MARS 2027" ;
- * sinon "DÉCEMBRE 2026 - FÉVRIER 2027".
- */
-function formaterPeriodeGrande(moisDebut: string, moisFin: string): string {
-  const [ad, md] = moisDebut.split('-').map(Number);
-  const [af, mf] = moisFin.split('-').map(Number);
-  const nomD = MOIS_PLEIN[(md ?? 1) - 1] ?? moisDebut;
-  const nomF = MOIS_PLEIN[(mf ?? 1) - 1] ?? moisFin;
-  if (moisDebut === moisFin) return `${nomD} ${String(ad)}`;
-  if (ad === af) return `${nomD} - ${nomF} ${String(af)}`;
-  return `${nomD} ${String(ad)} - ${nomF} ${String(af)}`;
-}
-
 /**
  * Cibles réglementaires / D2 (SOUS-LOT 4.2). Hardcodées pour l'instant
  * (backlog `dim_cibles`, cf. CONTEXTE_REPRISE). Alignées sur cibles-d2
@@ -168,17 +117,6 @@ function formaterPeriodeGrande(moisDebut: string, moisFin: string): string {
  */
 const CIBLE_COEF_EXPLOITATION_MAX = 65; // % — cible BCEAO
 const CIBLE_PNB_ANNUEL_M = 1570; // M FCFA — cible D2
-
-/** Formate un membre du Comité pour la page Approbations (Lot B2). */
-function formatMembreComite(m: MembreComitePdf): string {
-  const label =
-    m.fonction === 'PRESIDENT'
-      ? 'Président'
-      : m.fonction === 'SECRETAIRE'
-        ? 'Secrétaire'
-        : 'Membre';
-  return `${m.titre ? `${m.titre} ` : ''}${m.nomPrenom} — ${label}`;
-}
 
 /** Couleur d'exécution selon proximité à 100 % (compte de résultat). */
 function execColor(taux: number | null): string {
@@ -204,59 +142,25 @@ export function buildTableauBordAnalysePdf(
   data: TableauBordAnalyseData,
   pdfBuilder: PdfBuilderService,
 ): void {
-  // Page de garde institutionnelle (SOUS-LOT 2.1).
-  renderCoverPage(doc, data, pdfBuilder);
-  // Page — en-tête + métadonnées + KPI
-  doc.addPage();
+  // Rapport « aide à la décision » (Lot PDF-V2) — 3 à 4 pages, sans
+  // page de garde ni page Approbations : on va droit au contenu.
+  //
+  // Page 1 — Dashboard synthétique (KPI V2 + alertes prioritaires).
   renderPage1HeaderEtKpi(doc, data, pdfBuilder);
-  // Page — bar chart mensuel + donut niveaux
+  // Page 2 — Vue détaillée (graphiques + top 10 des écarts).
   doc.addPage();
-  renderPage2Graphiques(doc, data, pdfBuilder);
-  // Page — top 10 écarts (tableau)
-  doc.addPage();
-  renderPage3Top10(doc, data, pdfBuilder);
-  // Page — compte de résultat structuré (SOUS-LOT 4)
+  renderPageVueDetaillee(doc, data, pdfBuilder);
+  // Page 3 — Compte de résultat + indicateurs vs cibles BCEAO.
   doc.addPage();
   renderPageCompteResultat(doc, data, pdfBuilder);
-  // Page — analyse MIZNAS AI (optionnelle)
+  // Page 4 — Analyse MIZNAS AI approfondie (cœur du rapport, si présente).
   if (data.analyseIa) {
     doc.addPage();
     renderPage4AnalyseIa(doc, data.analyseIa, pdfBuilder, bankOf(data));
   }
-  // Page — approbations Comité (SOUS-LOT 5) — toujours en dernier.
-  doc.addPage();
-  renderPageSignatures(doc, data, pdfBuilder);
 }
 
-// ─── Page de garde (SOUS-LOT 2.1) ──────────────────────────────────
-
-function renderCoverPage(
-  doc: PDFKit.PDFDocument,
-  data: TableauBordAnalyseData,
-  pdfBuilder: PdfBuilderService,
-): void {
-  const f = data.ecarts.filtres;
-  const bank = bankOf(data);
-  pdfBuilder.drawCoverPage(doc, {
-    title: 'ANALYSE BUDGÉTAIRE',
-    subtitle: 'BUDGET vs RÉALISÉ',
-    periodeGrande: formaterPeriodeGrande(f.moisDebut, f.moisFin),
-    destinataire:
-      "À l'attention de Monsieur le Directeur Général et du Comité Budgétaire",
-    metaRows: [
-      { label: 'Version', value: data.metadata.codeVersion },
-      { label: 'Scénario', value: data.metadata.codeScenario },
-      { label: 'Édité le', value: formaterDateFr(data.metadata.generatedAt) },
-      { label: 'Par', value: data.metadata.userEmail },
-    ],
-    confidentialMention:
-      `Document CONFIDENTIEL - ${bank.nom} - Usage interne réservé au ` +
-      'Comité Budgétaire. Généré par MIZNAS.',
-    bank,
-  });
-}
-
-// ─── Page 2 — Indicateurs clés V2 + Alertes (SOUS-LOT 3.1 / 3.2) ────
+// ─── Page 1 — Indicateurs clés V2 + Alertes (SOUS-LOT 3.1 / 3.2) ────
 
 function tauxColor(taux: number): string {
   if (taux >= 90) return COULEURS_NIVEAU.NORMAL;
@@ -585,9 +489,9 @@ function drawKpiCard(
   doc.restore();
 }
 
-// ─── Page 2 — Graphiques ───────────────────────────────────────────
+// ─── Page 2 — Vue détaillée (graphiques + top 10, Lot PDF-V2) ───────
 
-function renderPage2Graphiques(
+function renderPageVueDetaillee(
   doc: PDFKit.PDFDocument,
   data: TableauBordAnalyseData,
   pdfBuilder: PdfBuilderService,
@@ -596,7 +500,7 @@ function renderPage2Graphiques(
     doc.page.width - doc.page.margins.left - doc.page.margins.right;
   const left = doc.page.margins.left;
 
-  // Bandeau de section (SOUS-LOT 3.5).
+  // Bandeau de section.
   doc.x = left;
   doc.y = doc.page.margins.top;
   pdfBuilder.drawColoredBanner(doc, 'Évolution mensuelle et répartition', {
@@ -604,13 +508,18 @@ function renderPage2Graphiques(
   });
   let y = doc.y + 4;
 
-  // Bar chart mensuel — moitié haute
-  const barHeight = 230;
+  // Charts raccourcis (Lot PDF-V2) pour loger le top 10 sur la même page.
+  const barHeight = 165;
   drawBarChartMensuel(doc, left, y, widthDispo, barHeight, data.ecarts.lignes);
-  y += barHeight + 30;
+  y += barHeight + 18;
 
-  // Donut niveaux — moitié basse
-  drawDonutNiveaux(doc, left, y, widthDispo, 230, data.ecarts.lignes);
+  const donutHeight = 150;
+  drawDonutNiveaux(doc, left, y, widthDispo, donutHeight, data.ecarts.lignes);
+  y += donutHeight + 14;
+
+  // Top 10 des écarts, enchaîné sur la même page.
+  doc.y = y;
+  renderTop10Section(doc, data, pdfBuilder);
 }
 
 interface PointMensuel {
@@ -940,9 +849,9 @@ function drawDonutSegment(
   void MOIS_FR;
 }
 
-// ─── Page 3 — Top 10 écarts ─────────────────────────────────────────
+// ─── Section Top 10 écarts (enchaînée sur la page Vue détaillée) ────
 
-function renderPage3Top10(
+function renderTop10Section(
   doc: PDFKit.PDFDocument,
   data: TableauBordAnalyseData,
   pdfBuilder: PdfBuilderService,
@@ -951,9 +860,8 @@ function renderPage3Top10(
     doc.page.width - doc.page.margins.left - doc.page.margins.right;
   const left = doc.page.margins.left;
 
-  // Bandeau de section (SOUS-LOT 3.5).
+  // Bandeau de section — enchaîné à partir du doc.y courant (pas de reset).
   doc.x = left;
-  doc.y = doc.page.margins.top;
   pdfBuilder.drawColoredBanner(
     doc,
     'Top 10 des écarts les plus significatifs',
@@ -995,35 +903,34 @@ function renderPage3Top10(
     // SOUS-LOT 1.4 — colonne Ligne métier pour distinguer un même
     // compte présent sur plusieurs LM (ex. 7081/LM_PART vs 7081/LM_PME).
     l.codeLigneMetier,
-    // SOUS-LOT 3 ajust. 2 — libellé élargi (135pt), tronqué 1 ligne.
-    l.libelleCompte.length > 26
-      ? `${l.libelleCompte.slice(0, 25)}...`
+    // Lot PDF-V2b — libellé élargi (137pt), tronqué 1 ligne.
+    l.libelleCompte.length > 30
+      ? `${l.libelleCompte.slice(0, 29)}...`
       : l.libelleCompte,
     l.codeCr,
-    l.libelleMois,
     `${formatMontant(l.ecartAbs)} FCFA`,
     LIBELLES_NIVEAU[l.niveauAlerte],
   ]);
 
-  // Largeurs (total 495pt) : Libellé élargi à 135pt au détriment de
-  // Compte/LM/CR/Mois (SOUS-LOT 3 ajust. 2).
+  // Largeurs (total 495pt) — Lot PDF-V2b : colonne « Mois » retirée
+  // (redondante avec la période de l'en-tête) au profit de CR (90pt,
+  // « CR_AG_SIEGE » complet) et Niveau (60pt, « Sans budget »/« Attention »).
   pdfBuilder.drawTable(
     doc,
     [
       { header: '#', width: 18, align: 'center' },
       { header: 'Compte', width: 44 },
       { header: 'Ligne métier', width: 54 },
-      { header: 'Libellé', width: 135 },
-      { header: 'CR', width: 64 },
-      { header: 'Mois', width: 52 },
+      { header: 'Libellé', width: 137 },
+      { header: 'CR', width: 90 },
       { header: 'Écart abs.', width: 86, align: 'right' },
-      { header: 'Niveau', width: 42, align: 'center' },
+      { header: 'Niveau', width: 66, align: 'center' },
     ],
     rows,
     {
-      // SOUS-LOT 3.4 — badge coloré sur la colonne Niveau (index 7).
+      // Badge coloré sur la colonne Niveau (désormais index 6).
       cellStyle: (r, c) =>
-        c === 7 ? { bg: COULEURS_NIVEAU[top[r].niveauAlerte] } : undefined,
+        c === 6 ? { bg: COULEURS_NIVEAU[top[r].niveauAlerte] } : undefined,
     },
   );
 }
@@ -1063,36 +970,11 @@ function renderPage4AnalyseIa(
   doc.moveDown(0.6);
 
   // Contenu markdown étendu (tableaux / citations / code — SOUS-LOT 3.3).
+  // Lot PDF-V2c — le pied de section (métadonnées techniques de génération
+  // + disclaimer) a été retiré : sans valeur métier pour le Comité. Le détail
+  // technique (modèle, tokens, durée) reste tracé dans audit_log.
   doc.x = left;
   renderMarkdown(doc, ia.analyse, pdfBuilder);
-
-  // Pied de section : métadonnées de génération (discrètes) + disclaimer.
-  const generatedAtStr = ia.generatedAt ? formaterDateFr(ia.generatedAt) : '—';
-  const metaY = doc.page.height - doc.page.margins.bottom - 52;
-  doc
-    .fillColor(BRAND.colors.grisFonce)
-    .font(BRAND.fonts.body)
-    .fontSize(BRAND.fontSizes.bodySmall - 1)
-    .text(
-      `Métadonnées de génération — Modèle : ${ia.model}  ·  Générée le ${generatedAtStr}  ·  ` +
-        `Tokens : ${String(ia.tokensInput)} in / ${String(ia.tokensOutput)} out  ·  ` +
-        `Durée : ${String(ia.dureeMs)} ms`,
-      left,
-      metaY,
-      { width: widthDispo, align: 'center', lineBreak: false },
-    );
-  const disclaimerY = doc.page.height - doc.page.margins.bottom - 36;
-  doc
-    .fillColor(BRAND.colors.grisFonce)
-    .font(BRAND.fonts.italic)
-    .fontSize(BRAND.fontSizes.bodySmall - 1)
-    .text(
-      'Cette analyse est générée automatiquement et doit être validée par un humain. ' +
-        "MIZNAS AI ne remplace pas l'expertise d'un contrôleur de gestion.",
-      left,
-      disclaimerY,
-      { width: widthDispo, align: 'center' },
-    );
 }
 
 // ─── Page — Compte de résultat structuré (SOUS-LOT 4) ──────────────
@@ -1283,163 +1165,4 @@ function drawConformiteLigne(
     .text(cible, left, y + 15, { width: width - 130, lineBreak: false });
   doc.y = y + 34;
   doc.x = left;
-}
-
-// ─── Page — Approbations Comité (SOUS-LOT 5) ───────────────────────
-
-function renderPageSignatures(
-  doc: PDFKit.PDFDocument,
-  data: TableauBordAnalyseData,
-  pdfBuilder: PdfBuilderService,
-): void {
-  const left = doc.page.margins.left;
-  const width = doc.page.width - left - doc.page.margins.right;
-  const bank = bankOf(data);
-  const membres = membresOf(data);
-
-  doc.x = left;
-  doc.y = doc.page.margins.top;
-  pdfBuilder.drawColoredBanner(doc, 'Approbations', {
-    bg: bank.couleurSecondaire,
-    textColor: bank.couleurPrimaireDark,
-  });
-
-  // Bloc 1 — Préparé par.
-  drawSignatureBox(doc, left, doc.y, width, 78, 'Préparé par', [
-    'Nom : Direction Finance',
-    'Date : ______________________',
-    '',
-    'Signature : _______________________________',
-  ]);
-
-  // Bloc 2 — Validé par le Comité Budgétaire (membres hors DG, Lot B2).
-  const membresComite = membres.filter((m) => m.fonction !== 'DG');
-  const membreLines = [
-    'Date de la réunion : ______________________',
-    '',
-    'Membres présents :',
-    ...membresComite.map((m) => `[  ]  ${formatMembreComite(m)}`),
-  ];
-  drawSignatureBox(
-    doc,
-    left,
-    doc.y,
-    width,
-    52 + membresComite.length * 15,
-    'Validé par le Comité Budgétaire',
-    membreLines,
-  );
-
-  // Bloc 3 — Approuvé pour publication (DG issu de la config) + cachet.
-  const dg = membres.find((m) => m.fonction === 'DG');
-  const dgNom = dg
-    ? `${dg.titre ? `${dg.titre} ` : ''}${dg.nomPrenom}`
-    : 'M. Issoufou BARRY';
-  drawSignatureBox(
-    doc,
-    left,
-    doc.y,
-    width,
-    170,
-    'Approuvé pour publication',
-    [
-      dgNom,
-      'Directeur Général',
-      'Date : ______________________',
-      '',
-      'Signature : _______________________________',
-      '',
-      'Cachet officiel :',
-    ],
-    { cachet: true },
-  );
-
-  // ─── Mentions réglementaires (SOUS-LOT 5.2) ───
-  const mentionsY = doc.page.height - doc.page.margins.bottom - 44;
-  const dateArrete = formaterDateFr(data.metadata.generatedAt);
-  const refBceao =
-    bank.refReglementaireBceao ?? 'n° XXX/XX/XXXX (référence à confirmer)';
-  doc
-    .fillColor(BRAND.colors.grisFonce)
-    .font(BRAND.fonts.italic)
-    .fontSize(BRAND.fontSizes.bodySmall - 1)
-    .text(
-      `Document établi conformément aux instructions BCEAO ${refBceao}.`,
-      left,
-      mentionsY,
-      { width, align: 'center', lineBreak: false },
-    )
-    .text(
-      `Version : ${data.metadata.codeVersion} (statut : GELÉ)  ·  ` +
-        `Date d'arrêté du réalisé : ${dateArrete}`,
-      left,
-      mentionsY + 12,
-      { width, align: 'center', lineBreak: false },
-    );
-}
-
-/** Encadré de signature : en-tête gris + lignes de contenu. */
-function drawSignatureBox(
-  doc: PDFKit.PDFDocument,
-  x: number,
-  y: number,
-  width: number,
-  height: number,
-  titre: string,
-  lignes: string[],
-  opts: { cachet?: boolean } = {},
-): void {
-  // Cadre + en-tête.
-  doc
-    .save()
-    .lineWidth(1)
-    .strokeColor(BRAND.colors.bleuNuit)
-    .fillColor('#FFFFFF')
-    .rect(x, y, width, height)
-    .fillAndStroke()
-    .restore();
-  doc
-    .save()
-    .fillColor(BRAND.colors.bleuNuit)
-    .rect(x, y, width, 20)
-    .fill()
-    .restore();
-  doc
-    .fillColor('#FFFFFF')
-    .font(BRAND.fonts.titre)
-    .fontSize(BRAND.fontSizes.bodySmall)
-    .text(titre.toUpperCase(), x + 10, y + 6, {
-      width: width - 20,
-      lineBreak: false,
-    });
-
-  // Contenu.
-  let ly = y + 30;
-  for (const l of lignes) {
-    if (l.length > 0) {
-      doc
-        .fillColor(BRAND.colors.bleuNuitDark)
-        .font(BRAND.fonts.body)
-        .fontSize(BRAND.fontSizes.bodySmall)
-        .text(l, x + 12, ly, { width: width - 24, lineBreak: false });
-    }
-    ly += 15;
-  }
-
-  // Cadre cachet 5x5 cm (~142pt) si demandé.
-  if (opts.cachet) {
-    const size = 100;
-    doc
-      .save()
-      .lineWidth(0.7)
-      .dash(3, { space: 2 })
-      .strokeColor(BRAND.colors.grisFonce)
-      .rect(x + width - size - 16, y + height - size - 12, size, size)
-      .stroke()
-      .undash()
-      .restore();
-  }
-
-  doc.y = y + height + 12;
-  doc.x = x;
 }

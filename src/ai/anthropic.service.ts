@@ -37,7 +37,10 @@ import type {
 } from '../tableau-de-bord/dto/tableau-bord.dto';
 
 const DEFAULT_MODEL = 'claude-sonnet-4-6';
-const DEFAULT_MAX_TOKENS = 2048;
+// Lot PDF-V2 — l'analyse IA devient le cœur du rapport (structure riche :
+// diagnostic + analyse par écart + signaux faibles + reco + questions Comité).
+// On double le budget de sortie pour laisser la place à ce développement.
+const DEFAULT_MAX_TOKENS = 4096;
 const TOP_LIGNES = 20;
 
 export interface AiAnalyseResult {
@@ -233,13 +236,39 @@ export class AnthropicService {
       ``,
       `# Consigne`,
       ``,
-      `Produis une analyse markdown structurée :`,
-      `1. **Synthèse** en 2-3 phrases (état global, tendance).`,
-      `2. **Écarts critiques** : commenter les 3-5 plus importants.`,
-      `3. **Tendance mensuelle** : identifier saisonnalité ou rupture.`,
-      `4. **Recommandations actionables** : 3 points max, concrètes.`,
+      `Tu produis la partie CENTRALE d'un rapport d'aide a la decision destine`,
+      `au Directeur General et au Comite Budgetaire. Sois dense, precis et`,
+      `oriente action. Structure ta reponse en markdown ainsi :`,
       ``,
-      `Reste factuel, en français professionnel. Pas de spéculation au-delà des chiffres.`,
+      `## Diagnostic`,
+      `3 a 5 lignes : etat global de l'execution budgetaire, tendance, niveau`,
+      `de risque d'ensemble. Cite les chiffres cles (ecart total, nb CRITIQUE).`,
+      ``,
+      `## Analyse des ecarts significatifs`,
+      `Pour CHACUN des 3 a 5 ecarts les plus importants, un bloc "### <compte`,
+      `- CR>" avec exactement ces puces :`,
+      `- **Constat** : le chiffre (budget vs realise, ecart en FCFA et %).`,
+      `- **Interpretation metier** : ce que cela signifie pour l'activite.`,
+      `- **Causes racines probables** : 1 a 3 hypotheses plausibles.`,
+      `- **Action correctrice** : mesure PRECISE, avec proprietaire suggere`,
+      `  (fonction : DG, DAF, responsable CR...) et echeance indicative.`,
+      `- **Risque en cas d'inaction** : consequence chiffree ou qualitative.`,
+      ``,
+      `## Signaux faibles`,
+      `2 a 4 points : tendances naissantes, comptes a surveiller avant qu'ils`,
+      `ne basculent en CRITIQUE, effets de saisonnalite detectes.`,
+      ``,
+      `## Recommandations priorisees`,
+      `Top 5 maximum, ordonnees par impact decroissant. Chaque reco tient en`,
+      `une ligne actionnable (verbe d'action + cible + horizon).`,
+      ``,
+      `## Questions pour le prochain Comite`,
+      `3 a 5 questions ouvertes que le Comite devrait trancher, formulees pour`,
+      `provoquer une decision.`,
+      ``,
+      `Reste factuel et en francais professionnel. Ne specule pas au-dela des`,
+      `chiffres fournis. Respecte STRICTEMENT la contrainte d'encodage ASCII /`,
+      `Latin-1 rappelee dans les instructions systeme.`,
     ].join('\n');
   }
 

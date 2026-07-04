@@ -221,6 +221,10 @@ function renderMarkdownTable(
       { width },
     );
   }
+  // Lot PDF-V2b — drawTable laisse doc.x sur une colonne interne : sans ce
+  // reset, les paragraphes suivants démarrent en retrait et wrappent sur une
+  // largeur réduite (rendu « en colonne »). On repositionne à la marge gauche.
+  doc.x = left;
   doc.moveDown(0.5);
 }
 
