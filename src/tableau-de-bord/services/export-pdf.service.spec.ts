@@ -182,6 +182,12 @@ describe('ExportPdfService', () => {
       dryRun: true,
     });
     expect(countPages(avecIa)).toBe(4);
+    // Lot PDF-V2c — plus de métadonnées techniques ni de disclaimer IA.
+    const txtIa = extractPdfText(avecIa);
+    expect(txtIa).not.toContain('Métadonnées de génération');
+    expect(txtIa).not.toContain('Tokens');
+    expect(txtIa).not.toContain('automatiquement');
+    expect(txtIa).not.toContain('contrôleur de gestion');
   });
 
   it('B2 — bank fictive "TEST BANK" : rend TEST BANK, pas BSIC', async () => {

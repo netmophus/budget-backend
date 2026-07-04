@@ -110,16 +110,6 @@ const MOIS_FR = [
   'Déc',
 ];
 
-function formaterDateFr(iso: string): string {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return iso;
-  const pad = (n: number): string => String(n).padStart(2, '0');
-  return (
-    `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${String(d.getFullYear())} ` +
-    `${pad(d.getHours())}:${pad(d.getMinutes())}`
-  );
-}
-
 /**
  * Cibles réglementaires / D2 (SOUS-LOT 4.2). Hardcodées pour l'instant
  * (backlog `dim_cibles`, cf. CONTEXTE_REPRISE). Alignées sur cibles-d2
@@ -980,36 +970,11 @@ function renderPage4AnalyseIa(
   doc.moveDown(0.6);
 
   // Contenu markdown étendu (tableaux / citations / code — SOUS-LOT 3.3).
+  // Lot PDF-V2c — le pied de section (métadonnées techniques de génération
+  // + disclaimer) a été retiré : sans valeur métier pour le Comité. Le détail
+  // technique (modèle, tokens, durée) reste tracé dans audit_log.
   doc.x = left;
   renderMarkdown(doc, ia.analyse, pdfBuilder);
-
-  // Pied de section : métadonnées de génération (discrètes) + disclaimer.
-  const generatedAtStr = ia.generatedAt ? formaterDateFr(ia.generatedAt) : '—';
-  const metaY = doc.page.height - doc.page.margins.bottom - 52;
-  doc
-    .fillColor(BRAND.colors.grisFonce)
-    .font(BRAND.fonts.body)
-    .fontSize(BRAND.fontSizes.bodySmall - 1)
-    .text(
-      `Métadonnées de génération — Modèle : ${ia.model}  ·  Générée le ${generatedAtStr}  ·  ` +
-        `Tokens : ${String(ia.tokensInput)} in / ${String(ia.tokensOutput)} out  ·  ` +
-        `Durée : ${String(ia.dureeMs)} ms`,
-      left,
-      metaY,
-      { width: widthDispo, align: 'center', lineBreak: false },
-    );
-  const disclaimerY = doc.page.height - doc.page.margins.bottom - 36;
-  doc
-    .fillColor(BRAND.colors.grisFonce)
-    .font(BRAND.fonts.italic)
-    .fontSize(BRAND.fontSizes.bodySmall - 1)
-    .text(
-      'Cette analyse est générée automatiquement et doit être validée par un humain. ' +
-        "MIZNAS AI ne remplace pas l'expertise d'un contrôleur de gestion.",
-      left,
-      disclaimerY,
-      { width: widthDispo, align: 'center' },
-    );
 }
 
 // ─── Page — Compte de résultat structuré (SOUS-LOT 4) ──────────────
