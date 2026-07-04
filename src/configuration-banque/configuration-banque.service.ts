@@ -10,6 +10,7 @@ import {
   DEFAULT_BANK_BRANDING,
   DEFAULT_MEMBRES_COMITE,
   type BankBranding,
+  type BankEmailContext,
   type MembreComitePdf,
 } from './bank-branding';
 import type {
@@ -24,6 +25,9 @@ import type {
 /** id figé de la ligne unique (table mono-ligne verrouillée par CHECK). */
 const CONFIG_ID = '1';
 
+/** TTL du cache mémoire du contexte email (Lot B3) — 5 minutes. */
+const EMAIL_CTX_TTL_MS = 5 * 60 * 1000;
+
 /**
  * ConfigurationBanqueService (Lot B1) — lecture/écriture de la config
  * institutionnelle de la banque cliente + membres du Comité. Toute
@@ -33,6 +37,9 @@ const CONFIG_ID = '1';
  */
 @Injectable()
 export class ConfigurationBanqueService {
+  /** Cache mémoire du contexte email (Lot B3) — TTL 5 min, invalidé au save. */
+  private emailCtxCache?: { value: BankEmailContext; expiresAt: number };
+
   constructor(
     @InjectRepository(ConfigurationBanque)
     private readonly configRepo: Repository<ConfigurationBanque>,
@@ -124,6 +131,9 @@ export class ConfigurationBanqueService {
       );
     });
 
+    // Lot B3 — la config a changé : le contexte email caché devient obsolète.
+    this.invalidateEmailCache();
+
     return this.getConfiguration();
   }
 
@@ -150,6 +160,57 @@ export class ConfigurationBanqueService {
       logoRef: c.logoRef,
       refReglementaireBceao: c.refReglementaireBceao,
     };
+  }
+
+  /**
+   * Contexte « plat » pour les templates emails (Lot B3), exposé sous la
+   * clé `bank`. Cache mémoire 5 min (le rendu email est fréquent et la
+   * config change rarement) — invalidé par `updateConfiguration`. Ne throw
+   * jamais : repli DEFAULT_BANK_BRANDING si la config est indisponible.
+   */
+  async getBankContextForEmail(): Promise<BankEmailContext> {
+    const now = Date.now();
+    if (this.emailCtxCache && this.emailCtxCache.expiresAt > now) {
+      return this.emailCtxCache.value;
+    }
+    const value = await this.buildEmailContext();
+    this.emailCtxCache = { value, expiresAt: now + EMAIL_CTX_TTL_MS };
+    return value;
+  }
+
+  private async buildEmailContext(): Promise<BankEmailContext> {
+    const c = await this.configRepo.findOne({ where: { id: CONFIG_ID } });
+    const d = DEFAULT_BANK_BRANDING;
+    if (!c) {
+      return {
+        sigle: d.sigle,
+        nom: d.nom,
+        nomComplet: d.nomComplet,
+        adresseComplete: [d.adresse, d.villeSiege, d.pays]
+          .filter(Boolean)
+          .join(', '),
+        groupe: null,
+        telephone: null,
+        logoRef: d.logoRef,
+      };
+    }
+    const adresse = [c.siegeSocial, c.villeSiege, c.pays]
+      .filter((p): p is string => !!p)
+      .join(', ');
+    return {
+      sigle: c.sigle,
+      nom: c.nom,
+      nomComplet: c.nomCommercialComplet ?? d.nomComplet,
+      adresseComplete: adresse || d.adresse,
+      groupe: c.groupe,
+      telephone: c.telephone,
+      logoRef: c.logoRef,
+    };
+  }
+
+  /** Invalide le cache du contexte email (appelé après une écriture). */
+  private invalidateEmailCache(): void {
+    this.emailCtxCache = undefined;
   }
 
   /** Membres actifs du Comité pour la page Approbations (fallback BSIC). */

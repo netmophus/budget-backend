@@ -3,6 +3,7 @@ import { ConfigModule } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 
 import { AuthModule } from '../auth/auth.module';
+import { ConfigurationBanqueModule } from '../configuration-banque/configuration-banque.module';
 import { User } from '../users/entities/user.entity';
 import { EmailQueueModule } from './email-queue.module';
 import { EmailWorker } from './email.worker';
@@ -22,6 +23,7 @@ import { NotificationsService } from './notifications.service';
     TypeOrmModule.forFeature([EmailLog, User]),
     ConfigModule,
     AuthModule,
+    ConfigurationBanqueModule, // Lot B3 — branding banque dans les emails
     // Lot 6.4.C — EmailQueueModule expose le Producer (et la queue
     // BullMQ). Le Worker (@Processor) reste registré ici, pas dans
     // EmailQueueModule, pour ne pas être propagé transitivement aux

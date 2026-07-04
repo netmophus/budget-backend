@@ -11,15 +11,29 @@ import { ConfigService } from '@nestjs/config';
 import type { Repository } from 'typeorm';
 
 import type { PermissionsService } from '../auth/permissions.service';
+import type { ConfigurationBanqueService } from '../configuration-banque/configuration-banque.service';
+import type { BankEmailContext } from '../configuration-banque/bank-branding';
 import type { User } from '../users/entities/user.entity';
 import type { EmailQueueProducer } from './email-queue.producer';
 import type { EmailLog } from './entities/email-log.entity';
 import { NotificationsService } from './notifications.service';
 
+const BANK_BSIC: BankEmailContext = {
+  sigle: 'BSIC',
+  nom: 'BSIC NIGER',
+  nomComplet: 'Banque Sahélo-Saharienne',
+  adresseComplete: 'Boulevard de la Liberté, Niamey, Niger',
+  groupe: 'Groupe BSIC',
+  telephone: null,
+  logoRef: null,
+};
+
 const VARS_BASE = {
   destinataire: { prenom: 'Aïcha', nom: 'Diallo', email: 'a@miznas.local' },
   app_base_url: 'http://localhost:5173',
   annee: 2026,
+  // Lot B3 — contexte banque injecté par le worker (ici en dur pour le test).
+  bank: BANK_BSIC,
 };
 
 function makeService(): NotificationsService {
@@ -32,6 +46,7 @@ function makeService(): NotificationsService {
     cfg,
     {} as PermissionsService,
     {} as EmailQueueProducer,
+    {} as ConfigurationBanqueService,
   );
 }
 
@@ -208,5 +223,29 @@ describe('Templates Handlebars (Lot 4.3)', () => {
     expect(html).toContain('automatiquement par MIZNAS');
     expect(html).toContain('préférences');
     expect(html).toContain('© 2026');
+  });
+
+  // ─── Lot B3 — sigle banque débranché dans le footer ────────────────
+
+  it('B3 : le footer rend bank.sigle (BSIC par défaut)', () => {
+    const html = service.rendreTemplate('budget-soumis', {
+      ...VARS_BASE,
+      codeVersion: 'X',
+      auteurEmail: 'y@m.io',
+      lien_action: '/budget/versions',
+    });
+    expect(html).toContain('© 2026 BSIC — Usage interne');
+  });
+
+  it('B3 : bank fictive "ECOBANK" → sigle dans le footer, plus de BSIC', () => {
+    const html = service.rendreTemplate('budget-valide', {
+      ...VARS_BASE,
+      bank: { ...BANK_BSIC, sigle: 'ECOBANK', nom: 'ECOBANK NIGER' },
+      codeVersion: 'X',
+      validateurEmail: 'v@m.io',
+      lien_action: '/budget/versions',
+    });
+    expect(html).toContain('© 2026 ECOBANK — Usage interne');
+    expect(html).not.toContain('BSIC');
   });
 });
