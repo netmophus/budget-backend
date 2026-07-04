@@ -22,6 +22,7 @@ import { Role } from '../roles/entities/role.entity';
 import { RolePermission } from '../roles/entities/role-permission.entity';
 import { User } from '../users/entities/user.entity';
 import { UserRole } from '../users/entities/user-role.entity';
+import type { ConfigurationBanqueService } from '../configuration-banque/configuration-banque.service';
 import { EmailLog } from './entities/email-log.entity';
 import {
   EVENT_AFFECTATION_CREATED,
@@ -100,6 +101,21 @@ function makePermsMock(
   } as unknown as PermissionsService;
 }
 
+/** Lot B3 — mock ConfigurationBanqueService (contexte email BSIC). */
+function makeConfigBanqueMock(): ConfigurationBanqueService {
+  return {
+    getBankContextForEmail: jest.fn().mockResolvedValue({
+      sigle: 'BSIC',
+      nom: 'BSIC NIGER',
+      nomComplet: 'Banque Sahelo-Saharienne',
+      adresseComplete: 'Boulevard de la Liberte, BP 12 080, Niamey',
+      groupe: 'Groupe BSIC S.A. (Tripoli)',
+      telephone: null,
+      logoRef: null,
+    }),
+  } as unknown as ConfigurationBanqueService;
+}
+
 describe('Notifications — intégration listener (Lot 4.3)', () => {
   let ds: DataSource;
   let service: NotificationsService;
@@ -133,6 +149,7 @@ describe('Notifications — intégration listener (Lot 4.3)', () => {
       {
         publier: jest.fn().mockResolvedValue(undefined),
       } as unknown as EmailQueueProducer,
+      makeConfigBanqueMock(),
     );
     listeners = new NotificationsListeners(service);
     // Câblage manuel des @OnEvent (nécessaire hors NestJS module).
