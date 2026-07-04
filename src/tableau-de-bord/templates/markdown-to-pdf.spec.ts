@@ -6,7 +6,8 @@
  * (>=, <=, ->) ou strippés, tout en PRÉSERVANT les caractères
  * typographiques CP1252 (– — ' ' " " • … €) qui rendent correctement.
  */
-import { nettoyerEmojis } from './markdown-to-pdf';
+import { PdfBuilderService } from '../../reporting/generators/pdf-builder.service';
+import { nettoyerEmojis, renderMarkdown } from './markdown-to-pdf';
 
 describe('nettoyerEmojis (post-processing Latin-1)', () => {
   it('convertit les opérateurs de comparaison Unicode en ASCII', () => {
@@ -49,5 +50,28 @@ describe('nettoyerEmojis (post-processing Latin-1)', () => {
     // La structure markdown (##, >) et le texte restent intacts.
     expect(propre).toContain('## Synthèse [CRITIQUE]');
     expect(propre).toContain('> Écart >= 10 % -> action');
+  });
+});
+
+describe('renderMarkdown — reprise pleine largeur (Lot PDF-V2b)', () => {
+  it('réinitialise doc.x à la marge gauche après un tableau markdown', () => {
+    const pdf = new PdfBuilderService();
+    const doc = pdf.createDocument({ title: 'test' });
+    const left = doc.page.margins.left;
+    // Sans le reset, drawTable laisserait doc.x sur la dernière colonne :
+    // les paragraphes suivants wrapperaient sur une largeur réduite.
+    renderMarkdown(doc, '| A | B |\n|---|---|\n| 1 | 2 |', pdf);
+    expect(doc.x).toBe(left);
+  });
+
+  it('la largeur dispo est pleine juste après le tableau (pas de retrait)', () => {
+    const pdf = new PdfBuilderService();
+    const doc = pdf.createDocument({ title: 'test' });
+    const left = doc.page.margins.left;
+    const pleineLargeur = doc.page.width - left - doc.page.margins.right;
+    renderMarkdown(doc, '| A | B | C |\n|---|---|---|\n| 1 | 2 | 3 |', pdf);
+    // Au point courant (juste après le tableau), la largeur exploitable
+    // par un paragraphe doit être la pleine largeur de la page.
+    expect(doc.page.width - doc.x - doc.page.margins.right).toBe(pleineLargeur);
   });
 });

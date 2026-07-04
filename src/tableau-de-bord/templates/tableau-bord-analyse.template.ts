@@ -913,35 +913,34 @@ function renderTop10Section(
     // SOUS-LOT 1.4 — colonne Ligne métier pour distinguer un même
     // compte présent sur plusieurs LM (ex. 7081/LM_PART vs 7081/LM_PME).
     l.codeLigneMetier,
-    // SOUS-LOT 3 ajust. 2 — libellé élargi (135pt), tronqué 1 ligne.
-    l.libelleCompte.length > 26
-      ? `${l.libelleCompte.slice(0, 25)}...`
+    // Lot PDF-V2b — libellé élargi (137pt), tronqué 1 ligne.
+    l.libelleCompte.length > 30
+      ? `${l.libelleCompte.slice(0, 29)}...`
       : l.libelleCompte,
     l.codeCr,
-    l.libelleMois,
     `${formatMontant(l.ecartAbs)} FCFA`,
     LIBELLES_NIVEAU[l.niveauAlerte],
   ]);
 
-  // Largeurs (total 495pt) : Libellé élargi à 135pt au détriment de
-  // Compte/LM/CR/Mois (SOUS-LOT 3 ajust. 2).
+  // Largeurs (total 495pt) — Lot PDF-V2b : colonne « Mois » retirée
+  // (redondante avec la période de l'en-tête) au profit de CR (90pt,
+  // « CR_AG_SIEGE » complet) et Niveau (60pt, « Sans budget »/« Attention »).
   pdfBuilder.drawTable(
     doc,
     [
       { header: '#', width: 18, align: 'center' },
       { header: 'Compte', width: 44 },
       { header: 'Ligne métier', width: 54 },
-      { header: 'Libellé', width: 135 },
-      { header: 'CR', width: 64 },
-      { header: 'Mois', width: 52 },
+      { header: 'Libellé', width: 137 },
+      { header: 'CR', width: 90 },
       { header: 'Écart abs.', width: 86, align: 'right' },
-      { header: 'Niveau', width: 42, align: 'center' },
+      { header: 'Niveau', width: 66, align: 'center' },
     ],
     rows,
     {
-      // SOUS-LOT 3.4 — badge coloré sur la colonne Niveau (index 7).
+      // Badge coloré sur la colonne Niveau (désormais index 6).
       cellStyle: (r, c) =>
-        c === 7 ? { bg: COULEURS_NIVEAU[top[r].niveauAlerte] } : undefined,
+        c === 6 ? { bg: COULEURS_NIVEAU[top[r].niveauAlerte] } : undefined,
     },
   );
 }
