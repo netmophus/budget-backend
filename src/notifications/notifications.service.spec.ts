@@ -21,6 +21,7 @@ import { RolePermission } from '../roles/entities/role-permission.entity';
 import { User } from '../users/entities/user.entity';
 import { UserRole } from '../users/entities/user-role.entity';
 import { EmailLog, type TypeEvenement } from './entities/email-log.entity';
+import type { ConfigurationBanqueService } from '../configuration-banque/configuration-banque.service';
 import type { EmailQueueProducer } from './email-queue.producer';
 import { NotificationsService } from './notifications.service';
 
@@ -128,6 +129,21 @@ function makeQueueMock(): EmailQueueProducer & { publier: jest.Mock } {
   } as unknown as EmailQueueProducer & { publier: jest.Mock };
 }
 
+/** Lot B3 — mock ConfigurationBanqueService (contexte email BSIC). */
+function makeConfigBanqueMock(): ConfigurationBanqueService {
+  return {
+    getBankContextForEmail: jest.fn().mockResolvedValue({
+      sigle: 'BSIC',
+      nom: 'BSIC NIGER',
+      nomComplet: 'Banque Sahelo-Saharienne',
+      adresseComplete: 'Boulevard de la Liberte, BP 12 080, Niamey',
+      groupe: 'Groupe BSIC S.A. (Tripoli)',
+      telephone: null,
+      logoRef: null,
+    }),
+  } as unknown as ConfigurationBanqueService;
+}
+
 describe('NotificationsService', () => {
   let ds: DataSource;
   let service: NotificationsService;
@@ -157,6 +173,7 @@ describe('NotificationsService', () => {
         cfg,
         makePermsMock(),
         makeQueueMock(),
+        makeConfigBanqueMock(),
       );
       const u = await seedUser(ds, 'a@miznas.local');
       const r = await service.envoyer('BUDGET_SOUMIS', u, {
@@ -181,6 +198,7 @@ describe('NotificationsService', () => {
         cfg,
         makePermsMock(),
         queue,
+        makeConfigBanqueMock(),
       );
       const u = await seedUser(ds, 'a@miznas.local');
       const r = await service.envoyer('BUDGET_SOUMIS', u, {
@@ -211,6 +229,7 @@ describe('NotificationsService', () => {
         cfg,
         makePermsMock(),
         queue,
+        makeConfigBanqueMock(),
       );
       const u = await seedUser(ds, 'a@miznas.local');
       await service.envoyer('BUDGET_SOUMIS', u, {
@@ -228,6 +247,7 @@ describe('NotificationsService', () => {
         cfg,
         makePermsMock(),
         makeQueueMock(),
+        makeConfigBanqueMock(),
       );
       const u = await seedUser(ds, 'a@miznas.local', {
         notificationsEmailActives: false,
@@ -252,6 +272,7 @@ describe('NotificationsService', () => {
         cfg,
         makePermsMock(),
         makeQueueMock(),
+        makeConfigBanqueMock(),
       );
       const u = await seedUser(ds, 'a@miznas.local', {
         notificationsEmailTypes: ['BUDGET_PUBLIE'],
@@ -277,6 +298,7 @@ describe('NotificationsService', () => {
         makeConfig({ EMAIL_DRY_RUN: 'true' }),
         makePermsMock(),
         makeQueueMock(),
+        makeConfigBanqueMock(),
       );
     });
 
@@ -293,6 +315,7 @@ describe('NotificationsService', () => {
           [auteur.id]: ['BUDGET.VALIDER'], // auteur exclu malgré la perm
         }),
         makeQueueMock(),
+        makeConfigBanqueMock(),
       );
       const r = await service.resoudreDestinataires('BUDGET_SOUMIS', {
         budgetVersionId: '99',
@@ -316,6 +339,7 @@ describe('NotificationsService', () => {
         makeConfig({ EMAIL_DRY_RUN: 'true' }),
         makePermsMock({ [pub.id]: ['BUDGET.PUBLIER'] }),
         makeQueueMock(),
+        makeConfigBanqueMock(),
       );
       const r = await service.resoudreDestinataires('BUDGET_VALIDE', {
         budgetVersionId: '88',
@@ -357,6 +381,7 @@ describe('NotificationsService', () => {
         makeConfig({ EMAIL_DRY_RUN: 'true' }),
         makePermsMock({ [sais.id]: ['BUDGET.SAISIR'] }),
         makeQueueMock(),
+        makeConfigBanqueMock(),
       );
       const r = await service.resoudreDestinataires('BUDGET_PUBLIE', {
         budgetVersionId: '66',
@@ -419,6 +444,7 @@ describe('NotificationsService', () => {
           [auteur.id]: ['BUDGET.SAISIR', 'BUDGET.VALIDER'], // auteur exclu malgré les perms
         }),
         makeQueueMock(),
+        makeConfigBanqueMock(),
       );
       const r = await service.resoudreDestinataires('CAMPAGNE_OUVERTE', {
         budgetVersionId: '42',
@@ -453,6 +479,7 @@ describe('NotificationsService', () => {
         cfg,
         makePermsMock(),
         queue,
+        makeConfigBanqueMock(),
       );
       // Pose une ligne email_log directement en statut ECHEC pour
       // simuler une exécution antérieure du worker qui a fail.
@@ -489,6 +516,7 @@ describe('NotificationsService', () => {
         makeConfig({ EMAIL_DRY_RUN: 'true' }),
         makePermsMock(),
         makeQueueMock(),
+        makeConfigBanqueMock(),
       );
       // 3 envois SUPPRIME (dry-run)
       const events: TypeEvenement[] = [

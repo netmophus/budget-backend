@@ -19,6 +19,23 @@ export interface BankBranding {
   refReglementaireBceao: string | null;
 }
 
+/**
+ * Contexte « plat » injecté dans les templates emails Handlebars (Lot B3),
+ * exposé sous la clé `bank`. Débranche le hardcoding « BSIC » du layout et
+ * met à disposition les infos institutionnelles pour de futurs templates.
+ */
+export interface BankEmailContext {
+  sigle: string;
+  nom: string;
+  nomComplet: string;
+  /** Adresse concaténée : siège, ville, pays (parties vides ignorées). */
+  adresseComplete: string;
+  groupe: string | null;
+  telephone: string | null;
+  /** `bank.logoRef` tel quel (chemin/URL), sans traitement. */
+  logoRef: string | null;
+}
+
 /** Un membre du Comité tel que rendu sur la page Approbations des PDF. */
 export interface MembreComitePdf {
   nomPrenom: string;

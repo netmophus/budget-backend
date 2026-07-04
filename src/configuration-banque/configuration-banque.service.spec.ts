@@ -141,4 +141,34 @@ describe('ConfigurationBanqueService', () => {
     expect(apres.membres).toHaveLength(2);
     expect(apres.membres.find((m) => m.id === cible.id)?.estActif).toBe(false);
   });
+
+  // ─── Lot B3 — contexte email + cache ───────────────────────────────
+
+  it('getBankContextForEmail : objet plat depuis la config', async () => {
+    const ctx = await svc.getBankContextForEmail();
+    expect(ctx.sigle).toBe('BSIC');
+    expect(ctx.nom).toBe('BSIC NIGER');
+    expect(ctx.adresseComplete).toContain('Niamey');
+    expect(ctx.adresseComplete).toContain('Niger');
+  });
+
+  it('getBankContextForEmail : cache 5 min, invalidé par updateConfiguration', async () => {
+    const c1 = await svc.getBankContextForEmail();
+    expect(c1.sigle).toBe('BSIC');
+    // Modif directe en base (contourne le service) → toujours servi du cache.
+    await ds.query(`UPDATE configuration_banque SET sigle='XXX' WHERE id=1`);
+    expect((await svc.getBankContextForEmail()).sigle).toBe('BSIC');
+    // updateConfiguration invalide le cache → valeur fraîche au prochain appel.
+    await svc.updateConfiguration({ sigle: 'ECOBANK' }, USER);
+    expect((await svc.getBankContextForEmail()).sigle).toBe('ECOBANK');
+  });
+
+  it('getBankContextForEmail : fallback DEFAULT si config absente', async () => {
+    await ds.query('DELETE FROM configuration_banque_membre_comite');
+    await ds.query('DELETE FROM configuration_banque');
+    const ctx = await svc.getBankContextForEmail();
+    expect(ctx.sigle).toBe('BSIC'); // DEFAULT_BANK_BRANDING
+    expect(ctx.nom).toBe('BSIC NIGER');
+    expect(ctx.groupe).toBeNull();
+  });
 });

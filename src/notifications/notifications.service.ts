@@ -30,6 +30,7 @@ import { type Transporter, createTransport } from 'nodemailer';
 import { Repository } from 'typeorm';
 
 import { PermissionsService } from '../auth/permissions.service';
+import { ConfigurationBanqueService } from '../configuration-banque/configuration-banque.service';
 import { User } from '../users/entities/user.entity';
 import { EmailQueueProducer } from './email-queue.producer';
 import {
@@ -123,6 +124,8 @@ export class NotificationsService {
     // Lot 6.3 — publication async dans la queue BullMQ. L'envoi SMTP
     // réel et la transition ENVOYE/ECHEC sont effectués par EmailWorker.
     private readonly emailQueue: EmailQueueProducer,
+    // Lot B3 — branding banque injecté dans le contexte des templates.
+    private readonly configBanque: ConfigurationBanqueService,
   ) {}
 
   // ─── Configuration ──────────────────────────────────────────────
@@ -499,6 +502,9 @@ export class NotificationsService {
         : null,
       app_base_url: this.getAppBaseUrl(),
       annee: new Date().getFullYear(),
+      // Lot B3 — branding banque (fallback BSIC, cache 5 min). Injecté ici
+      // (worker) car le rendu est asynchrone, pas à l'enqueue.
+      bank: await this.configBanque.getBankContextForEmail(),
     };
     const html = this.rendreTemplate(log.template, variables);
 
