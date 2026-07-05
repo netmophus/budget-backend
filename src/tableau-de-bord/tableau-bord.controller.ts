@@ -33,6 +33,7 @@ import {
 } from '../ai/ai-rate-limiter.service';
 import { AnthropicService } from '../ai/anthropic.service';
 import { AuditService } from '../audit/audit.service';
+import { ConfigurationBanqueService } from '../configuration-banque/configuration-banque.service';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { AuthUser } from '../auth/decorators/current-user.decorator';
 import { RequirePermissions } from '../auth/decorators/require-permissions.decorator';
@@ -44,6 +45,7 @@ import {
 import { AnalyseEcartsService } from './services/analyse-ecarts.service';
 import { ExportExcelService } from './services/export-excel.service';
 import { ExportPdfService } from './services/export-pdf.service';
+import { StructureOrganisationnelleService } from './services/structure-organisationnelle.service';
 
 interface AiAnalyseReponseHttp {
   analyse: string;
@@ -67,6 +69,9 @@ export class TableauBordController {
     private readonly aiRateLimiter: AiAnalyseRateLimiterService,
     private readonly auditSvc: AuditService,
     private readonly exportPdfSvc: ExportPdfService,
+    // Chantier A — contexte enrichi du prompt IA (config banque + structure org).
+    private readonly configBanque: ConfigurationBanqueService,
+    private readonly structureOrg: StructureOrganisationnelleService,
     @InjectDataSource()
     private readonly dataSource: DataSource,
   ) {}
@@ -191,7 +196,18 @@ export class TableauBordController {
 
     // 3. Appel Anthropic (ou mock si AI_DRY_RUN=true)
     try {
-      const result = await this.anthropicSvc.analyserEcarts(ecarts, user.email);
+      // Chantier A — contexte enrichi : identité/marché banque + structure
+      // organisationnelle (CR filtrés périmètre user + lignes métier).
+      const [bank, centresResponsabilite, lignesMetier] = await Promise.all([
+        this.configBanque.getPromptContext(),
+        this.structureOrg.getCentresResponsabilite(user),
+        this.structureOrg.getLignesMetier(),
+      ]);
+      const result = await this.anthropicSvc.analyserEcarts(
+        ecarts,
+        user.email,
+        { bank, centresResponsabilite, lignesMetier },
+      );
 
       // 4. Audit succès (récap, sans le prompt ni la réponse — volatile
       //    côté client uniquement).

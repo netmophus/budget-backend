@@ -10,7 +10,7 @@
  */
 import { ConfigService } from '@nestjs/config';
 
-import { AnthropicService } from './anthropic.service';
+import { AnthropicService, type AiPromptContext } from './anthropic.service';
 import type { EcartsResponseDto } from '../tableau-de-bord/dto/tableau-bord.dto';
 
 // Mock du SDK Anthropic. Le client renvoyé expose `messages.create`.
@@ -223,4 +223,99 @@ describe('AnthropicService', () => {
     expect(prompt).toMatch(/Évolution mensuelle/);
     expect(prompt).toMatch(/Mai 2026/);
   });
+
+  // ─── Chantier A — system prompt enrichi ────────────────────────────
+
+  it('construireSystemPrompt (BSIC) : nom banque + role senior + BCEAO + CR/LM', () => {
+    svc = new AnthropicService(makeConfig());
+    const sys = svc.construireSystemPrompt(ctxBsic());
+    expect(sys).toContain('BSIC NIGER');
+    expect(sys).toContain("15 ans d'experience");
+    expect(sys).toContain('CADRE REGLEMENTAIRE BCEAO');
+    expect(sys).toContain('CR_AG_SIEGE : Agence Siege');
+    expect(sys).toContain('LM_PART : Particuliers');
+    expect(sys).toContain('Mobile money en essor');
+  });
+
+  it('construireSystemPrompt (ECOBANK) : rend ECOBANK NIGER, pas de BSIC', () => {
+    svc = new AnthropicService(makeConfig());
+    const sys = svc.construireSystemPrompt(
+      ctxBsic({
+        bank: {
+          nom: 'ECOBANK NIGER',
+          sigle: 'ECOBANK',
+          nomComplet: 'Ecobank Niger',
+          groupe: 'Groupe Ecobank',
+          contexteMarche: 'Marche concurrentiel',
+          positionnement: 'Banque panafricaine',
+          concurrents: 'BSIC, BOA',
+        },
+      }),
+    );
+    expect(sys).toContain('ECOBANK NIGER');
+    // "BSIC" ne doit apparaitre QUE s'il est saisi (ici dans concurrents) —
+    // on verifie qu'il n'y a pas de fuite du defaut : le nom banque est ECOBANK.
+    expect(sys).toContain('Direction Generale de ECOBANK NIGER');
+  });
+
+  it('construireSystemPrompt : sections vides OMISES (pas de "non renseigne")', () => {
+    svc = new AnthropicService(makeConfig());
+    const sys = svc.construireSystemPrompt(
+      ctxBsic({
+        bank: { contexteMarche: null, positionnement: null, concurrents: null },
+        centresResponsabilite: [],
+        lignesMetier: [],
+      }),
+    );
+    expect(sys).not.toContain('CONTEXTE DE MARCHE');
+    expect(sys).not.toContain('POSITIONNEMENT');
+    expect(sys).not.toContain('PRINCIPAUX CONCURRENTS');
+    expect(sys).not.toContain('STRUCTURE ORGANISATIONNELLE');
+    expect(sys.toLowerCase()).not.toContain('non renseigne');
+    // Les invariants restent presents.
+    expect(sys).toContain('CADRE REGLEMENTAIRE BCEAO');
+  });
+
+  it('coherence user/system : le user prompt renvoie aux 6 sections, sans emojis', () => {
+    svc = new AnthropicService(makeConfig());
+    const user = svc.construirePrompt(ecartsFixture());
+    const sys = svc.construireSystemPrompt(ctxBsic());
+    expect(user).toContain('6 sections');
+    expect(user).toContain('[CRITIQUE]');
+    expect(user).toContain("pas d'emojis");
+    // Le system interdit les emojis : pas d'ordre contradictoire cote user.
+    expect(sys).toContain('INTERDIT : emojis');
+    expect(user).not.toMatch(/avec emojis/i);
+  });
 });
+
+/** Contexte prompt de base (BSIC), surchargeable. */
+function ctxBsic(
+  overrides: {
+    bank?: Partial<AiPromptContext['bank']>;
+    centresResponsabilite?: AiPromptContext['centresResponsabilite'];
+    lignesMetier?: AiPromptContext['lignesMetier'];
+  } = {},
+): AiPromptContext {
+  return {
+    bank: {
+      nom: 'BSIC NIGER',
+      sigle: 'BSIC',
+      nomComplet: 'Banque Sahelo-Saharienne',
+      positionnement: 'Retail et Corporate',
+      contexteMarche: 'Mobile money en essor',
+      concurrents: 'Ecobank Niger, BOA Niger',
+      groupe: 'Groupe BSIC',
+      villeSiege: 'Niamey',
+      pays: 'Niger',
+      refReglementaireBceao: null,
+      ...overrides.bank,
+    },
+    centresResponsabilite: overrides.centresResponsabilite ?? [
+      { code: 'CR_AG_SIEGE', libelle: 'Agence Siege' },
+    ],
+    lignesMetier: overrides.lignesMetier ?? [
+      { code: 'LM_PART', libelle: 'Particuliers' },
+    ],
+  };
+}

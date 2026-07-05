@@ -11,6 +11,7 @@ import {
   DEFAULT_MEMBRES_COMITE,
   type BankBranding,
   type BankEmailContext,
+  type BankPromptContext,
   type MembreComitePdf,
 } from './bank-branding';
 import type {
@@ -25,8 +26,8 @@ import type {
 /** id figé de la ligne unique (table mono-ligne verrouillée par CHECK). */
 const CONFIG_ID = '1';
 
-/** TTL du cache mémoire du contexte email (Lot B3) — 5 minutes. */
-const EMAIL_CTX_TTL_MS = 5 * 60 * 1000;
+/** TTL des caches mémoire (contexte email B3 / prompt IA Chantier A). */
+const CTX_TTL_MS = 5 * 60 * 1000;
 
 /**
  * ConfigurationBanqueService (Lot B1) — lecture/écriture de la config
@@ -39,6 +40,8 @@ const EMAIL_CTX_TTL_MS = 5 * 60 * 1000;
 export class ConfigurationBanqueService {
   /** Cache mémoire du contexte email (Lot B3) — TTL 5 min, invalidé au save. */
   private emailCtxCache?: { value: BankEmailContext; expiresAt: number };
+  /** Cache mémoire du contexte prompt IA (Chantier A) — même politique. */
+  private promptCtxCache?: { value: BankPromptContext; expiresAt: number };
 
   constructor(
     @InjectRepository(ConfigurationBanque)
@@ -131,8 +134,8 @@ export class ConfigurationBanqueService {
       );
     });
 
-    // Lot B3 — la config a changé : le contexte email caché devient obsolète.
-    this.invalidateEmailCache();
+    // La config a changé : caches contextuels (email B3 + prompt IA) obsolètes.
+    this.invalidateCaches();
 
     return this.getConfiguration();
   }
@@ -174,7 +177,47 @@ export class ConfigurationBanqueService {
       return this.emailCtxCache.value;
     }
     const value = await this.buildEmailContext();
-    this.emailCtxCache = { value, expiresAt: now + EMAIL_CTX_TTL_MS };
+    this.emailCtxCache = { value, expiresAt: now + CTX_TTL_MS };
+    return value;
+  }
+
+  /**
+   * Contexte institutionnel pour le prompt IA (Chantier A). Cache 5 min +
+   * invalidation au save. Ne throw jamais : repli DEFAULT_BANK_BRANDING.
+   */
+  async getPromptContext(): Promise<BankPromptContext> {
+    const now = Date.now();
+    if (this.promptCtxCache && this.promptCtxCache.expiresAt > now) {
+      return this.promptCtxCache.value;
+    }
+    const c = await this.configRepo.findOne({ where: { id: CONFIG_ID } });
+    const d = DEFAULT_BANK_BRANDING;
+    const value: BankPromptContext = c
+      ? {
+          nom: c.nom,
+          sigle: c.sigle,
+          nomComplet: c.nomCommercialComplet ?? d.nomComplet,
+          positionnement: c.positionnement,
+          contexteMarche: c.contexteMarche,
+          concurrents: c.concurrents,
+          groupe: c.groupe,
+          villeSiege: c.villeSiege ?? d.villeSiege,
+          pays: c.pays ?? d.pays,
+          refReglementaireBceao: c.refReglementaireBceao,
+        }
+      : {
+          nom: d.nom,
+          sigle: d.sigle,
+          nomComplet: d.nomComplet,
+          positionnement: null,
+          contexteMarche: null,
+          concurrents: null,
+          groupe: null,
+          villeSiege: d.villeSiege,
+          pays: d.pays,
+          refReglementaireBceao: null,
+        };
+    this.promptCtxCache = { value, expiresAt: now + CTX_TTL_MS };
     return value;
   }
 
@@ -208,9 +251,10 @@ export class ConfigurationBanqueService {
     };
   }
 
-  /** Invalide le cache du contexte email (appelé après une écriture). */
-  private invalidateEmailCache(): void {
+  /** Invalide les caches contextuels (email + prompt IA) après écriture. */
+  private invalidateCaches(): void {
     this.emailCtxCache = undefined;
+    this.promptCtxCache = undefined;
   }
 
   /** Membres actifs du Comité pour la page Approbations (fallback BSIC). */

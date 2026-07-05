@@ -31,6 +31,10 @@ import Anthropic from '@anthropic-ai/sdk';
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 
+import {
+  DEFAULT_BANK_BRANDING,
+  type BankPromptContext,
+} from '../configuration-banque/bank-branding';
 import type {
   EcartsResponseDto,
   LigneEcartDto,
@@ -51,6 +55,40 @@ export interface AiAnalyseResult {
   dureeMs: number;
   dryRun: boolean;
 }
+
+/** Une entrée code+libellé (CR ou ligne métier) pour la structure org. */
+export interface CodeLibelle {
+  code: string;
+  libelle: string;
+}
+
+/**
+ * Contexte injecté dans le prompt IA (Chantier A) : identité/marché de la
+ * banque (config) + structure organisationnelle (CR périmètre + LM globales).
+ */
+export interface AiPromptContext {
+  bank: BankPromptContext;
+  centresResponsabilite: CodeLibelle[];
+  lignesMetier: CodeLibelle[];
+}
+
+/** Repli si le caller ne fournit pas de contexte (BSIC, sans structure). */
+const FALLBACK_PROMPT_CONTEXT: AiPromptContext = {
+  bank: {
+    nom: DEFAULT_BANK_BRANDING.nom,
+    sigle: DEFAULT_BANK_BRANDING.sigle,
+    nomComplet: DEFAULT_BANK_BRANDING.nomComplet,
+    positionnement: null,
+    contexteMarche: null,
+    concurrents: null,
+    groupe: null,
+    villeSiege: DEFAULT_BANK_BRANDING.villeSiege,
+    pays: DEFAULT_BANK_BRANDING.pays,
+    refReglementaireBceao: null,
+  },
+  centresResponsabilite: [],
+  lignesMetier: [],
+};
 
 interface ResumeMensuel {
   mois: string;
@@ -98,9 +136,11 @@ export class AnthropicService {
   async analyserEcarts(
     ecarts: EcartsResponseDto,
     userEmail: string,
+    ctx: AiPromptContext = FALLBACK_PROMPT_CONTEXT,
   ): Promise<AiAnalyseResult> {
     const start = Date.now();
     const prompt = this.construirePrompt(ecarts);
+    const systemPrompt = this.construireSystemPrompt(ctx);
 
     if (this.dryRun) {
       this.logger.log(
@@ -119,7 +159,7 @@ export class AnthropicService {
       const response = await client.messages.create({
         model: this.model,
         max_tokens: DEFAULT_MAX_TOKENS,
-        system: SYSTEM_PROMPT,
+        system: systemPrompt,
         messages: [{ role: 'user', content: prompt }],
       });
       const analyseText = response.content
@@ -147,6 +187,69 @@ export class AnthropicService {
       // Le caller construira un message générique côté HTTP.
       throw new Error('AI_PROVIDER_ERROR');
     }
+  }
+
+  /**
+   * Construit le system prompt enrichi (Chantier A). Rôle senior + cadre
+   * BCEAO + structure attendue + règles de format sont INVARIANTS ; les
+   * sections institutionnelles/marché/positionnement/concurrents/structure
+   * org sont injectées dynamiquement et OMISES si vides (arbitrage : pas
+   * de « non renseigné »). Public pour permettre les tests.
+   */
+  construireSystemPrompt(ctx: AiPromptContext): string {
+    const b = ctx.bank;
+    const parts: string[] = [
+      `Tu es MIZNAS AI, controleur de gestion senior avec 15 ans d'experience`,
+      `dans le secteur bancaire de l'Union Economique et Monetaire Ouest-`,
+      `Africaine (UMOA). Tu conseilles la Direction Generale de ${b.nom}.`,
+    ];
+
+    const inst: string[] = [];
+    if (b.nomComplet) inst.push(`- Denomination : ${b.nomComplet}`);
+    if (b.groupe) inst.push(`- Groupe : ${b.groupe}`);
+    inst.push(`- Siege : ${b.villeSiege}, ${b.pays}`);
+    if (b.refReglementaireBceao) {
+      inst.push(`- Reference reglementaire : ${b.refReglementaireBceao}`);
+    }
+    parts.push('', 'CONTEXTE INSTITUTIONNEL', ...inst);
+
+    if (b.contexteMarche) {
+      parts.push('', 'CONTEXTE DE MARCHE', b.contexteMarche);
+    }
+    if (b.positionnement) {
+      parts.push('', 'POSITIONNEMENT', b.positionnement);
+    }
+    if (b.concurrents) {
+      parts.push('', 'PRINCIPAUX CONCURRENTS', b.concurrents);
+    }
+
+    if (ctx.centresResponsabilite.length || ctx.lignesMetier.length) {
+      parts.push('', 'STRUCTURE ORGANISATIONNELLE');
+      if (ctx.centresResponsabilite.length) {
+        parts.push('Centres de responsabilite :');
+        parts.push(
+          ...ctx.centresResponsabilite.map((c) => `- ${c.code} : ${c.libelle}`),
+        );
+      }
+      if (ctx.lignesMetier.length) {
+        parts.push('Lignes metier :');
+        parts.push(
+          ...ctx.lignesMetier.map((l) => `- ${l.code} : ${l.libelle}`),
+        );
+      }
+    }
+
+    parts.push(
+      '',
+      BCEAO_BLOCK,
+      '',
+      ROLE_BLOCK,
+      '',
+      STRUCTURE_BLOCK,
+      '',
+      FORMAT_BLOCK,
+    );
+    return parts.join('\n');
   }
 
   /**
@@ -236,39 +339,15 @@ export class AnthropicService {
       ``,
       `# Consigne`,
       ``,
-      `Tu produis la partie CENTRALE d'un rapport d'aide a la decision destine`,
-      `au Directeur General et au Comite Budgetaire. Sois dense, precis et`,
-      `oriente action. Structure ta reponse en markdown ainsi :`,
+      `Analyse les donnees ci-dessus et produis ton rapport en respectant`,
+      `EXACTEMENT la structure en 6 sections et les regles de format definies`,
+      `dans ton prompt systeme (DIAGNOSTIC -> ANALYSE DES ECARTS -> INDICATEURS`,
+      `BCEAO -> SIGNAUX FAIBLES -> RECOMMANDATIONS -> QUESTIONS COMITE).`,
       ``,
-      `## Diagnostic`,
-      `3 a 5 lignes : etat global de l'execution budgetaire, tendance, niveau`,
-      `de risque d'ensemble. Cite les chiffres cles (ecart total, nb CRITIQUE).`,
-      ``,
-      `## Analyse des ecarts significatifs`,
-      `Pour CHACUN des 3 a 5 ecarts les plus importants, un bloc "### <compte`,
-      `- CR>" avec exactement ces puces :`,
-      `- **Constat** : le chiffre (budget vs realise, ecart en FCFA et %).`,
-      `- **Interpretation metier** : ce que cela signifie pour l'activite.`,
-      `- **Causes racines probables** : 1 a 3 hypotheses plausibles.`,
-      `- **Action correctrice** : mesure PRECISE, avec proprietaire suggere`,
-      `  (fonction : DG, DAF, responsable CR...) et echeance indicative.`,
-      `- **Risque en cas d'inaction** : consequence chiffree ou qualitative.`,
-      ``,
-      `## Signaux faibles`,
-      `2 a 4 points : tendances naissantes, comptes a surveiller avant qu'ils`,
-      `ne basculent en CRITIQUE, effets de saisonnalite detectes.`,
-      ``,
-      `## Recommandations priorisees`,
-      `Top 5 maximum, ordonnees par impact decroissant. Chaque reco tient en`,
-      `une ligne actionnable (verbe d'action + cible + horizon).`,
-      ``,
-      `## Questions pour le prochain Comite`,
-      `3 a 5 questions ouvertes que le Comite devrait trancher, formulees pour`,
-      `provoquer une decision.`,
-      ``,
-      `Reste factuel et en francais professionnel. Ne specule pas au-dela des`,
-      `chiffres fournis. Respecte STRICTEMENT la contrainte d'encodage ASCII /`,
-      `Latin-1 rappelee dans les instructions systeme.`,
+      `Format ASCII / Latin-1 uniquement, pas d'emojis : utilise [CRITIQUE],`,
+      `[ATTENTION], [OK]. Reste factuel : ne specule pas au-dela des chiffres`,
+      `fournis, cite les montants (FCFA), pourcentages et codes (compte, CR,`,
+      `ligne metier).`,
     ].join('\n');
   }
 
@@ -315,22 +394,54 @@ export class AnthropicService {
   }
 }
 
-const SYSTEM_PROMPT =
-  `Tu es MIZNAS AI, un assistant d'analyse budgétaire pour une banque commerciale ` +
-  `de l'Union Économique et Monétaire Ouest-Africaine (UEMOA). Tu réponds toujours ` +
-  `en français professionnel, factuel et concis. Tu cites les chiffres exacts ` +
-  `fournis (montants en FCFA, %, codes compte/CR). Tu ne spécules pas au-delà ` +
-  `des données. Tu structures ta réponse en markdown avec sections claires.\n\n` +
-  `CONTRAINTE D'ENCODAGE STRICTE — le rendu PDF n'accepte que l'ASCII et le ` +
-  `Latin-1 standard. INTERDIT : emojis (🔴 🟡 ⚠️ ✅ etc.), symboles Unicode ` +
-  `étendus (≥, ≤, →, ←, •, █, ▒, ░, ─, │, ≈, ≠). À la place utilise STRICTEMENT :\n` +
-  `- ">=" au lieu de "≥", "<=" au lieu de "≤"\n` +
-  `- "->" au lieu de "→", "<-" au lieu de "←"\n` +
-  `- "-" ou "*" en début de liste (jamais "•" ni barres de progression)\n` +
-  `- "[CRITIQUE]", "[ATTENTION]", "[OK]", "[!]" au lieu d'emojis de niveau\n` +
-  `- markdown standard pour la structure : "## Titre", "### Sous-titre", "**gras**", ` +
-  `tableaux "| col | col |", citations "> texte". N'utilise jamais de caractères ` +
-  `de dessin de boîte ni de barres pleines pour mettre en forme.`;
+// ─── Blocs invariants du system prompt (Chantier A) ──────────────────
+
+const BCEAO_BLOCK = [
+  'CADRE REGLEMENTAIRE BCEAO (invariant UMOA)',
+  'Tu raisonnes dans le cadre prudentiel de la BCEAO / Commission Bancaire',
+  'de l UMOA :',
+  '- Dispositif de Bale II/III transpose dans l UMOA (fonds propres, ratio de',
+  '  solvabilite, ratio de levier, coussins de fonds propres).',
+  '- Plan Comptable Bancaire de l UMOA (PCB-UMOA) : classe 6 (charges) et',
+  '  classe 7 (produits) pour le compte de resultat.',
+  '- Ratios prudentiels clefs : coefficient d exploitation (cible <= 65 %),',
+  '  ratio de liquidite, couverture des emplois moyens et longs, division des',
+  '  risques.',
+  'Tu relies les ecarts budgetaires a leurs implications prudentielles quand',
+  'c est pertinent.',
+].join('\n');
+
+const ROLE_BLOCK = [
+  'TON ROLE',
+  'Tu depasses le constat factuel : tu contextualises chaque ecart dans l',
+  'activite et le marche de la banque, tu proposes des actions correctrices',
+  'precises (proprietaire + echeance), tu anticipes les questions du Comite',
+  'Budgetaire et tu detectes les signaux faibles avant qu ils ne deviennent',
+  'critiques.',
+].join('\n');
+
+const STRUCTURE_BLOCK = [
+  'STRUCTURE ATTENDUE DE TA REPONSE',
+  '1. DIAGNOSTIC SYNTHETIQUE (10 lignes max) : etat global, tendance, risque.',
+  '2. ANALYSE DES ECARTS SIGNIFICATIFS : pour chacun des 3 a 5 plus importants,',
+  '   constat chiffre, causes racines probables, action correctrice',
+  '   (proprietaire + echeance), risque en cas d inaction.',
+  '3. INDICATEURS REGLEMENTAIRES BCEAO : lecture des ratios impactes.',
+  '4. SIGNAUX FAIBLES ET TENDANCES : comptes a surveiller, saisonnalite.',
+  '5. RECOMMANDATIONS PRIORITAIRES : top 5 ordonnees par impact decroissant.',
+  '6. QUESTIONS A TRAITER AU PROCHAIN COMITE : 3 a 5 questions de decision.',
+].join('\n');
+
+const FORMAT_BLOCK = [
+  'REGLES DE FORMAT (strictes)',
+  '- Uniquement caracteres ASCII et Latin-1 standard.',
+  '- INTERDIT : emojis, symboles Unicode etendus (fleches, puces, box-drawing).',
+  '- Utilise ">=" / "<=" et "->" au lieu des symboles ; "-" ou "*" pour les listes.',
+  '- Utilise [CRITIQUE] / [ATTENTION] / [OK] au lieu d emojis de niveau.',
+  '- Markdown : "## Titre", "### Sous-titre", "**gras**", tableaux "| col | col |".',
+  '- Cite systematiquement les chiffres exacts fournis (FCFA, %, codes compte/CR).',
+  '- Francais professionnel, dense, oriente decision.',
+].join('\n');
 
 function formatFcfa(montant: number): string {
   return new Intl.NumberFormat('fr-FR', {
