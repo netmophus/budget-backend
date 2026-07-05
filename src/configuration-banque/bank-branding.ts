@@ -36,6 +36,23 @@ export interface BankEmailContext {
   logoRef: string | null;
 }
 
+/**
+ * Contexte institutionnel injecté dans le prompt IA (Chantier A). Objet
+ * plat, sections vides (`null`) omises du prompt côté AnthropicService.
+ */
+export interface BankPromptContext {
+  nom: string;
+  sigle: string;
+  nomComplet: string;
+  positionnement: string | null;
+  contexteMarche: string | null;
+  concurrents: string | null;
+  groupe: string | null;
+  villeSiege: string;
+  pays: string;
+  refReglementaireBceao: string | null;
+}
+
 /** Un membre du Comité tel que rendu sur la page Approbations des PDF. */
 export interface MembreComitePdf {
   nomPrenom: string;

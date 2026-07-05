@@ -171,4 +171,21 @@ describe('ConfigurationBanqueService', () => {
     expect(ctx.nom).toBe('BSIC NIGER');
     expect(ctx.groupe).toBeNull();
   });
+
+  // ─── Chantier A — contexte prompt IA + cache ───────────────────────
+
+  it('getPromptContext : valeurs config (positionnement, marché)', async () => {
+    const ctx = await svc.getPromptContext();
+    expect(ctx.nom).toBe('BSIC NIGER');
+    expect(ctx.positionnement).toBe('banque de reference');
+    expect(ctx.contexteMarche).toBe('marche concurrentiel UEMOA');
+  });
+
+  it('getPromptContext : cache 5 min, invalidé par updateConfiguration', async () => {
+    expect((await svc.getPromptContext()).nom).toBe('BSIC NIGER');
+    await ds.query(`UPDATE configuration_banque SET nom='XXX' WHERE id=1`);
+    expect((await svc.getPromptContext()).nom).toBe('BSIC NIGER'); // caché
+    await svc.updateConfiguration({ nom: 'ECOBANK NIGER' }, USER);
+    expect((await svc.getPromptContext()).nom).toBe('ECOBANK NIGER'); // invalidé
+  });
 });

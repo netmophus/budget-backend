@@ -1,14 +1,18 @@
 import { Module } from '@nestjs/common';
+import { TypeOrmModule } from '@nestjs/typeorm';
 
 import { AiModule } from '../ai/ai.module';
 import { AuditModule } from '../audit/audit.module';
 import { AuthModule } from '../auth/auth.module';
 import { BudgetModule } from '../budget/budget.module';
 import { ConfigurationBanqueModule } from '../configuration-banque/configuration-banque.module';
+import { DimCentreResponsabilite } from '../referentiels/centre-responsabilite/entities/dim-centre-responsabilite.entity';
+import { DimLigneMetier } from '../referentiels/ligne-metier/entities/dim-ligne-metier.entity';
 import { ReportingModule } from '../reporting/reporting.module';
 import { AnalyseEcartsService } from './services/analyse-ecarts.service';
 import { ExportExcelService } from './services/export-excel.service';
 import { ExportPdfService } from './services/export-pdf.service';
+import { StructureOrganisationnelleService } from './services/structure-organisationnelle.service';
 import { TableauBordController } from './tableau-bord.controller';
 
 /**
@@ -28,9 +32,16 @@ import { TableauBordController } from './tableau-bord.controller';
     AuditModule,
     ReportingModule, // Lot 8.6.B — pour PdfBuilderService
     ConfigurationBanqueModule, // Lot B2 — branding banque
+    // Chantier A — dims CR/LM pour la structure organisationnelle du prompt.
+    TypeOrmModule.forFeature([DimCentreResponsabilite, DimLigneMetier]),
   ],
   controllers: [TableauBordController],
-  providers: [AnalyseEcartsService, ExportExcelService, ExportPdfService],
+  providers: [
+    AnalyseEcartsService,
+    ExportExcelService,
+    ExportPdfService,
+    StructureOrganisationnelleService,
+  ],
   exports: [AnalyseEcartsService],
 })
 export class TableauBordModule {}
