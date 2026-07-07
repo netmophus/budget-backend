@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 
 import { AiModule } from '../ai/ai.module';
+import { AnalyseIaModule } from '../analyse-ia/analyse-ia.module';
 import { AuditModule } from '../audit/audit.module';
 import { AuthModule } from '../auth/auth.module';
 import { BudgetModule } from '../budget/budget.module';
@@ -32,6 +33,7 @@ import { TableauBordController } from './tableau-bord.controller';
     AuditModule,
     ReportingModule, // Lot 8.6.B — pour PdfBuilderService
     ConfigurationBanqueModule, // Lot B2 — branding banque
+    AnalyseIaModule, // Chantier C1 — persistance des analyses IA
     // Chantier A — dims CR/LM pour la structure organisationnelle du prompt.
     TypeOrmModule.forFeature([DimCentreResponsabilite, DimLigneMetier]),
   ],
