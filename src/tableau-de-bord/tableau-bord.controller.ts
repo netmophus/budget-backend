@@ -32,6 +32,8 @@ import {
   type AiRateLimitResult,
 } from '../ai/ai-rate-limiter.service';
 import { AnthropicService } from '../ai/anthropic.service';
+import { AnalyseIaService } from '../analyse-ia/analyse-ia.service';
+import { estimerCoutUsd, PROMPT_VERSION } from '../analyse-ia/tarifs';
 import { AuditService } from '../audit/audit.service';
 import { ConfigurationBanqueService } from '../configuration-banque/configuration-banque.service';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
@@ -72,6 +74,8 @@ export class TableauBordController {
     // Chantier A — contexte enrichi du prompt IA (config banque + structure org).
     private readonly configBanque: ConfigurationBanqueService,
     private readonly structureOrg: StructureOrganisationnelleService,
+    // Chantier C1 — historisation des analyses IA (persistance best-effort).
+    private readonly analyseIaSvc: AnalyseIaService,
     @InjectDataSource()
     private readonly dataSource: DataSource,
   ) {}
@@ -237,6 +241,40 @@ export class TableauBordController {
         },
         dureeMs: Date.now() - start,
       });
+
+      // 5. Chantier C1 — historisation BEST-EFFORT : si le save échoue,
+      //    l'utilisateur reçoit quand même son analyse (on logge un warning).
+      try {
+        await this.analyseIaSvc.creer({
+          fkUser: user.userId,
+          demandeurEmail: user.email,
+          dateGeneration: new Date(),
+          versionId: filtres.versionId,
+          scenarioId: filtres.scenarioId,
+          moisDebut: filtres.moisDebut,
+          moisFin: filtres.moisFin,
+          crsSelectionnes: filtres.crIds ?? null,
+          modele: result.model,
+          promptVersion: PROMPT_VERSION,
+          reponseMarkdown: result.analyse,
+          kpiSnapshot: ecarts.kpi as unknown as Record<string, unknown>,
+          tokensIn: result.tokensInput,
+          tokensOut: result.tokensOutput,
+          dureeMs: result.dureeMs,
+          coutEstime: estimerCoutUsd(
+            result.model,
+            result.tokensInput,
+            result.tokensOutput,
+          ),
+          dryRun: result.dryRun,
+        });
+      } catch (persistErr) {
+        const m =
+          persistErr instanceof Error ? persistErr.message : String(persistErr);
+        this.logger.warn(
+          `[C1] Historisation analyse IA échouée (analyse renvoyée quand même) : ${m}`,
+        );
+      }
 
       return result;
     } catch (err) {

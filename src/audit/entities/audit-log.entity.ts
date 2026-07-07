@@ -165,7 +165,13 @@ export type TypeAction =
   // Code seede en base via migration 1779200000590 (BANQUE.GERER)
   // Trace toute modif de configuration_banque + membres du Comite
   // Pas de point-virgule dans ce commentaire (regex CI fragile)
-  | 'CONFIGURATION_BANQUE_MODIFIEE';
+  | 'CONFIGURATION_BANQUE_MODIFIEE'
+  // Chantier C1 historisation des analyses IA (table analyse_ia)
+  // Codes seedes en base via migration 1779200000610 (AI.HISTORIQUE)
+  // CONSULTEE = GET detail, SUPPRIMEE = DELETE (gate AI.HISTORIQUE)
+  // Pas de point-virgule dans ce commentaire (regex CI fragile)
+  | 'ANALYSE_IA_CONSULTEE'
+  | 'ANALYSE_IA_SUPPRIMEE';
 
 export type AuditStatut = 'success' | 'failure';
 

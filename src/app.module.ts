@@ -16,6 +16,7 @@ import { PasswordExpiredGuard } from './auth/guards/password-expired.guard';
 import { PermissionsGuard } from './auth/guards/permissions.guard';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 import { DelegationsModule } from './delegations/delegations.module';
+import { AnalyseIaModule } from './analyse-ia/analyse-ia.module';
 import { ConfigurationBanqueModule } from './configuration-banque/configuration-banque.module';
 import { DocumentsOfficielsModule } from './documents-officiels/documents-officiels.module';
 import { NotificationsModule } from './notifications/notifications.module';
@@ -150,6 +151,8 @@ import { UsersModule } from './users/users.module';
     RealiseModule,
     ParametreSystemeModule,
     ConfigurationBanqueModule,
+    // Chantier C1 — historisation des analyses IA
+    AnalyseIaModule,
     // Lot 5.2 — tableau de bord budget vs réalisé
     TableauBordModule,
     // Lot 5.3 — reforecast trimestriel
