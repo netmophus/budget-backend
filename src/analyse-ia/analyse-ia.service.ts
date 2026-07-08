@@ -49,6 +49,7 @@ export class AnalyseIaService {
       dureeMs: data.dureeMs,
       coutEstime: data.coutEstime.toFixed(5),
       dryRun: data.dryRun,
+      datasetSnapshot: data.datasetSnapshot,
       statut: 'success',
       utilisateurCreation: data.demandeurEmail,
     });
@@ -75,9 +76,33 @@ export class AnalyseIaService {
    * AI.HISTORIQUE. Trace une consultation (audit ANALYSE_IA_CONSULTEE).
    */
   async getDetail(id: string, user: AuthUser): Promise<AnalyseIaDetailDto> {
+    const a = await this.chargerAvecAcces(id, user);
+    await this.auditService.log({
+      utilisateur: user.email,
+      typeAction: 'ANALYSE_IA_CONSULTEE',
+      entiteCible: 'analyse_ia',
+      idCible: a.id,
+      statut: 'success',
+      commentaire: `Consultation de l'analyse IA ${a.id}.`,
+    });
+    return toDetail(a);
+  }
+
+  /**
+   * Charge l'entité complète (avec datasetSnapshot) pour l'export PDF, après
+   * contrôle d'accès. Utilisé par le controller PDF (module tableau-de-bord).
+   */
+  async getPourExport(id: string, user: AuthUser): Promise<AnalyseIa> {
+    return this.chargerAvecAcces(id, user);
+  }
+
+  /** Charge + contrôle d'accès (propriétaire OU AI.HISTORIQUE). */
+  private async chargerAvecAcces(
+    id: string,
+    user: AuthUser,
+  ): Promise<AnalyseIa> {
     const a = await this.repo.findOne({ where: { id } });
     if (!a) throw new NotFoundException(`Analyse IA ${id} introuvable.`);
-
     // Comparaison en string : bigint peut remonter en number selon le driver.
     if (String(a.fkUser) !== String(user.userId)) {
       const peutToutVoir = await this.permissionsService.hasPermission(
@@ -90,17 +115,7 @@ export class AnalyseIaService {
         );
       }
     }
-
-    await this.auditService.log({
-      utilisateur: user.email,
-      typeAction: 'ANALYSE_IA_CONSULTEE',
-      entiteCible: 'analyse_ia',
-      idCible: a.id,
-      statut: 'success',
-      commentaire: `Consultation de l'analyse IA ${a.id}.`,
-    });
-
-    return toDetail(a);
+    return a;
   }
 
   /** Suppression (gate AI.HISTORIQUE côté controller). Hard delete + audit. */
@@ -192,5 +207,6 @@ function toDetail(a: AnalyseIa): AnalyseIaDetailDto {
     promptVersion: a.promptVersion,
     reponseMarkdown: a.reponseMarkdown,
     kpiSnapshot: a.kpiSnapshot,
+    hasDataset: a.datasetSnapshot !== null,
   };
 }

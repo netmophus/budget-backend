@@ -9,6 +9,8 @@ import {
   Min,
 } from 'class-validator';
 
+import type { AnalyseIaDatasetSnapshot } from '../entities/analyse-ia.entity';
+
 const MOIS = /^\d{4}-\d{2}$/;
 
 /** Données passées à AnalyseIaService.creer() (persistance best-effort). */
@@ -30,6 +32,8 @@ export interface CreerAnalyseIaData {
   dureeMs: number;
   coutEstime: number;
   dryRun: boolean;
+  /** Dataset complet figé (C-fix) — null pour un repli sur recalcul. */
+  datasetSnapshot: AnalyseIaDatasetSnapshot | null;
 }
 
 // ─── Requête de liste ────────────────────────────────────────────────
@@ -99,6 +103,8 @@ export class AnalyseIaDetailDto extends AnalyseIaListItemDto {
   @ApiProperty() promptVersion!: string;
   @ApiProperty() reponseMarkdown!: string;
   @ApiPropertyOptional() kpiSnapshot!: Record<string, unknown> | null;
+  /** true si le dataset complet est figé → PDF fidèle (sinon recalcul). */
+  @ApiProperty() hasDataset!: boolean;
 }
 
 export class PaginatedAnalysesIaDto {

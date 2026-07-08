@@ -1,6 +1,19 @@
 import { Column, Entity, Index, PrimaryGeneratedColumn } from 'typeorm';
 
 /**
+ * Dataset figé (Chantier C-fix) : l'EcartsResponseDto entier au moment de la
+ * génération + les libellés metadata, pour un export PDF fidèle des mois
+ * après (document d'archive). `ecarts` reste opaque ici (typé
+ * EcartsResponseDto au point d'usage) pour ne pas coupler l'entité au module
+ * tableau-de-bord.
+ */
+export interface AnalyseIaDatasetSnapshot {
+  ecarts: Record<string, unknown>;
+  codeVersion: string;
+  codeScenario: string;
+}
+
+/**
  * `analyse_ia` (Chantier C1) — historisation des analyses MIZNAS AI
  * réussies. Rend persistant ce qui était volatile (renvoyé au client puis
  * perdu). L'`audit_log` continue de tracer l'appel + les échecs ; cette
@@ -67,6 +80,13 @@ export class AnalyseIa {
 
   @Column({ name: 'dry_run', type: 'boolean' })
   dryRun!: boolean;
+
+  /**
+   * Dataset complet figé (Chantier C-fix). NULL pour les analyses C1
+   * antérieures (fallback recalcul à l'export).
+   */
+  @Column({ name: 'dataset_snapshot', type: 'jsonb', nullable: true })
+  datasetSnapshot!: AnalyseIaDatasetSnapshot | null;
 
   /** Toujours 'success' en C1 (les échecs restent dans audit_log). */
   @Column({ name: 'statut', type: 'varchar', length: 10, default: 'success' })

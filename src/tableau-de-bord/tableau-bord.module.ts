@@ -14,6 +14,7 @@ import { AnalyseEcartsService } from './services/analyse-ecarts.service';
 import { ExportExcelService } from './services/export-excel.service';
 import { ExportPdfService } from './services/export-pdf.service';
 import { StructureOrganisationnelleService } from './services/structure-organisationnelle.service';
+import { AnalyseIaPdfController } from './analyse-ia-pdf.controller';
 import { TableauBordController } from './tableau-bord.controller';
 
 /**
@@ -37,7 +38,7 @@ import { TableauBordController } from './tableau-bord.controller';
     // Chantier A — dims CR/LM pour la structure organisationnelle du prompt.
     TypeOrmModule.forFeature([DimCentreResponsabilite, DimLigneMetier]),
   ],
-  controllers: [TableauBordController],
+  controllers: [TableauBordController, AnalyseIaPdfController],
   providers: [
     AnalyseEcartsService,
     ExportExcelService,
