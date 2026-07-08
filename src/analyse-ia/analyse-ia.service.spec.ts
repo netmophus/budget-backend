@@ -160,6 +160,35 @@ describe('AnalyseIaService (Chantier C1)', () => {
     expect(d2.hasDataset).toBe(false);
   });
 
+  it('C3 add-on : getDetail expose PNB/coef depuis le dataset (null sinon)', async () => {
+    const c = await svc.creer(
+      data({
+        datasetSnapshot: {
+          ecarts: {
+            kpi: {},
+            lignes: [],
+            totaux: {
+              pnb: { budget: 100, realise: 82 },
+              coefExploitationBudget: 70,
+              coefExploitationRealise: 65.2,
+            },
+          },
+          codeVersion: 'V',
+          codeScenario: 'S',
+        },
+      }),
+    );
+    const d = await svc.getDetail(c.id, USER1);
+    expect(d.pnbBudget).toBe(100);
+    expect(d.pnbRealise).toBe(82);
+    expect(d.coefExploitationRealise).toBe(65.2);
+    // Analyse C1 sans dataset -> null.
+    const c2 = await svc.creer(data());
+    const d2 = await svc.getDetail(c2.id, USER1);
+    expect(d2.pnbBudget).toBeNull();
+    expect(d2.coefExploitationRealise).toBeNull();
+  });
+
   it('C-fix : getPourExport renvoie l’entité (avec dataset) + contrôle d’accès', async () => {
     const c = await svc.creer(
       data({
