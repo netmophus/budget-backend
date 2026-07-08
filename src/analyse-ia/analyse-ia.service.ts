@@ -208,5 +208,33 @@ function toDetail(a: AnalyseIa): AnalyseIaDetailDto {
     reponseMarkdown: a.reponseMarkdown,
     kpiSnapshot: a.kpiSnapshot,
     hasDataset: a.datasetSnapshot !== null,
+    ...extraireTotaux(a.datasetSnapshot),
+  };
+}
+
+/** Type structurel de la partie totaux du dataset figé (Chantier C3). */
+interface TotauxFige {
+  pnb?: { budget?: unknown; realise?: unknown };
+  coefExploitationBudget?: unknown;
+  coefExploitationRealise?: unknown;
+}
+
+function nombreOuNull(v: unknown): number | null {
+  return typeof v === 'number' ? v : null;
+}
+
+/** Extrait PNB / coef exploitation du dataset figé (null si absent — C1). */
+function extraireTotaux(snap: AnalyseIa['datasetSnapshot']): {
+  pnbBudget: number | null;
+  pnbRealise: number | null;
+  coefExploitationBudget: number | null;
+  coefExploitationRealise: number | null;
+} {
+  const t = (snap?.ecarts as { totaux?: TotauxFige } | undefined)?.totaux;
+  return {
+    pnbBudget: nombreOuNull(t?.pnb?.budget),
+    pnbRealise: nombreOuNull(t?.pnb?.realise),
+    coefExploitationBudget: nombreOuNull(t?.coefExploitationBudget),
+    coefExploitationRealise: nombreOuNull(t?.coefExploitationRealise),
   };
 }

@@ -105,6 +105,12 @@ export class AnalyseIaDetailDto extends AnalyseIaListItemDto {
   @ApiPropertyOptional() kpiSnapshot!: Record<string, unknown> | null;
   /** true si le dataset complet est figé → PDF fidèle (sinon recalcul). */
   @ApiProperty() hasDataset!: boolean;
+  // Chantier C3 add-on — métriques bancaires extraites du dataset figé
+  // (null pour les analyses C1 sans dataset_snapshot).
+  @ApiPropertyOptional() pnbBudget!: number | null;
+  @ApiPropertyOptional() pnbRealise!: number | null;
+  @ApiPropertyOptional() coefExploitationBudget!: number | null;
+  @ApiPropertyOptional() coefExploitationRealise!: number | null;
 }
 
 export class PaginatedAnalysesIaDto {
