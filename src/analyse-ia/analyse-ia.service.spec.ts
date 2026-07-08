@@ -64,6 +64,7 @@ function data(overrides: Partial<CreerAnalyseIaData> = {}): CreerAnalyseIaData {
     dureeMs: 500,
     coutEstime: 0.0033,
     dryRun: false,
+    datasetSnapshot: null,
     ...overrides,
   };
 }
@@ -139,6 +140,46 @@ describe('AnalyseIaService (Chantier C1)', () => {
       `SELECT 1 FROM audit_log WHERE type_action='ANALYSE_IA_SUPPRIMEE'`,
     )) as unknown[];
     expect(audits).toHaveLength(1);
+  });
+
+  it('C-fix : datasetSnapshot persiste + getDetail expose hasDataset', async () => {
+    const c = await svc.creer(
+      data({
+        datasetSnapshot: {
+          ecarts: { kpi: { nbEcartsCritique: 2 }, lignes: [] },
+          codeVersion: 'BI_2027',
+          codeScenario: 'CENTRAL',
+        },
+      }),
+    );
+    const d = await svc.getDetail(c.id, USER1);
+    expect(d.hasDataset).toBe(true);
+    // Analyse sans dataset (C1) -> hasDataset false.
+    const c2 = await svc.creer(data());
+    const d2 = await svc.getDetail(c2.id, USER1);
+    expect(d2.hasDataset).toBe(false);
+  });
+
+  it('C-fix : getPourExport renvoie l’entité (avec dataset) + contrôle d’accès', async () => {
+    const c = await svc.creer(
+      data({
+        fkUser: '2',
+        datasetSnapshot: {
+          ecarts: { kpi: {}, lignes: [] },
+          codeVersion: 'V',
+          codeScenario: 'S',
+        },
+      }),
+    );
+    // Propriétaire d'un autre -> refus sans AI.HISTORIQUE.
+    perms.hasPermission.mockResolvedValue(false);
+    await expect(svc.getPourExport(c.id, USER1)).rejects.toBeInstanceOf(
+      ForbiddenException,
+    );
+    // Avec AI.HISTORIQUE -> ok + dataset présent.
+    perms.hasPermission.mockResolvedValue(true);
+    const e = await svc.getPourExport(c.id, USER1);
+    expect(e.datasetSnapshot?.codeVersion).toBe('V');
   });
 
   it('purgerAnciennes : supprime les analyses > 24 mois', async () => {

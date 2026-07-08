@@ -244,7 +244,14 @@ export class TableauBordController {
 
       // 5. Chantier C1 — historisation BEST-EFFORT : si le save échoue,
       //    l'utilisateur reçoit quand même son analyse (on logge un warning).
+      //    C-fix : on fige AUSSI le dataset complet (ecarts) + les codes
+      //    version/scénario pour un export PDF fidèle des mois après.
       try {
+        const { codeVersion, codeScenario } =
+          await this.resoudreCodesVersionScenario(
+            filtres.versionId,
+            filtres.scenarioId,
+          );
         await this.analyseIaSvc.creer({
           fkUser: user.userId,
           demandeurEmail: user.email,
@@ -267,6 +274,11 @@ export class TableauBordController {
             result.tokensOutput,
           ),
           dryRun: result.dryRun,
+          datasetSnapshot: {
+            ecarts: ecarts as unknown as Record<string, unknown>,
+            codeVersion,
+            codeScenario,
+          },
         });
       } catch (persistErr) {
         const m =
@@ -301,6 +313,33 @@ export class TableauBordController {
         502,
       );
     }
+  }
+
+  /**
+   * Résout code_version + code_scenario depuis leurs id (2 SELECT légers).
+   * Repli silencieux sur les ids si la résolution échoue.
+   */
+  private async resoudreCodesVersionScenario(
+    versionId: string,
+    scenarioId: string,
+  ): Promise<{ codeVersion: string; codeScenario: string }> {
+    let codeVersion = versionId;
+    let codeScenario = scenarioId;
+    try {
+      const v = await this.dataSource.query<Array<{ code_version: string }>>(
+        `SELECT code_version FROM dim_version WHERE id = $1 LIMIT 1`,
+        [versionId],
+      );
+      if (v.length > 0) codeVersion = v[0].code_version;
+      const s = await this.dataSource.query<Array<{ code_scenario: string }>>(
+        `SELECT code_scenario FROM dim_scenario WHERE id = $1 LIMIT 1`,
+        [scenarioId],
+      );
+      if (s.length > 0) codeScenario = s[0].code_scenario;
+    } catch {
+      // Repli : on garde les ids.
+    }
+    return { codeVersion, codeScenario };
   }
 
   // ─── Lot 8.6.B — Export PDF Analyse Budget vs Réalisé ────────────
