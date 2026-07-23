@@ -80,146 +80,6 @@ export function assertProductionPasswordPolicy(envVarName: string): void {
   }
 }
 
-export interface PermissionSeed {
-  code: string;
-  libelle: string;
-  module: string;
-  description?: string;
-}
-
-export const PERMISSIONS: PermissionSeed[] = [
-  {
-    code: 'SYSTEM.ADMIN',
-    libelle: 'Administration système',
-    module: 'SYSTEM',
-    description: 'Accès complet à toutes les fonctionnalités d’administration.',
-  },
-  {
-    code: 'USER.LIRE',
-    libelle: 'Lire les utilisateurs',
-    module: 'USER',
-  },
-  {
-    code: 'USER.GERER',
-    libelle: 'Gérer les utilisateurs',
-    module: 'USER',
-    description: 'Créer, modifier, désactiver des utilisateurs.',
-  },
-  {
-    code: 'ROLE.LIRE',
-    libelle: 'Lire les rôles et permissions',
-    module: 'ROLE',
-  },
-  {
-    code: 'ROLE.GERER',
-    libelle: 'Gérer les rôles et permissions',
-    module: 'ROLE',
-    description:
-      'Créer, modifier, supprimer des rôles ; affecter des permissions.',
-  },
-  {
-    code: 'AUDIT.LIRE',
-    libelle: 'Consulter le journal d’audit',
-    module: 'AUDIT',
-  },
-  {
-    code: 'REFERENTIEL.LIRE',
-    libelle: 'Lire les référentiels',
-    module: 'REFERENTIEL',
-  },
-  {
-    code: 'REFERENTIEL.GERER',
-    libelle: 'Gérer les référentiels',
-    module: 'REFERENTIEL',
-    description:
-      'Créer, modifier, désactiver les éléments des référentiels (devises, calendrier, etc.).',
-  },
-  {
-    code: 'BUDGET.LIRE',
-    libelle: 'Lire les faits budget',
-    module: 'BUDGET',
-    description:
-      'Consulter les lignes de fait_budget (toutes versions et scénarios).',
-  },
-  {
-    code: 'BUDGET.SAISIR',
-    libelle: 'Saisir / modifier les faits budget',
-    module: 'BUDGET',
-    description:
-      "Créer et modifier les mesures d'un fait_budget tant que la version est ouverte.",
-  },
-  {
-    code: 'BUDGET.SUPPRIMER',
-    libelle: 'Supprimer les faits budget',
-    module: 'BUDGET',
-    description:
-      'Supprimer une ligne de fait_budget (autorisé uniquement si la version est ouverte).',
-  },
-  {
-    code: 'BUDGET.SOUMETTRE',
-    libelle: 'Soumettre une version pour contrôle',
-    module: 'BUDGET',
-    description:
-      "Soumettre une version 'ouvert' à validation hiérarchique (transition ouvert → soumis). " +
-      'Permission consommée par le workflow Lot 3.5.',
-  },
-  {
-    code: 'BUDGET.VALIDER',
-    libelle: 'Valider ou rejeter une version soumise',
-    module: 'BUDGET',
-    description:
-      "Valider une version 'soumis' (transition soumis → valide) ou la rejeter " +
-      '(transition soumis → ouvert avec commentaire). Permission consommée par le workflow Lot 3.5.',
-  },
-  {
-    code: 'BUDGET.PUBLIER',
-    libelle: 'Geler/publier une version validée',
-    module: 'BUDGET',
-    description:
-      "Geler une version 'valide' (transition valide → gele, vocabulaire UI : « publier »). " +
-      'Action irréversible. Permission consommée par le workflow Lot 3.5.',
-  },
-  {
-    code: 'CONFIGURATION.LIRE',
-    libelle: 'Lire la configuration (référentiels secondaires)',
-    module: 'CONFIGURATION',
-    description:
-      'Consulter les énumérations métier (types structure / pays / classes compte / etc.).',
-  },
-  {
-    code: 'CONFIGURATION.GERER',
-    libelle: 'Gérer la configuration (référentiels secondaires)',
-    module: 'CONFIGURATION',
-    description:
-      'Créer, modifier, désactiver, supprimer les valeurs des référentiels secondaires.',
-  },
-];
-
-interface RoleSeed {
-  code: string;
-  libelle: string;
-  description: string;
-  permissions: string[];
-}
-
-const ROLES: RoleSeed[] = [
-  {
-    code: 'ADMIN',
-    libelle: 'Administrateur système',
-    description: 'Rôle disposant de toutes les permissions techniques.',
-    permissions: PERMISSIONS.map((p) => p.code),
-  },
-  {
-    code: 'LECTEUR',
-    libelle: 'Lecteur',
-    description:
-      'Rôle en lecture seule sur les utilisateurs, rôles et journal d’audit.',
-    permissions: PERMISSIONS.filter((p) => p.code.endsWith('.LIRE')).map(
-      (p) => p.code,
-    ),
-  },
-];
-
 export async function seedAuth(ds: DataSource = AppDataSource): Promise<void> {
   const ownsConnection = !ds.isInitialized;
   if (ownsConnection) {
@@ -228,49 +88,14 @@ export async function seedAuth(ds: DataSource = AppDataSource): Promise<void> {
 
   try {
     await ds.transaction(async (manager) => {
-      // 1. Permissions (idempotent via ON CONFLICT)
-      for (const permission of PERMISSIONS) {
-        await manager.query(
-          `INSERT INTO ref_permission (code_permission, libelle, module, description, utilisateur_creation)
-           VALUES ($1, $2, $3, $4, 'system')
-           ON CONFLICT (code_permission) DO NOTHING`,
-          [
-            permission.code,
-            permission.libelle,
-            permission.module,
-            permission.description ?? null,
-          ],
-        );
-      }
+      // NB : le catalogue RBAC (permissions socle + rôles ADMIN/LECTEUR +
+      // leurs bridges) N'EST PLUS créé ici — il l'est par la migration
+      // 1777384329142-SeedBaseRbacCatalogue, source unique. Ce seed ne
+      // crée plus que les UTILISATEURS de démo (donnée non-système). Les
+      // rôles ADMIN/LECTEUR référencés ci-dessous préexistent donc via la
+      // migration (ou, en e2e, via la phase 1 exécutée avant ce seed).
 
-      // 2. Rôles (idempotent via ON CONFLICT)
-      for (const role of ROLES) {
-        await manager.query(
-          `INSERT INTO ref_role (code_role, libelle, description, est_actif, utilisateur_creation)
-           VALUES ($1, $2, $3, true, 'system')
-           ON CONFLICT (code_role) DO NOTHING`,
-          [role.code, role.libelle, role.description],
-        );
-      }
-
-      // 3. Liens rôle ↔ permission (idempotent via ON CONFLICT sur uq_bridge_role_permission)
-      for (const role of ROLES) {
-        if (role.permissions.length === 0) {
-          continue;
-        }
-        await manager.query(
-          `INSERT INTO bridge_role_permission (fk_role, fk_permission)
-           SELECT r.id, p.id
-           FROM ref_role r
-           CROSS JOIN ref_permission p
-           WHERE r.code_role = $1
-             AND p.code_permission = ANY($2::varchar[])
-           ON CONFLICT ON CONSTRAINT uq_bridge_role_permission DO NOTHING`,
-          [role.code, role.permissions],
-        );
-      }
-
-      // 4. Utilisateurs par défaut (idempotents) + assignation de leur rôle global
+      // Utilisateurs par défaut (idempotents) + assignation de leur rôle global
       const rounds = Number.parseInt(process.env.BCRYPT_ROUNDS ?? '12', 10);
 
       for (const seedUser of SEED_USERS) {
