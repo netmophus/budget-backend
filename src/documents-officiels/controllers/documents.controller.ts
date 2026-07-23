@@ -359,7 +359,7 @@ export class DocumentsController {
   })
   @ApiOkResponse({
     description:
-      'Fichier uploadé, document_officiel.fichier_joint_path mis à jour.',
+      'Fichier uploadé, stocké en base (document_officiel.fichier_contenu).',
   })
   @ApiBadRequestResponse({
     description:

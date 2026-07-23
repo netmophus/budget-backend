@@ -4,20 +4,27 @@
  *
  * Le PDF original (reçu du Holding ou émis en interne) est la **source
  * de vérité documentaire** pour audit BCEAO. Conservation 10 ans avec
- * le document. Stocké sur disque local (chemin paramétré via env
- * `DOCUMENTS_UPLOAD_PATH`), pas dans la DB.
+ * le document.
  *
- * Structure de stockage :
- *   <uploadRoot>/<exercice>/<codeDocument>.pdf
+ * **Stockage EN BASE** (migration ...630) : les octets du PDF vivent
+ * dans `document_officiel.fichier_contenu` (bytea), pas sur disque. Le
+ * système de fichiers des plateformes PaaS (Heroku, Render) est
+ * éphémère — un fichier écrit sur disque disparaît au redémarrage du
+ * dyno. En base, il est persistant et capturé par les sauvegardes
+ * Postgres (cohérence document + métadonnée dans le même instantané).
  *
- * Le `fichier_joint_path` en DB stocke le chemin RELATIF à uploadRoot
- * (portabilité entre environnements). Le `fichier_joint_nom` capture
- * le nom original pour le téléchargement.
+ * Colonnes :
+ *   - `fichier_contenu` (bytea, select:false) : les octets.
+ *   - `fichier_taille`  (int)                 : taille en octets.
+ *   - `fichier_mime`    (varchar)             : type MIME.
+ *   - `fichier_joint_nom` (varchar)           : nom d'origine + indicateur
+ *     « le document a un fichier ». `fichier_joint_path` (legacy disque)
+ *     n'est plus alimenté par l'upload.
  *
  * **Sécurité** :
  *   - Magic bytes PDF vérifiés (le MIME type HTTP est trichable)
- *   - Path traversal bloqué via validation de `codeDocument`
- *   - Limite 10 MB côté FileInterceptor (controller)
+ *   - Limite 10 MB côté FileInterceptor (controller) ET ici
+ *   - Contrôle d'accès download : émetteur, viseur ou signataire
  */
 import {
   BadRequestException,
@@ -26,20 +33,17 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { InjectDataSource } from '@nestjs/typeorm';
-import { createReadStream, type ReadStream } from 'fs';
-import { mkdir, unlink, writeFile } from 'fs/promises';
-import { resolve as resolvePath, dirname } from 'path';
+import { Readable } from 'stream';
 import { DataSource } from 'typeorm';
 
 import { AuditLog } from '../../audit/entities/audit-log.entity';
 import { DocumentOfficiel } from '../entities/document-officiel.entity';
 import { DocumentVisa } from '../entities/document-visa.entity';
-import { CampagneBudgetaire } from '../entities/campagne-budgetaire.entity';
 
 const TAILLE_MAX_BYTES = 10 * 1024 * 1024; // 10 MB
 const PDF_MAGIC_HEADER = '%PDF-';
+const PDF_MIME = 'application/pdf';
 
 /**
  * Type local du fichier reçu via Multer/FileInterceptor. Aligné sur
@@ -61,17 +65,14 @@ export interface UploadFichierResult {
 }
 
 export interface TelechargerFichierResult {
-  stream: ReadStream;
+  stream: Readable;
   fichierNom: string;
   mimeType: string;
 }
 
 @Injectable()
 export class DocumentFichierService {
-  constructor(
-    @InjectDataSource() private readonly dataSource: DataSource,
-    private readonly config: ConfigService,
-  ) {}
+  constructor(@InjectDataSource() private readonly dataSource: DataSource) {}
 
   /**
    * Upload du PDF original sur un document BROUILLON.
@@ -83,11 +84,9 @@ export class DocumentFichierService {
    *   - file présent, PDF valide (magic bytes), taille > 0 et ≤ 10 MB
    *
    * Action :
-   *   - Si un fichier existait déjà → unlink ancien avant write nouveau
-   *   - mkdir récursif `<uploadRoot>/<exerciceFiscal>/`
-   *   - writeFile `<uploadRoot>/<exerciceFiscal>/<codeDocument>.pdf`
-   *   - UPDATE document_officiel (path relatif + nom original)
-   *   - INSERT audit_log EDITER_DOCUMENT avec payload UPLOAD_FICHIER
+   *   - UPDATE document_officiel : fichier_contenu (octets) + taille +
+   *     mime + nom d'origine
+   *   - INSERT audit_log EDITER_DOCUMENT (UPLOAD_FICHIER / REMPLACER_FICHIER)
    */
   async uploadFichier(
     documentId: string,
@@ -129,35 +128,14 @@ export class DocumentFichierService {
       );
     }
 
-    // Path resolution + protection path traversal.
-    const exercice = await this.lookupExerciceFiscal(doc.fkCampagne);
-    const uploadRoot = this.getUploadRoot();
-    const codeDocSafe = this.sanitizeCodeDocument(doc.codeDocument);
-    const relativePath = `${exercice}/${codeDocSafe}.pdf`;
-    const absolutePath = resolvePath(uploadRoot, relativePath);
-    // Vérifie que le chemin résolu reste DANS uploadRoot (anti-traversal
-    // ceinture-bretelle, même si sanitizeCodeDocument a déjà fait son job).
-    if (!absolutePath.startsWith(resolvePath(uploadRoot))) {
-      throw new BadRequestException(
-        'Chemin de stockage invalide (path traversal détecté).',
-      );
-    }
+    // `fichier_joint_nom` fait office d'indicateur « fichier déjà présent »
+    // (remplacement vs premier upload). L'ancien contenu est simplement
+    // écrasé par le UPDATE ci-dessous — pas de fichier disque à nettoyer.
+    const avaitFichier = Boolean(doc.fichierJointNom);
 
-    // Suppression ancien fichier (remplacement). Tolérant aux erreurs
-    // ENOENT (fichier supprimé manuellement entre-temps).
-    if (doc.fichierJointPath) {
-      const oldAbs = resolvePath(uploadRoot, doc.fichierJointPath);
-      try {
-        await unlink(oldAbs);
-      } catch {
-        // Best-effort, on ne bloque pas l'upload pour un cleanup raté.
-      }
-    }
-
-    await mkdir(dirname(absolutePath), { recursive: true });
-    await writeFile(absolutePath, file.buffer);
-
-    doc.fichierJointPath = relativePath;
+    doc.fichierContenu = file.buffer;
+    doc.fichierTaille = file.size;
+    doc.fichierMime = PDF_MIME;
     doc.fichierJointNom = file.originalname;
     doc.dateModification = new Date();
     doc.utilisateurModification = userEmail;
@@ -169,10 +147,10 @@ export class DocumentFichierService {
       entiteCible: 'document_officiel',
       idCible: doc.id,
       payloadApres: {
-        action: doc.fichierJointPath ? 'REMPLACER_FICHIER' : 'UPLOAD_FICHIER',
+        action: avaitFichier ? 'REMPLACER_FICHIER' : 'UPLOAD_FICHIER',
         nom: file.originalname,
         taille: file.size,
-        cheminRelatif: relativePath,
+        stockage: 'base',
       },
       commentaire: `Upload fichier ${file.originalname} (${file.size} octets) pour document ${doc.codeDocument}.`,
       statut: 'success',
@@ -187,11 +165,15 @@ export class DocumentFichierService {
   }
 
   /**
-   * Téléchargement du PDF stocké.
+   * Téléchargement du PDF stocké en base.
    *
    * Accès = émetteur OU viseur OU signataire (mêmes règles que
    * `DocumentWorkflowService.detailDocument`). Le bypass admin reste
    * dette technique du Lot 8.1.C.
+   *
+   * Le blob (`fichier_contenu`, select:false) n'est pas chargé par le
+   * `findOne` de contrôle d'accès : il est récupéré par une requête
+   * ciblée, puis servi via un flux `Readable`.
    */
   async telechargerFichier(
     documentId: string,
@@ -203,7 +185,7 @@ export class DocumentFichierService {
     if (!doc) {
       throw new NotFoundException(`Document ${documentId} introuvable.`);
     }
-    if (!doc.fichierJointPath || !doc.fichierJointNom) {
+    if (!doc.fichierJointNom) {
       throw new NotFoundException(
         `Aucun fichier joint pour le document ${doc.codeDocument}.`,
       );
@@ -222,20 +204,32 @@ export class DocumentFichierService {
       );
     }
 
-    const absolutePath = resolvePath(
-      this.getUploadRoot(),
-      doc.fichierJointPath,
+    // Récupération ciblée du blob (colonne select:false).
+    const rows = await this.dataSource.query<
+      Array<{ fichier_contenu: Buffer | null }>
+    >(
+      `SELECT "fichier_contenu" FROM "document_officiel" WHERE "id" = $1 LIMIT 1`,
+      [documentId],
     );
+    const contenu = rows[0]?.fichier_contenu ?? null;
+    if (!contenu || contenu.length === 0) {
+      // Ligne antérieure à la migration ...630 (contenu jadis sur disque,
+      // non migré) ou fichier corrompu.
+      throw new NotFoundException(
+        `Contenu du fichier introuvable pour ${doc.codeDocument} (fichier stocké sur l'ancien système disque et non migré — ré-uploader le PDF).`,
+      );
+    }
+
     return {
-      stream: createReadStream(absolutePath),
+      stream: Readable.from(contenu),
       fichierNom: doc.fichierJointNom,
-      mimeType: 'application/pdf',
+      mimeType: doc.fichierMime ?? PDF_MIME,
     };
   }
 
   /**
-   * Suppression du PDF (en BROUILLON uniquement). Le fichier sur disque
-   * est unlink, les colonnes DB passent à NULL.
+   * Suppression du PDF (en BROUILLON uniquement). Le contenu, la taille,
+   * le mime et le nom passent à NULL.
    */
   async supprimerFichier(documentId: string, userEmail: string): Promise<void> {
     const docRepo = this.dataSource.getRepository(DocumentOfficiel);
@@ -255,16 +249,9 @@ export class DocumentFichierService {
       );
     }
 
-    if (doc.fichierJointPath) {
-      const abs = resolvePath(this.getUploadRoot(), doc.fichierJointPath);
-      try {
-        await unlink(abs);
-      } catch {
-        // Best-effort.
-      }
-    }
-
-    doc.fichierJointPath = null;
+    doc.fichierContenu = null;
+    doc.fichierTaille = null;
+    doc.fichierMime = null;
     doc.fichierJointNom = null;
     doc.dateModification = new Date();
     doc.utilisateurModification = userEmail;
@@ -283,45 +270,11 @@ export class DocumentFichierService {
 
   // ─── Helpers privés ─────────────────────────────────────────────
 
-  private getUploadRoot(): string {
-    return this.config.get<string>(
-      'DOCUMENTS_UPLOAD_PATH',
-      './uploads/documents',
-    );
-  }
-
-  /**
-   * Bloque les caractères dangereux dans `codeDocument` (path traversal,
-   * séparateurs, null bytes). En complément de `path.resolve()` + check
-   * startsWith uploadRoot dans `uploadFichier`.
-   */
-  private sanitizeCodeDocument(code: string): string {
-    if (/[/\\.\0]/.test(code) || code.includes('..')) {
-      throw new BadRequestException(
-        `Code document '${code}' contient des caractères interdits (/, \\, ., \\0, ..).`,
-      );
-    }
-    return code;
-  }
-
   private async lookupUserIdByEmail(email: string): Promise<string | null> {
     const rows = await this.dataSource.query<Array<{ id: string }>>(
       `SELECT "id" FROM "user" WHERE "email" = $1 LIMIT 1`,
       [email],
     );
     return rows[0]?.id ?? null;
-  }
-
-  private async lookupExerciceFiscal(
-    campagneId: string | null,
-  ): Promise<string> {
-    if (!campagneId) {
-      // Document sans campagne — fallback "orphelins" pour ne pas crasher.
-      return 'orphelins';
-    }
-    const c = await this.dataSource
-      .getRepository(CampagneBudgetaire)
-      .findOne({ where: { id: campagneId } });
-    return String(c?.exerciceFiscal ?? 'orphelins');
   }
 }
