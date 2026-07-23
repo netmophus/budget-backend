@@ -31,16 +31,23 @@ export class AjouterUserLireSaisisseurPublicateur1779200000310 implements Migrat
     ];
 
     for (const { role, permission } of attributions) {
+      // Pattern tolérant (JOIN r×p) : n'insère QUE si le rôle ET la
+      // permission existent déjà. Sur une base reconstruite from scratch
+      // par les seules migrations, la permission `USER.LIRE` n'existe pas
+      // encore (elle est créée par le seed auth), donc le SELECT ne
+      // produit aucune ligne → no-op au lieu d'insérer un NULL qui
+      // violait la contrainte NOT NULL. Idempotent via NOT EXISTS.
       await queryRunner.query(
         `INSERT INTO "bridge_role_permission" ("fk_role", "fk_permission")
-         SELECT
-           (SELECT id FROM "ref_role" WHERE code_role = $1),
-           (SELECT id FROM "ref_permission" WHERE code_permission = $2)
-         WHERE NOT EXISTS (
-           SELECT 1 FROM "bridge_role_permission"
-           WHERE fk_role = (SELECT id FROM "ref_role" WHERE code_role = $1)
-             AND fk_permission = (SELECT id FROM "ref_permission" WHERE code_permission = $2)
-         )`,
+         SELECT r."id", p."id"
+           FROM "ref_role" r, "ref_permission" p
+          WHERE r."code_role" = $1
+            AND p."code_permission" = $2
+            AND NOT EXISTS (
+              SELECT 1 FROM "bridge_role_permission" b
+               WHERE b."fk_role" = r."id"
+                 AND b."fk_permission" = p."id"
+            )`,
         [role, permission],
       );
     }

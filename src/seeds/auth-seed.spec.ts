@@ -1,57 +1,11 @@
-import { assertProductionPasswordPolicy, PERMISSIONS } from './auth-seed';
+import { assertProductionPasswordPolicy } from './auth-seed';
 
-describe('PERMISSIONS seed list', () => {
-  it('contains the two REFERENTIEL permissions', () => {
-    const codes = PERMISSIONS.map((p) => p.code);
-    expect(codes).toContain('REFERENTIEL.LIRE');
-    expect(codes).toContain('REFERENTIEL.GERER');
-  });
-
-  it('declares REFERENTIEL.LIRE under module REFERENTIEL', () => {
-    const lire = PERMISSIONS.find((p) => p.code === 'REFERENTIEL.LIRE');
-    expect(lire?.module).toBe('REFERENTIEL');
-    expect(lire?.libelle).toBe('Lire les référentiels');
-  });
-
-  it('declares REFERENTIEL.GERER under module REFERENTIEL with a description', () => {
-    const gerer = PERMISSIONS.find((p) => p.code === 'REFERENTIEL.GERER');
-    expect(gerer?.module).toBe('REFERENTIEL');
-    expect(gerer?.description).toBeDefined();
-  });
-
-  // ─── Lot 3.1 : permissions workflow budget
-
-  it('contient les 6 permissions BUDGET attendues (Lot 3.1)', () => {
-    const codesBudget = PERMISSIONS.filter((p) => p.module === 'BUDGET').map(
-      (p) => p.code,
-    );
-    expect(codesBudget).toEqual(
-      expect.arrayContaining([
-        'BUDGET.LIRE',
-        'BUDGET.SAISIR',
-        'BUDGET.SUPPRIMER',
-        'BUDGET.SOUMETTRE',
-        'BUDGET.VALIDER',
-        'BUDGET.PUBLIER',
-      ]),
-    );
-    expect(codesBudget).toHaveLength(6);
-  });
-
-  it('BUDGET.SOUMETTRE / VALIDER / PUBLIER ont chacun une description', () => {
-    for (const code of [
-      'BUDGET.SOUMETTRE',
-      'BUDGET.VALIDER',
-      'BUDGET.PUBLIER',
-    ]) {
-      const perm = PERMISSIONS.find((p) => p.code === code);
-      expect(perm).toBeDefined();
-      expect(perm?.module).toBe('BUDGET');
-      expect(perm?.description).toBeDefined();
-      expect(perm?.description?.length ?? 0).toBeGreaterThan(20);
-    }
-  });
-});
+// Le catalogue RBAC (permissions socle + rôles ADMIN/LECTEUR) a été
+// déplacé du seed vers la migration 1777384329142-SeedBaseRbacCatalogue
+// (source unique). Sa cohérence est validée par la construction de la
+// base « from scratch » via la chaîne de migrations. Le seed ne porte
+// plus que la création des utilisateurs de démo — d'où la disparition
+// des tests sur la liste PERMISSIONS ici.
 
 describe('assertProductionPasswordPolicy', () => {
   const ENV_VAR = 'SEED_TEST_PASSWORD';
