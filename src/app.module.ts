@@ -91,17 +91,33 @@ import { UsersModule } from './users/users.module';
     }),
     TypeOrmModule.forRootAsync({
       inject: [ConfigService],
-      useFactory: (config: ConfigService) => ({
-        type: 'postgres',
-        host: config.get<string>('DB_HOST'),
-        port: config.get<number>('DB_PORT'),
-        username: config.get<string>('DB_USER'),
-        password: config.get<string>('DB_PASSWORD'),
-        database: config.get<string>('DB_NAME'),
-        autoLoadEntities: true,
-        synchronize: false,
-        migrationsRun: false,
-      }),
+      useFactory: (config: ConfigService) => {
+        // TLS imposé par Aiven / Heroku Postgres (DB_SSL=true). Cf.
+        // data-source.ts (migrations) pour la même logique.
+        const ssl =
+          config.get<string>('DB_SSL') === 'true'
+            ? { rejectUnauthorized: false }
+            : false;
+        // DATABASE_URL (chaîne unique Aiven/Heroku) prioritaire ; sinon
+        // variables discrètes pour le dev local.
+        const databaseUrl = config.get<string>('DATABASE_URL');
+        return {
+          type: 'postgres',
+          ...(databaseUrl
+            ? { url: databaseUrl }
+            : {
+                host: config.get<string>('DB_HOST'),
+                port: config.get<number>('DB_PORT'),
+                username: config.get<string>('DB_USER'),
+                password: config.get<string>('DB_PASSWORD'),
+                database: config.get<string>('DB_NAME'),
+              }),
+          ssl,
+          autoLoadEntities: true,
+          synchronize: false,
+          migrationsRun: false,
+        };
+      },
     }),
     // Lot 4.3 — bus d'événements applicatif (couplage faible). Doit
     // être enregistré globalement pour que les services métier puissent
@@ -122,6 +138,11 @@ import { UsersModule } from './users/users.module';
           host: config.get<string>('REDIS_HOST', 'localhost'),
           port: Number(config.get<string>('REDIS_PORT', '6379')),
           password: config.get<string>('REDIS_PASSWORD') || undefined,
+          // TLS imposé par Aiven / Heroku Redis (rediss://). Activé via
+          // REDIS_TLS=true ; en local (Redis docker sans TLS) laissé off.
+          ...(config.get<string>('REDIS_TLS') === 'true'
+            ? { tls: {} }
+            : {}),
         },
       }),
     }),
