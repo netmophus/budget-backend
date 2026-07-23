@@ -140,9 +140,7 @@ import { UsersModule } from './users/users.module';
           password: config.get<string>('REDIS_PASSWORD') || undefined,
           // TLS imposé par Aiven / Heroku Redis (rediss://). Activé via
           // REDIS_TLS=true ; en local (Redis docker sans TLS) laissé off.
-          ...(config.get<string>('REDIS_TLS') === 'true'
-            ? { tls: {} }
-            : {}),
+          ...(config.get<string>('REDIS_TLS') === 'true' ? { tls: {} } : {}),
         },
       }),
     }),
