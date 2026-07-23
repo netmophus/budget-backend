@@ -30,6 +30,7 @@
     "migration:revert": "npm run typeorm -- migration:revert",
     "migration:show": "npm run typeorm -- migration:show",
     "seed:auth": "ts-node src/seeds/auth-seed.ts",
+    "seed:auth:prod": "node dist/seeds/auth-seed.js",
     "seed:temps": "ts-node src/seeds/temps-seed.ts",
     "seed:devises": "ts-node src/seeds/devise-seed.ts",
     "seed:structures": "ts-node src/seeds/structure-seed.ts",
