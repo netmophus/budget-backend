@@ -162,6 +162,33 @@ export class DocumentOfficiel {
   })
   fichierJointNom!: string | null;
 
+  /**
+   * Contenu binaire du PDF stocké EN BASE (cf. migration ...630). Le PDF
+   * n'est plus sur disque (FS éphémère sur PaaS). `select: false` : le
+   * blob (≤ 10 Mo) N'EST PAS chargé sur les `findOne`/`find` courants —
+   * uniquement via une requête ciblée au moment du téléchargement. Ça
+   * évite de tirer des mégaoctets sur chaque lecture de document et
+   * garantit qu'il n'est jamais sérialisé dans les réponses JSON.
+   */
+  @Column({
+    name: 'fichier_contenu',
+    type: 'bytea',
+    nullable: true,
+    select: false,
+  })
+  fichierContenu!: Buffer | null;
+
+  @Column({ name: 'fichier_taille', type: 'integer', nullable: true })
+  fichierTaille!: number | null;
+
+  @Column({
+    name: 'fichier_mime',
+    type: 'varchar',
+    length: 100,
+    nullable: true,
+  })
+  fichierMime!: string | null;
+
   @Column({
     name: 'utilisateur_creation',
     type: 'varchar',
